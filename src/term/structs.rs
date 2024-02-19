@@ -67,3 +67,36 @@ pub enum Term {
     /// 等价 | 暂不考虑对称性，后续判等时会优化
     Equivalence(TermRefType, TermRefType),
 }
+
+/// 词项类别
+/// * 🎯用于对词项快速分类
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TermCategory {
+    /// 原子词项
+    Atom,
+    /// 复合词项
+    Compound,
+    /// 陈述
+    Statement,
+}
+
+/// 词项容量
+/// * 🎯用于对词项快速分类
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TermCapability {
+    /// 原子
+    Atom,
+    /// 一元
+    Unary,
+    /// 二元序列
+    BinaryVec,
+    /// 二元集合
+    BinarySet,
+    /// （多元）序列
+    Vec,
+    /// （多元）集合
+    Set,
+}
+
+// 直接导出内部所有
+pub use Term::*;

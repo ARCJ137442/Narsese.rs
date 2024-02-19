@@ -6,8 +6,21 @@
 //!
 //! ⚠️【2024-02-19 10:58:46】暂不考虑通用性，仅考虑「MWE」
 
-pub mod terms;
-pub use terms::*;
+// 实用
+pub mod util;
+
+// 词项
+pub mod term;
+pub use term::*;
+
+// 语句
+pub mod sentence;
+
+// 任务
+pub mod task;
+
+// 转换
+pub mod conversion;
 
 #[cfg(test)]
 #[allow(unused)]

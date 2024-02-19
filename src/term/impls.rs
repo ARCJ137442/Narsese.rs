@@ -1,6 +1,9 @@
 //! 统一定义词项实现
 
-use crate::terms::structs::*;
+use crate::GetTerm;
+
+use super::structs::*;
+use std::any::type_name;
 use std::hash::Hash;
 
 // 实现 //
@@ -58,7 +61,7 @@ fn test_term_vec_for_image(placeholder_index: usize, vec: &TermVecType) {
     // 检查 | 判断索引是否越界
     // * 📌在`placeholder_index == vec.len()`时，相当于「像占位符在最后一个」的情况
     if placeholder_index > vec.len() {
-        panic!("placeholder index out of range")
+        panic!("占位符超出范围")
     }
 }
 
@@ -75,9 +78,6 @@ fn new_term_vec_for_image(
     // 返回
     vec
 }
-
-// 导出其中所有的枚举项
-use Term::*;
 
 /// 实现/构造函数
 impl Term {
@@ -335,6 +335,207 @@ mod test_new {
     }
 }
 
+/// 类型判断相关
+impl Term {
+    // 通用 //
+
+    /// 获取类型名称
+    /// * 📝Rust使用[`std::any`]实现类似「获取类型名」的反射代码
+    pub fn type_name(&self) -> &str {
+        type_name::<Self>()
+    }
+
+    /// 获取词项类别
+    pub fn get_category(&self) -> TermCategory {
+        match self {
+            // 原子词项
+            Word(..)
+            | VariableIndependent(..)
+            | VariableDependent(..)
+            | VariableQuery(..)
+            | Interval(..)
+            | Operator(..) => TermCategory::Atom,
+            // 复合词项
+            SetExtension(..)
+            | SetIntension(..)
+            | IntersectionExtension(..)
+            | IntersectionIntension(..)
+            | DifferenceExtension(..)
+            | DifferenceIntension(..)
+            | Product(..)
+            | ImageExtension(..)
+            | ImageIntension(..)
+            | Conjunction(..)
+            | Disjunction(..)
+            | Negation(..)
+            | ConjunctionSequential(..)
+            | ConjunctionParallel(..) => TermCategory::Compound,
+            // 陈述
+            Inheritance(..) | Similarity(..) | Implication(..) | Equivalence(..) => {
+                TermCategory::Statement
+            }
+        }
+    }
+
+    /// 获取词项容量
+    pub fn get_capacity(&self) -> TermCapability {
+        match self {
+            // 原子词项
+            Word(..)
+            | VariableIndependent(..)
+            | VariableDependent(..)
+            | VariableQuery(..)
+            | Interval(..)
+            | Operator(..) => TermCapability::Atom,
+            // 一元
+            Negation(..) => TermCapability::Unary,
+            // 二元序列
+            DifferenceExtension(..)
+            | DifferenceIntension(..)
+            | Inheritance(..)
+            | Implication(..) => TermCapability::BinaryVec,
+            // 二元集合
+            Similarity(..) | Equivalence(..) => TermCapability::BinarySet,
+            // 序列
+            Product(..) | ImageExtension(..) | ImageIntension(..) | ConjunctionSequential(..) => {
+                TermCapability::Vec
+            }
+            // 集合
+            SetExtension(..)
+            | SetIntension(..)
+            | IntersectionExtension(..)
+            | IntersectionIntension(..)
+            | Conjunction(..)
+            | Disjunction(..)
+            | ConjunctionParallel(..) => TermCapability::Set,
+        }
+    }
+
+    // 专用 //
+
+    /// 判型/原子词项
+    /// * 1 词语
+    /// * 6 独立变量
+    /// * 6 非独变量
+    /// * 6 查询变量
+    /// * 7 间隔
+    pub fn is_atom(&self) -> bool {
+        self.get_category() == TermCategory::Atom
+    }
+
+    /// 判型/复合词项
+    /// * 3 外延集
+    /// * 3 内涵集
+    /// * 3 外延交
+    /// * 3 内涵交
+    /// * 3 外延差
+    /// * 3 内涵差
+    /// * 4 乘积
+    /// * 4 外延像
+    /// * 4 内涵像
+    /// * 5 合取
+    /// * 5 析取
+    /// * 5 否定
+    /// * 7 顺序合取
+    /// * 7 平行合取
+    pub fn is_compound(&self) -> bool {
+        self.get_category() == TermCategory::Compound
+    }
+
+    /// 判型/陈述
+    /// * 1 继承
+    /// * 2 相似
+    /// * 5 蕴含
+    /// * 5 等价
+    pub fn is_statement(&self) -> bool {
+        self.get_category() == TermCategory::Statement
+    }
+
+    /// 获取词项作为原子词项的字符串名
+    /// * 对「间隔」而言，会转换成字符串形式
+    /// * ⚠️对**非原子词项**会**panic**
+    pub fn get_atom_name_unchecked(&self) -> String {
+        match self {
+            Word(name)
+            | VariableIndependent(name)
+            | VariableDependent(name)
+            | VariableQuery(name)
+            | Operator(name) => name.clone(),
+            Interval(interval) => interval.to_string(),
+            other => panic!("`{}`并非原子词项", other.type_name()),
+        }
+    }
+
+    /// 获取词项作为原子词项的字符串名
+    /// * 对「间隔」而言，会转换成字符串形式
+    /// * 📌当词项非原子词项时，返回[`None`]
+    pub fn get_atom_name(&self) -> Option<String> {
+        match self.is_atom() {
+            true => Some(self.get_atom_name_unchecked()),
+            false => None,
+        }
+    }
+
+    /// 获取词项作为复合词项的「所有词项」
+    /// * 📌原子词项⇒返回自身
+    /// * 📌陈述⇒返回主谓词
+    /// * 📝Rust会自动根据返回类型，为变量加引用/解引用
+    pub fn get_components(&self) -> Vec<&Term> {
+        match self {
+            // 原子词项⇒返回自身
+            Word(..)
+            | VariableIndependent(..)
+            | VariableDependent(..)
+            | VariableQuery(..)
+            | Interval(..)
+            | Operator(..) => vec![self],
+
+            // 一元容器⇒返回包装后的容器
+            Negation(term) => vec![term],
+
+            // 二元容器⇒返回包装后的容器
+            DifferenceExtension(term1, term2)
+            | DifferenceIntension(term1, term2)
+            | Inheritance(term1, term2)
+            | Similarity(term1, term2)
+            | Implication(term1, term2)
+            | Equivalence(term1, term2) => vec![term1, term2],
+
+            // 有序容器⇒返回拷贝后的容器
+            Product(vec)
+            | ImageExtension(_, vec)
+            | ImageIntension(_, vec)
+            | ConjunctionSequential(vec) => vec.iter().collect(),
+
+            // 集合容器⇒返回收集后的容器
+            SetExtension(set)
+            | SetIntension(set)
+            | IntersectionExtension(set)
+            | IntersectionIntension(set)
+            | Conjunction(set)
+            | Disjunction(set)
+            | ConjunctionParallel(set) => set.iter().collect(),
+        }
+    }
+
+    /// 获取词项作为复合词项的「所有词项」
+    /// * 📌仅对复合词项起效
+    ///   * ⚠️其它情况返回[`None`]
+    pub fn get_compound_components(&self) -> Option<Vec<&Term>> {
+        match self.is_compound() {
+            true => Some(self.get_components()),
+            false => None,
+        }
+    }
+}
+
+#[test]
+fn test_components() {
+    let set = Term::new_set_extension(vec![Term::new_word("a"), Term::new_word("b")]);
+    println!("set: {:?}", set.get_components());
+    assert_eq!(set.get_components().len(), 2);
+}
+
 /// 散列化「无序不重复词项容器」
 /// * ⚠️潜在假设：集合相同⇒遍历顺序相同⇒散列化顺序相同⇒散列化结果相同
 fn hash_term_set<H: std::hash::Hasher>(set: &TermSetType, state: &mut H) {
@@ -344,7 +545,7 @@ fn hash_term_set<H: std::hash::Hasher>(set: &TermSetType, state: &mut H) {
     }
 }
 
-/// 散列化逻辑
+/// 实现/散列化逻辑
 impl Hash for Term {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {
@@ -415,7 +616,7 @@ impl Hash for Term {
     }
 }
 
-/// 判等逻辑
+/// 实现/判等逻辑
 impl PartialEq for Term {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -462,3 +663,10 @@ impl PartialEq for Term {
 }
 /// 实现全相等
 impl Eq for Term {}
+
+/// 实现/获取词项
+impl GetTerm for Term {
+    fn get_term(&self) -> &Term {
+        &self
+    }
+}
