@@ -14,7 +14,7 @@
 ///     * ❌无法使用`From<f64>`的方法：[`f32`]未实现[`From<f64>`]特征，反之亦然
 pub type FloatPrecision = f64;
 /// 默认的整数精度
-/// * 🎯时间戳/固定时间
+/// * 🎯时间戳/固定时间 | OpenNARS/PyNARS均支持「负整数时间」
 pub type IntPrecision = isize;
 
 /// 「0-1」实数

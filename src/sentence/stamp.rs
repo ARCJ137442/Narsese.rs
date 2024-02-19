@@ -10,7 +10,7 @@
 use crate::util::IntPrecision;
 
 /// 时间戳
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Stamp {
     /// 永恒 | 空
     Eternal,
@@ -28,6 +28,11 @@ pub enum Stamp {
 
 /// 实现/属性
 impl Stamp {
+    /// 是否为「永恒」
+    pub fn is_eternal(&self) -> bool {
+        matches!(self, Stamp::Eternal)
+    }
+
     /// 是否为「固定时间」
     /// * 📝使用[`matches`]宏，快速判断「是否符合模式」
     pub fn is_fixed(&self) -> bool {

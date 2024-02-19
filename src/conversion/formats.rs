@@ -53,41 +53,65 @@ pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
         punctuation_question: "?",
         punctuation_quest: "@",
         stamp_brackets: (":", ":"),
-        stamp_predictive: "/",
-        stamp_concurrent: "|",
-        stamp_retrospective: "\\",
+        stamp_future: "/",
+        stamp_present: "|",
+        stamp_past: "\\",
         stamp_fixed: "!",
         truth_brackets: ("$", "$"),
         truth_separator: ";",
     },
     task: NarseseFormatTask {
-        truth_brackets: ("$", "$"),
-        truth_separator: ";",
+        budget_brackets: ("$", "$"),
+        budget_separator: ";",
     },
 };
 
 /// 单元测试
 #[cfg(test)]
-#[test]
-fn test_ascii() {
-    use crate::term::*;
-    let format = &FORMAT_ASCII;
-    println!("ASCII format: {format:#?}");
-    let term = Term::new_inheritance(Term::new_word("A"), Term::new_word("B"));
-    let term2 = Term::new_implication(
-        Term::new_inheritance(
-            Term::new_product(vec![
-                Term::new_set_extension(vec![Term::new_word("SELF")]),
-                Term::new_variable_independent("any"),
-                Term::new_variable_dependent("some"),
-            ]),
-            Term::new_operator("do"),
-        ),
-        Term::new_inheritance(
-            Term::new_set_extension(vec![Term::new_word("SELF")]),
-            Term::new_set_intension(vec![Term::new_word("good")]),
-        ),
-    );
-    println!("ASCII formatted term: {:#?}", format.format_term(&term));
-    println!("ASCII formatted term: {:#?}", format.format_term(&term2));
+mod tests {
+
+    use super::*;
+    use crate::*;
+
+    fn test_format(format: NarseseFormat<&str>) {
+        // 构造词项
+        let ball_left = Term::new_instance_property(Term::new_word("ball"), Term::new_word("left"));
+        let conditional_operation = Term::new_conjunction_sequential(vec![
+            ball_left.clone(),
+            Term::new_inheritance(
+                Term::new_product(vec![
+                    Term::new_set_extension(vec![Term::new_word("SELF")]),
+                    Term::new_variable_independent("any"),
+                    Term::new_variable_dependent("some"),
+                ]),
+                Term::new_operator("do"),
+            ),
+        ]);
+        let self_good = Term::new_instance_property(Term::new_word("SELF"), Term::new_word("good"));
+        let term = Term::new_implication(conditional_operation.clone(), self_good.clone());
+        // 构造语句
+        let truth = Truth::Double(1.0, 0.9);
+        let stamp = Stamp::Fixed(-1);
+        let sentence = Sentence::new_judgement(term.clone(), truth, stamp);
+        // 构造任务
+        let budget = Budget::Triple(0.5, 0.75, 0.4);
+        let task = Task::new(sentence.clone(), budget);
+        // 展示
+        println!(
+            "ASCII formatted term: {:#?}",
+            format.format_term(&self_good)
+        );
+        println!(
+            "ASCII formatted sentence: {:#?}",
+            format.format_sentence(&sentence)
+        );
+        println!("ASCII formatted task: {:#?}", format.format_task(&task));
+    }
+
+    #[test]
+    fn test_ascii() {
+        let format = FORMAT_ASCII;
+        println!("ASCII format: {format:#?}");
+        test_format(format);
+    }
 }

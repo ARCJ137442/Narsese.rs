@@ -218,6 +218,21 @@ impl Term {
     pub fn new_equivalence(subject: Term, predicate: Term) -> Self {
         Equivalence(new_term_ref_type(subject), new_term_ref_type(predicate))
     }
+
+    /// 实例（派生） | {S} --> P
+    pub fn new_instance(subject: Term, predicate: Term) -> Self {
+        Term::new_inheritance(Term::new_set_extension(vec![subject]), predicate)
+    }
+
+    /// 属性（派生） | S --> [P]
+    pub fn new_property(subject: Term, predicate: Term) -> Self {
+        Term::new_inheritance(subject, Term::new_set_intension(vec![predicate]))
+    }
+
+    /// 实例（派生） | {S} --> [P]
+    pub fn new_instance_property(subject: Term, predicate: Term) -> Self {
+        Term::new_inheritance(Term::new_set_extension(vec![subject]), Term::new_set_intension(vec![predicate]))
+    }
 }
 
 /// 单元测试/构造

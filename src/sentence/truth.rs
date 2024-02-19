@@ -13,7 +13,7 @@ use crate::util::{FloatPrecision, ZeroOneFloat};
 ///   * 空真值
 ///   * 单真值
 ///   * 双真值
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Truth {
     /// 空真值
     Empty,

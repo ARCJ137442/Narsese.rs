@@ -15,9 +15,11 @@ pub use term::*;
 
 // 语句
 pub mod sentence;
+pub use sentence::*;
 
 // 任务
 pub mod task;
+pub use task::*;
 
 // 转换
 pub mod conversion;
