@@ -28,6 +28,25 @@ pub use Sentence::*;
 
 /// 实现/构造
 impl Sentence {
+    /// 构造函数/从标点构造
+    /// * 🚩若需明确真值，不如直接使用下边的专用构造函数
+    /// * 此中真值在「无真值的语句类型」中会被舍去
+    pub fn from_punctuation(
+        term: Term,
+        punctuation: Punctuation,
+        stamp: Stamp,
+        truth: Truth,
+    ) -> Self {
+        match punctuation {
+            // 需要真值的
+            Punctuation::Judgement => Judgement(term, truth, stamp),
+            Punctuation::Goal => Goal(term, truth, stamp),
+            // 无需真值的
+            Punctuation::Question => Question(term, stamp),
+            Punctuation::Quest => Quest(term, stamp),
+        }
+    }
+
     /// 构造函数/判断
     pub fn new_judgement(term: Term, truth: Truth, stamp: Stamp) -> Self {
         Judgement(term, truth, stamp)
@@ -49,16 +68,24 @@ impl Sentence {
     }
 }
 
-
 /// 实现/属性
 impl Sentence {
+    /// 获取内部标点
+    pub fn get_punctuation(&self) -> Punctuation {
+        match self {
+            Judgement(..) => Punctuation::Judgement,
+            Goal(..) => Punctuation::Goal,
+            Question(..) => Punctuation::Question,
+            Quest(..) => Punctuation::Quest,
+        }
+    }
+
     /// 获取内部时间戳
     pub fn get_stamp(&self) -> &Stamp {
         match self {
-            Sentence::Judgement(_, _, stamp)
-            | Sentence::Goal(_, _, stamp)
-            | Sentence::Question(_, stamp)
-            | Sentence::Quest(_, stamp) => stamp,
+            Judgement(_, _, stamp) | Goal(_, _, stamp) | Question(_, stamp) | Quest(_, stamp) => {
+                stamp
+            }
         }
     }
 
@@ -66,9 +93,9 @@ impl Sentence {
     pub fn get_truth(&self) -> Option<&Truth> {
         match self {
             // 判断 | 目标 ⇒ 有真值
-            Sentence::Judgement(_, truth, _) | Sentence::Goal(_, truth, _) => Some(truth),
+            Judgement(_, truth, _) | Goal(_, truth, _) => Some(truth),
             // 问题 | 请求 ⇒ 无真值
-            Sentence::Question(..) | Sentence::Quest(..) => None,
+            Question(..) | Quest(..) => None,
         }
     }
 }
@@ -76,10 +103,7 @@ impl GetTerm for Sentence {
     /// 获取内部词项
     fn get_term(&self) -> &Term {
         match self {
-            Sentence::Judgement(term, _, _)
-            | Sentence::Goal(term, _, _)
-            | Sentence::Question(term, _)
-            | Sentence::Quest(term, _) => term,
+            Judgement(term, _, _) | Goal(term, _, _) | Question(term, _) | Quest(term, _) => term,
         }
     }
 }

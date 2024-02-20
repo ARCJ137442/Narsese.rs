@@ -1,7 +1,7 @@
 //! 记录Narsese的格式（数据结构）
 //! * 🎯提供CommonNarsese中所有的语法信息
 //!   * ⚠️仅作为「信息」使用，不提供任何 解析时/格式化时 优化
-//! * 📄部分定义参照自JuNarsese
+//! * 📄部分定义参照自[JuNarsese](https://github.com/ARCJ137442/JuNarsese.jl)
 //!
 //! 📝词项类型分类树
 //! * 原子词项

@@ -15,7 +15,7 @@ use crate::util::{FloatPrecision, ZeroOneFloat};
 ///   * 双真值
 #[derive(Debug, Clone, PartialEq)]
 pub enum Truth {
-    /// 空真值
+    /// 空真值（默认）
     Empty,
     /// 单真值
     Single(FloatPrecision),
