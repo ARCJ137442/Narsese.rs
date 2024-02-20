@@ -2,5 +2,6 @@
 //! * 解析
 //! * 格式化
 
-pub mod formats;
-pub mod formatter;
+// 字符串解析器 //
+
+pub mod string;

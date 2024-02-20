@@ -1,4 +1,4 @@
-use super::formatter::*;
+use super::format::*;
 
 /// ASCII格式
 pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
