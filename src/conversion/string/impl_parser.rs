@@ -25,7 +25,7 @@
 //!   * 📌解析函数总是从某个「起始位置」开始，通过系列解析过程，返回「解析结果」以及
 //!     * ✨有相应的「结果索引」类型
 
-use crate::{Budget, Punctuation, Sentence, Stamp, Task, Term, Truth};
+use crate::{first, Budget, Punctuation, Sentence, Stamp, Task, Term, Truth};
 use std::{error::Error, fmt::Display};
 
 use super::NarseseFormat;
@@ -95,11 +95,6 @@ type ParseIndex = usize;
 ///   * 📌关键差异：附带可设置的「中间解析结果」与「可变索引」
 ///   * 🚩子解析函数在解析之后，直接填充「中间解析结果」并修改「可变索引」
 type ParseResult = Result<NarseseResult, ParseError>;
-
-/// 用于表征「中间结果」
-/// * 带有「下一个要开始解析的对象」的开头索引（含）
-/// * ❗与「中间解析结果」的差异：是否在「解析组分」阶段
-type MidResult<T = NarseseResult, E = ParseError> = Result<(T, ParseIndex), E>;
 
 /// 用于表征「解析错误」
 /// * 📝不要依赖于任何外部引用：后续需要【脱离】解析环境
@@ -248,9 +243,67 @@ impl<'a> ParseState<'a, &str> {
     // 消耗文本 | 构建「中间解析结果」 //
 
     /// 构建「中间解析结果」/入口
+    /// * 🚩核心逻辑
+    ///   * 1 不断从「解析环境」中消耗文本（头部索引`head`右移）并置入「中间解析结果」中
+    ///   * 2 直到「头部索引」超过文本长度（越界）
     fn build_mid_result(&mut self) {
-        // TODO: 有待完成
+        let len_env = self.env.len();
+        // 重复直到「头部索引」超过文本长度
+        while self.head < len_env {
+            // 消耗文本&置入「中间结果」
+            self.consume_one();
+        }
     }
+
+    /// 检查自己的「解析环境」是否在「头部索引」处以指定字符串开头
+    fn starts_with(&self, to_compare: &str) -> bool {
+        for (i, c) in to_compare.chars().enumerate() {
+            if self.env[self.head + i] != c {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// 消耗文本&置入「中间结果」
+    /// * 头部索引移动
+    ///   * 📌无需顾忌「是否越界」
+    /// * 产生值并置入「中间解析结果」
+    ///
+    /// 💡📝可使用`match`简化重复的`if-else`逻辑
+    /// ! 📝`match`箭头的左边只能是
+    ///
+    fn consume_one(&mut self) {
+        // * 此处使用`match`纯属为了代码风格
+        first! {
+            // 空格⇒跳过
+            self.starts_with(self.format.space) => {
+                self.head += self.format.space.len();
+            },
+            // 陈述括弧开头⇒解析陈述
+            self.starts_with(self.format.statement.brackets.0) => {
+                self.head += self.format.space.len();
+            },
+            // 空格⇒跳过
+            self.starts_with(self.format.space) => {
+                self.head += self.format.space.len();
+            },
+            // 兜底⇒解析「原子词项」
+            _ => {
+                self.head += self.format.space.len();
+            }, // TODO: 有待完备
+        }
+    }
+
+    /// 消耗&置入/预算值
+    /// 消耗&置入/词项/原子
+    /// 消耗&置入/词项/复合（括弧）
+    /// 消耗&置入/词项/复合（外延集）
+    /// 消耗&置入/词项/复合（内涵集）
+    /// 消耗&置入/词项/陈述
+    /// 消耗&置入/标点
+    /// 消耗&置入/时间戳
+    /// 消耗&置入/真值
 
     // 组装 //
 

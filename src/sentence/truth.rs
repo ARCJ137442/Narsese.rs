@@ -73,6 +73,8 @@ impl Truth {
 /// 单元测试/真值
 #[cfg(test)]
 mod tests_truth {
+    use crate::fail_tests;
+
     use super::*;
 
     /// 辅助构造示例
@@ -110,54 +112,26 @@ mod tests_truth {
     }
 
     // invalid //
-    // TODO: 后续使用宏批量生成「失败测试」 | 难点：构造一个「断言所有指定行都会panic的测试」
+    fail_tests! {
+        // invalid - new | f | >1
+        test_new_invalid_f_up Truth::new_single(1.5);
 
-    /// invalid - new | f | >1
-    #[test]
-    #[should_panic]
-    fn test_new_invalid_f_up() {
-        Truth::new_single(1.5);
-    }
+        // invalid - new | f | <0
+        test_new_invalid_f_down Truth::new_single(-0.5);
 
-    /// invalid - new | f | <0
-    #[test]
-    #[should_panic]
-    fn test_new_invalid_f_down() {
-        Truth::new_single(-0.5);
-    }
+        // invalid - new | c | >1
+        test_new_invalid_c_up Truth::new_double(0.5, 1.5);
 
-    /// invalid - new | c | >1
-    #[test]
-    #[should_panic]
-    fn test_new_invalid_c_up() {
-        Truth::new_double(0.5, 1.5);
-    }
+        // invalid - new | c | <0
+        test_new_invalid_c_down Truth::new_double(0.5, -0.5);
 
-    /// invalid - new | c | <0
-    #[test]
-    #[should_panic]
-    fn test_new_invalid_c_down() {
-        Truth::new_double(0.5, -0.5);
-    }
+        // invalid - get | f | empty
+        test_get_invalid_f_empty Truth::new_empty().f();
 
-    /// invalid - get | f | empty
-    #[test]
-    #[should_panic]
-    fn test_get_invalid_f_empty() {
-        Truth::new_empty().f();
-    }
+        // invalid - get | c | empty
+        test_get_invalid_c_empty Truth::new_empty().c();
 
-    /// invalid - get | c | empty
-    #[test]
-    #[should_panic]
-    fn test_get_invalid_c_empty() {
-        Truth::new_empty().c();
-    }
-
-    /// invalid - get | c | single
-    #[test]
-    #[should_panic]
-    fn test_get_invalid_c_single() {
-        Truth::new_single(0.5).c();
+        // invalid - get | c | single
+        test_get_invalid_c_single Truth::new_single(0.5).c();
     }
 }
