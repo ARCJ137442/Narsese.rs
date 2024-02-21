@@ -57,7 +57,7 @@ pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
         stamp_present: "|",
         stamp_past: "\\",
         stamp_fixed: "!",
-        truth_brackets: ("$", "$"),
+        truth_brackets: ("%", "%"),
         truth_separator: ";",
     },
     task: NarseseFormatTask {

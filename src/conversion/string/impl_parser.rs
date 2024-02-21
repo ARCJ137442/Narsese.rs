@@ -25,7 +25,7 @@
 //!   * 📌解析函数总是从某个「起始位置」开始，通过系列解析过程，返回「解析结果」以及
 //!     * ✨有相应的「结果索引」类型
 
-use crate::{first, Budget, Punctuation, Sentence, Stamp, Task, Term, Truth};
+use crate::{first, util::FloatPrecision, Budget, Punctuation, Sentence, Stamp, Task, Term, Truth};
 use std::{error::Error, fmt::Display};
 
 use super::NarseseFormat;
@@ -202,6 +202,8 @@ impl<'a, C> ParseState<'a, C> {
 
     /// 重置状态到指定情形
     /// * 用于重定向上下文
+    /// * 📌自动内联
+    #[inline(always)]
     pub fn reset_to(&mut self, env: ParseEnv, head: ParseIndex) {
         self.env = env;
         self.head = head;
@@ -209,6 +211,8 @@ impl<'a, C> ParseState<'a, C> {
 
     /// 重置状态
     /// * 重置状态到默认情形：解析环境不变，头索引指向`0`
+    /// * 📌自动内联
+    #[inline(always)]
     pub fn reset(&mut self) {
         self.head = 0;
     }
@@ -235,6 +239,7 @@ impl<'a, C> ParseState<'a, C> {
 
     /// 生成「消耗成功」结果：无需内联自身状态
     /// * 🎯用于中间「消耗字符」的情况
+    /// * 📌自动内联
     #[inline(always)]
     pub fn ok_consume() -> ConsumeResult {
         Ok(())
@@ -390,6 +395,17 @@ impl<'a> ParseState<'a, &str> {
         self.head_step(to_be_skip.chars().count())
     }
 
+    /// 头索引跳过系列空白
+    /// * 🎯用于抽象「头部索引跳过空白序列」的过程
+    /// * 🚩逻辑：有多少空白跳过多少空白
+    /// * 📌自动内联
+    #[inline(always)]
+    fn head_skip_spaces(&mut self) {
+        while self.starts_with(self.format.space) {
+            self.head_skip(self.format.space);
+        }
+    }
+
     /// 构建「中间解析结果」/入口
     /// * 🚩核心逻辑
     ///   * 1 不断从「解析环境」中消耗文本（头部索引`head`右移）并置入「中间解析结果」中
@@ -397,8 +413,13 @@ impl<'a> ParseState<'a, &str> {
     fn build_mid_result(&mut self) -> ConsumeResult {
         // 在「可以继续消耗」时
         while self.can_consume() {
-            // 消耗文本&置入「中间结果」
-            self.consume_one()?;
+            // 索引跳过系列空白 | 用于处理对象之间的空白
+            self.head_skip_spaces();
+            // 仍能继续消耗⇒消耗文本
+            if self.can_consume() {
+                // 消耗文本&置入「中间结果」
+                self.consume_one()?;
+            }
         }
         // 返回「消耗成功」结果
         Self::ok_consume()
@@ -582,12 +603,92 @@ impl<'a> ParseState<'a, &str> {
         self.err("TODO!")
     }
 
+    /// 解析&置入/固定次数分隔的浮点数
+    /// * 使用常量`N`指定解析的数目
+    ///   * 多的会报错
+    ///   * 少的会忽略（额外返回「解析出的数目」作为标记）
+    fn parse_separated_floats<const N: usize>(
+        &mut self,
+        separator: &str,
+        right_bracket: &str,
+    ) -> ParseResult<([FloatPrecision; N], usize)> {
+        // 直接初始化定长数组
+        let mut result: [FloatPrecision; N] = [0.0; N];
+        // 构造数值缓冲区
+        let mut value_buffer = String::new();
+        // 填充数组
+        let mut i: usize = 0;
+        while self.can_consume() {
+            match self.head_char() {
+                // 空白⇒跳过
+                _ if self.starts_with(self.format.space) => self.head_skip(self.format.space),
+                // 小数点
+                // 数值|小数点⇒计入缓冲区&跳过
+                '.' | '0'..='9' => {
+                    value_buffer.push(self.head_char());
+                    self.head_step_one();
+                }
+                // 分隔符⇒解析并存入数值&跳过
+                _ if self.starts_with(separator) => {
+                    // 解析并存入数值
+                    match value_buffer.parse::<FloatPrecision>() {
+                        // 有效数值
+                        Ok(value) => {
+                            // 填充数组
+                            result[i] = value;
+                            // 清空缓冲区
+                            value_buffer.clear();
+                            // 跳过分隔符
+                            self.head_skip(separator);
+                            // 增加计数
+                            i += 1;
+                        }
+                        // 无效数值
+                        Err(_) => {
+                            // 无效数值
+                            return self.err(&format!("{value_buffer:?}不是有效的数值"));
+                        }
+                    }
+                    // 跳过
+                    self.head_skip(separator);
+                }
+                // 尾括弧⇒跳出循环 | 「跳出尾括弧」在循环外操作
+                _ if self.starts_with(right_bracket) => {
+                    break;
+                } // 其它⇒无效字符
+                c => return self.err(&format!("在解析浮点序列时出现无效字符{c:?}")),
+            }
+        }
+        // 返回最终结果
+        Ok((result, i + 1))
+    }
+
     /// 消耗&置入/真值
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
     fn consume_truth(&mut self) -> ConsumeResult {
-        // TODO: 有待完成
-        self.err("TODO!")
+        // 跳过左括弧
+        self.head_skip(self.format.sentence.truth_brackets.0);
+        let ([f, c], num) = self.parse_separated_floats::<2>(
+            self.format.sentence.truth_separator,
+            self.format.sentence.truth_brackets.1,
+        )?;
+        // 构造真值
+        let truth = match num {
+            // 无⇒空真值
+            0 => Truth::Empty,
+            // 单⇒单真值
+            1 => Truth::Single(f),
+            // 双⇒双真值
+            _ => Truth::Double(f, c),
+        };
+        // 跳过右括弧
+        self.head_skip(self.format.sentence.truth_brackets.1);
+        // 尝试置入真值
+        match Self::try_set(&mut self.mid_result.truth, truth, "真值") {
+            Some(message) => self.err(&message),
+            None => Self::ok_consume(),
+        }
     }
 
     /// 消耗&置入/词项
@@ -851,6 +952,7 @@ impl<'a> ParseState<'a, &str> {
 /// 总定义
 impl NarseseFormat<&str> {
     /// 构造解析状态
+    /// * 索引默认从开头开始
     pub fn build_parse_state<'a>(&'a self, input: &'a str) -> ParseState<'a, &str> {
         ParseState::new(self, input, 0)
     }
@@ -977,6 +1079,20 @@ mod tests_parse {
             // 格式×输入
             &format_ascii;
             "判断.", "目标!", "问题?", "请求@", "?查询变量vs问题?"
+        ];
+        show!(matrix);
+    }
+
+    /// 测试/真值（语句）
+    #[test]
+    fn test_parse_truth() {
+        let format_ascii = FORMAT_ASCII;
+        let matrix = f_matrix! [
+            // 应用的函数
+            _test_parse_sentence;
+            // 格式×输入
+            &format_ascii;
+            "判断. %1.0;0.9%", "目标! %.0;.9%", "问题?", "请求@"
         ];
         show!(matrix);
     }
