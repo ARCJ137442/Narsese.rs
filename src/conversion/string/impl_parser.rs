@@ -26,7 +26,7 @@
 //!     * ✨有相应的「结果索引」类型
 
 use crate::{first, util::FloatPrecision, Budget, Punctuation, Sentence, Stamp, Task, Term, Truth};
-use std::{error::Error, fmt::Display};
+use std::{error::Error, fmt::Display, io::ErrorKind};
 
 use super::NarseseFormat;
 
@@ -43,6 +43,44 @@ pub enum NarseseResult {
     Sentence(Sentence),
     /// 解析出来的任务
     Task(Task),
+}
+
+// 实现`(try_)From/To`转换方法
+impl TryFrom<NarseseResult> for Term {
+    type Error = std::io::Error;
+    fn try_from(value: NarseseResult) -> Result<Self, Self::Error> {
+        match value {
+            NarseseResult::Term(term) => Ok(term),
+            _ => Err(Self::Error::new(
+                ErrorKind::InvalidData,
+                format!("类型不匹配，无法转换为词项：{value:?}"),
+            )),
+        }
+    }
+}
+impl TryFrom<NarseseResult> for Sentence {
+    type Error = std::io::Error;
+    fn try_from(value: NarseseResult) -> Result<Self, Self::Error> {
+        match value {
+            NarseseResult::Sentence(sentence) => Ok(sentence),
+            _ => Err(Self::Error::new(
+                ErrorKind::InvalidData,
+                format!("类型不匹配，无法转换为语句：{value:?}"),
+            )),
+        }
+    }
+}
+impl TryFrom<NarseseResult> for Task {
+    type Error = std::io::Error;
+    fn try_from(value: NarseseResult) -> Result<Self, Self::Error> {
+        match value {
+            NarseseResult::Task(task) => Ok(task),
+            _ => Err(Self::Error::new(
+                ErrorKind::InvalidData,
+                format!("类型不匹配，无法转换为任务：{value:?}"),
+            )),
+        }
+    }
 }
 
 /// 定义「CommonNarsese组分」的结构
@@ -991,8 +1029,8 @@ impl NarseseFormat<&str> {
 #[cfg(test)]
 mod tests_parse {
     use crate::{
-        conversion::string::{impl_parser::NarseseResult, NarseseFormat, FORMAT_ASCII},
-        fail_tests, show,
+        conversion::string::{NarseseFormat, FORMAT_ASCII},
+        fail_tests, show, Sentence, Task, Term,
     };
 
     /// 生成「矩阵」
@@ -1032,16 +1070,14 @@ mod tests_parse {
         let result = format.parse(input);
         show!(&result);
         // 检验
-        let term = match result {
+        let term: Term = match result {
             // 词项⇒解析出词项
-            Ok(NarseseResult::Term(term)) => term,
+            Ok(result) => result.try_into().unwrap(),
             // 错误
             Err(e) => {
                 show!(e);
                 panic!("词项解析失败");
             }
-            // 别的解析结果
-            _ => panic!("解析出来的不是词项！{result:?}"),
         };
         // 展示
         show!(term);
@@ -1077,16 +1113,14 @@ mod tests_parse {
         let result = format.parse(input);
         show!(&result);
         // 检验
-        let term = match result {
+        let sentence: Sentence = match result {
             // 语句⇒解析出语句
-            Ok(NarseseResult::Sentence(sentence)) => sentence,
+            Ok(result) => result.try_into().unwrap(),
             // 错误
             Err(e) => panic!("语句解析失败{e}"),
-            // 别的解析结果
-            _ => panic!("解析出来的不是语句！{result:?}"),
         };
         // 展示
-        show!(term);
+        show!(sentence);
     }
 
     /// 测试/标点（语句）
@@ -1108,16 +1142,14 @@ mod tests_parse {
         let result = format.parse(input);
         show!(&result);
         // 检验
-        let term = match result {
+        let task: Task = match result {
             // 任务⇒解析出任务
-            Ok(NarseseResult::Task(task)) => task,
+            Ok(result) => result.try_into().unwrap(),
             // 错误
             Err(e) => panic!("任务解析失败{e}"),
-            // 别的解析结果
-            _ => panic!("解析出来的不是任务！{result:?}"),
         };
         // 展示
-        show!(term);
+        show!(task);
     }
 
     /// 测试/真值（语句）
