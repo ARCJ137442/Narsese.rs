@@ -504,14 +504,6 @@ impl<'a> ParseState<'a, &str> {
         }
     }
 
-    /// 消耗&置入/预算值
-    /// * 📌传入之前提：已识别出相应的「特征开头」
-    /// * 📌需要在此完成专有的挪位
-    fn consume_budget(&mut self) -> ConsumeResult {
-        // TODO: 有待完成
-        self.err("TODO!")
-    }
-
     /// 工具函数/尝试置入
     /// * 🚩仅对单个[`Option`]对象
     /// * 返回
@@ -595,14 +587,6 @@ impl<'a> ParseState<'a, &str> {
         self._try_set_punctuation(Punctuation::Quest)
     }
 
-    /// 消耗&置入/时间戳
-    /// * 📌传入之前提：已识别出相应的「特征开头」
-    /// * 📌需要在此完成专有的挪位
-    fn consume_stamp(&mut self) -> ConsumeResult {
-        // TODO: 有待完成
-        self.err("TODO!")
-    }
-
     /// 解析&置入/固定次数分隔的浮点数
     /// * 使用常量`N`指定解析的数目
     ///   * 多的会报错
@@ -661,6 +645,14 @@ impl<'a> ParseState<'a, &str> {
         Ok((result, i + 1))
     }
 
+    /// 消耗&置入/时间戳
+    /// * 📌传入之前提：已识别出相应的「特征开头」
+    /// * 📌需要在此完成专有的挪位
+    fn consume_stamp(&mut self) -> ConsumeResult {
+        // TODO: 有待完成
+        self.err("TODO!")
+    }
+
     /// 消耗&置入/真值
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
@@ -684,6 +676,36 @@ impl<'a> ParseState<'a, &str> {
         self.head_skip(self.format.sentence.truth_brackets.1);
         // 尝试置入真值
         match Self::try_set(&mut self.mid_result.truth, truth, "真值") {
+            Some(message) => self.err(&message),
+            None => Self::ok_consume(),
+        }
+    }
+
+    /// 消耗&置入/预算值
+    /// * 📌传入之前提：已识别出相应的「特征开头」
+    /// * 📌需要在此完成专有的挪位
+    fn consume_budget(&mut self) -> ConsumeResult {
+        // 跳过左括弧
+        self.head_skip(self.format.task.budget_brackets.0);
+        let ([p, d, q], num) = self.parse_separated_floats::<3>(
+            self.format.task.budget_separator,
+            self.format.task.budget_brackets.1,
+        )?;
+        // 构造预算
+        let budget = match num {
+            // 无⇒空预算
+            0 => Budget::Empty,
+            // 单⇒单预算
+            1 => Budget::Single(p),
+            // 双⇒双预算
+            2 => Budget::Double(p, d),
+            // 三⇒三预算
+            _ => Budget::Triple(p, d, q),
+        };
+        // 跳过右括弧
+        self.head_skip(self.format.task.budget_brackets.1);
+        // 尝试置入预算
+        match Self::try_set(&mut self.mid_result.budget, budget, "预算值") {
             Some(message) => self.err(&message),
             None => Self::ok_consume(),
         }
@@ -1070,27 +1092,59 @@ mod tests_parse {
     /// 测试/标点（语句）
     #[test]
     fn test_parse_punctuation() {
-        let format_ascii = FORMAT_ASCII;
         let matrix = f_matrix! [
-            // 应用的函数
-            _test_parse_sentence;
-            // 格式×输入
-            &format_ascii;
-            "判断.", "目标!", "问题?", "请求@", "?查询变量vs问题?"
+        // 应用的函数
+        _test_parse_sentence;
+        // 格式×输入
+        &FORMAT_ASCII;
+        "判断.", "目标!", "问题?", "请求@", "?查询变量vs问题?"
         ];
         show!(matrix);
+    }
+
+    /// 通用测试/任务
+    fn _test_parse_task(format: &NarseseFormat<&str>, input: &str) {
+        // 解析
+        let result = format.parse(input);
+        show!(&result);
+        // 检验
+        let term = match result {
+            // 任务⇒解析出任务
+            Ok(NarseseResult::Task(task)) => task,
+            // 错误
+            Err(e) => panic!("任务解析失败{e}"),
+            // 别的解析结果
+            _ => panic!("解析出来的不是任务！{result:?}"),
+        };
+        // 展示
+        show!(term);
     }
 
     /// 测试/真值（语句）
     #[test]
     fn test_parse_truth() {
-        let format_ascii = FORMAT_ASCII;
         let matrix = f_matrix! [
             // 应用的函数
             _test_parse_sentence;
             // 格式×输入
-            &format_ascii;
+            &FORMAT_ASCII;
             "判断. %1.0;0.9%", "目标! %.0;.9%", "问题?", "请求@"
+        ];
+        show!(matrix);
+    }
+
+    /// 测试/预算值（任务）
+    #[test]
+    fn test_parse_budget() {
+        let matrix = f_matrix! [
+            // 应用的函数
+            _test_parse_task;
+            // 格式×输入
+            &FORMAT_ASCII;
+            "$0.5;0.5;0.5$ 判断. %1.0;0.9%",
+            "$.7;.75;0.555$目标! %.0;.9%",
+            "$1;1;1$ 问题?",
+            "$0;0;0$请求@"
         ];
         show!(matrix);
     }
