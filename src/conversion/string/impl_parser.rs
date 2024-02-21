@@ -94,7 +94,10 @@ type ParseIndex = usize;
 /// * 现在是基于「解析器状态」的「状态机模型」
 ///   * 📌关键差异：附带可设置的「中间解析结果」与「可变索引」
 ///   * 🚩子解析函数在解析之后，直接填充「中间解析结果」并修改「可变索引」
-type ParseResult = Result<NarseseResult, ParseError>;
+type ParseResult<T = NarseseResult> = Result<T, ParseError>;
+/// 用于表征「令牌消耗结果」
+/// * 🎯用于在出错时传播错误
+type ConsumeResult = ParseResult<()>;
 
 /// 用于表征「解析错误」
 /// * 📝不要依赖于任何外部引用：后续需要【脱离】解析环境
@@ -161,6 +164,8 @@ pub struct ParseState<'a, Content> {
     format: &'a NarseseFormat<Content>,
     /// 「解析环境」
     env: ParseEnv,
+    /// 「解析环境」的长度 | 用于缓存常用变量
+    len_env: usize,
     /// 当前解析的位置 | 亦用作「下一起始索引」
     head: ParseIndex,
     /// 「中间解析结果」
@@ -176,11 +181,18 @@ impl<'a, C> ParseState<'a, C> {
         input: &'a str,
         head: ParseIndex,
     ) -> ParseState<'a, C> {
+        // 生成解析环境
+        let env = ParseState::_build_env(input);
+        // 生成环境长度 // ! 直接插入会有「同时引用」的所有权问题
+        let len_env = env.len();
+        // 构造结构体
         ParseState {
             // 直接指向格式
             format,
-            // 指向环境
-            env: ParseState::_build_env(input),
+            // 置入环境
+            env,
+            // 置入环境长度
+            len_env,
             // 从首个索引开始
             head,
             // 从空结果开始
@@ -212,8 +224,15 @@ impl<'a, C> ParseState<'a, C> {
     /// * 🎯用于最后「生成结果」的情况
     /// * 📝生成的结果不能与自身有任何瓜葛
     ///   * 📌后续「错误」中引用的「解析环境」可能在「状态销毁」后导致「悬垂引用」问题
-    pub fn err(&self, message: &str) -> ParseResult {
+    /// * 📝合并「消耗错误」结果：泛型参数可以自动捕获返回类型
+    pub fn err<T>(&self, message: &str) -> ParseResult<T> {
         Err(ParseError::new(message, self.env.clone(), self.head))
+    }
+
+    /// 生成「消耗成功」结果：直接根据值内联自身解析状态
+    /// * 🎯用于中间「消耗字符」的情况
+    pub fn ok_consume(&self) -> ConsumeResult {
+        Ok(())
     }
 }
 
@@ -237,6 +256,53 @@ macro_rules! first_method {
     };
 }
 
+/// 匹配并执行第一个成功匹配的分支
+/// * 🎯用于快速识别开头并执行代码
+///   * 📌对匹配失败者：还原头索引，并继续下一匹配
+/// * 📌用于消歧义：💢「独立变量」和「预算值」开头撞了
+/// 📝`self`是一个内容相关的关键字，必须向其中传递`self`作为参数
+macro_rules! first_method_ok {
+    {
+        // * 传入「self.方法名」作为被调用的方法
+        $self_:ident . $method_name:ident;
+        // * 传入「self.方法名」作为「移动头索引」的方法
+        $self_move:ident . $method_move:ident;
+        // * 传入「当前头索引」表达式
+        $original_head:expr;
+        // * 传入所有的分支
+        $( $pattern:expr => $branch:expr ),*,
+        // * 传入「else」分支
+        _ => $branch_else:expr $(,)?
+    } => {
+        {
+            // 缓存「头索引」
+            let original_head = $original_head;
+            let mut result;
+            // 插入`first!`宏中
+            first! {
+                $(
+                    // 每一个条件分支
+                    (
+                        // 先决条件：匹配判别方法
+                        $self_.$method_name($pattern)
+                        // 后续条件：是否执行成功
+                        && {
+                            // 回到原始头索引
+                            $self_move.$method_move(original_head);
+                            // 预先计算结果
+                            result = $branch;
+                            // 尝试匹配模式：只有`Ok`能截断返回
+                            matches!(result, Ok(_))
+                        }
+                    ) => result
+                ),*,
+                // 以上条件均失效时，匹配的分支
+                _ => $branch_else
+            }
+        }
+    };
+}
+
 /// ✨实现/解析 @ 静态字串
 /// 🚩整体解析流程
 /// 1. 构建解析环境
@@ -251,28 +317,86 @@ impl<'a> ParseState<'a, &str> {
     fn _build_env(input: &'a str) -> ParseEnv {
         input.chars().collect()
     }
-
     /// 解析总入口 | 全部使用自身状态
     pub fn parse(&mut self) -> ParseResult {
         // 消耗文本，构建「中间解析结果」
-        self.build_mid_result();
+        self.build_mid_result()?;
         // 转换解析结果
         self.transform_mid_result()
     }
 
     // 消耗文本 | 构建「中间解析结果」 //
 
+    /// 判断「是否可继续消耗」
+    /// * 🎯用于抽象「是否可（向右）消耗」的逻辑
+    /// * 🚩逻辑：判断「头部索引」是否超出范围`[0, 解析环境长度)`
+    /// * 📌自动内联
+    #[inline(always)]
+    fn can_consume(&self) -> bool {
+        self.head < self.len_env
+    }
+
+    /// 获取当前字符
+    /// * 🎯用于抽象「获取当前字符」的逻辑
+    /// * 🚩逻辑：获取当前字符
+    /// * 📌自动内联
+    /// * ⚠️未检查边界，可能会panic
+    #[inline(always)]
+    fn head_char(&self) -> char {
+        self.env[self.head]
+    }
+
+    /// 头索引移动
+    /// * 🎯用于抽象「头部索引移动到指定位置」的过程
+    ///   * ⚠️基于字符，不是字节
+    /// * 🚩逻辑：头部索引赋值
+    /// * 📌自动内联
+    #[inline(always)]
+    fn head_move(&mut self, to: ParseIndex) {
+        self.head = to;
+    }
+
+    /// 头索引递进
+    /// * 🎯用于抽象「头部索引位移」的过程
+    ///   * ⚠️跳过的是字符，不是字节
+    /// * 🚩逻辑：头部索引增加赋值
+    /// * 📌自动内联
+    #[inline(always)]
+    fn head_step(&mut self, step: usize) {
+        self.head += step;
+    }
+
+    /// 头索引移位（单个字符）
+    /// * 🎯用于抽象「头部索引递进」的过程
+    /// * 🚩逻辑：头部索引递进一个字符
+    /// * 📌自动内联
+    #[inline(always)]
+    fn head_step_one(&mut self) {
+        self.head_step(1)
+    }
+
+    /// 头索引跳过
+    /// * 🎯用于抽象「头部索引跳过」的过程
+    /// * 🚩逻辑：头部索引根据字符数量递进
+    /// * 📌自动内联
+    #[inline(always)]
+    fn head_skip(&mut self, to_be_skip: &str) {
+        // 跳过「字符数」个字符
+        self.head_step(to_be_skip.chars().count())
+    }
+
     /// 构建「中间解析结果」/入口
     /// * 🚩核心逻辑
     ///   * 1 不断从「解析环境」中消耗文本（头部索引`head`右移）并置入「中间解析结果」中
     ///   * 2 直到「头部索引」超过文本长度（越界）
-    fn build_mid_result(&mut self) {
-        let len_env = self.env.len();
-        // 重复直到「头部索引」超过文本长度
-        while self.head < len_env {
+    fn build_mid_result(&mut self) -> ConsumeResult {
+        // 在「可以继续消耗」时
+        while self.can_consume() {
             // 消耗文本&置入「中间结果」
-            self.consume_one();
+            self.consume_one()?;
         }
+        // 返回「消耗成功」结果
+        self.ok_consume()
     }
 
     /// 检查自己的「解析环境」是否在「头部索引」处以指定字符串开头
@@ -293,12 +417,20 @@ impl<'a> ParseState<'a, &str> {
     /// * 此处使用`first!`代表「截断条件表达式」
     /// * 📌该函数仅承担分支工作
     ///   * 「头部索引位移」在分支中进行
+    ///   * 当前一分支失败（返回Err）时，自动尝试匹配下一个分支
+    ///     * 🎯用于解决「『预算值』『独立变量』相互冲突」的问题
     ///
-    fn consume_one(&mut self) {
-        first_method! {
+    fn consume_one(&mut self) -> ConsumeResult {
+        first_method_ok! {
+            // 匹配开头
             self.starts_with;
+            // 当匹配失败时移回原始索引
+            self.head_move;
+            // 要缓存的索引
+            self.head;
+
             // 空格⇒跳过 //
-            self.format.space => self.head += self.format.space.len(),
+            self.format.space => Ok(self.head_skip(self.format.space)),
             // 预算值 //
             self.format.task.budget_brackets.0 => self.consume_budget(),
             // 标点 // ⚠️因开头不同且无法兜底，故直接内联至此
@@ -322,115 +454,226 @@ impl<'a> ParseState<'a, &str> {
     /// 消耗&置入/预算值
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
-    fn consume_budget(&mut self) {
+    fn consume_budget(&mut self) -> ConsumeResult {
         // TODO: 有待完成
-        todo!()
+        self.err("TODO!")
     }
 
     /// 消耗&置入/标点/判断
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
-    fn consume_punctuation_judgement(&mut self) {
+    fn consume_punctuation_judgement(&mut self) -> ConsumeResult {
         // TODO: 有待完成
-        todo!()
+        self.err("TODO!")
     }
 
     /// 消耗&置入/标点/目标
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
-    fn consume_punctuation_goal(&mut self) {
+    fn consume_punctuation_goal(&mut self) -> ConsumeResult {
         // TODO: 有待完成
-        todo!()
+        self.err("TODO!")
     }
 
     /// 消耗&置入/标点/问题
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
-    fn consume_punctuation_question(&mut self) {
+    fn consume_punctuation_question(&mut self) -> ConsumeResult {
         // TODO: 有待完成
-        todo!()
+        self.err("TODO!")
     }
 
     /// 消耗&置入/标点/请求
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
-    fn consume_punctuation_quest(&mut self) {
+    fn consume_punctuation_quest(&mut self) -> ConsumeResult {
         // TODO: 有待完成
-        todo!()
+        self.err("TODO!")
     }
 
     /// 消耗&置入/时间戳
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
-    fn consume_stamp(&mut self) {
+    fn consume_stamp(&mut self) -> ConsumeResult {
         // TODO: 有待完成
-        todo!()
+        self.err("TODO!")
     }
 
     /// 消耗&置入/真值
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
-    fn consume_truth(&mut self) {
+    fn consume_truth(&mut self) -> ConsumeResult {
         // TODO: 有待完成
-        todo!()
+        self.err("TODO!")
     }
 
     /// 消耗&置入/词项
+    /// * 🚩消耗&解析出一个词项，然后置入「中间解析结果」中
+    /// * 📌需要递归解析，因此不能直接开始「置入」
+    fn consume_term(&mut self) -> ConsumeResult {
+        // 先解析词项
+        let term = self.parse_term()?;
+        // 置入词项
+        match self.mid_result.term {
+            // 已有⇒报错
+            Some(_) => self.err("重复的词项"),
+            // 无⇒置入&结束
+            None => {
+                // 置入 // ! 无需使用其返回值
+                let _ = self.mid_result.term.insert(term);
+                // 结束
+                self.ok_consume()
+            }
+        }
+    }
+
+    /// 消耗&解析/词项
     /// * 🎯仍然只负责分派方法
-    fn consume_term(&mut self) {
+    ///   * 乃至无需`?`语法糖（错误直接传递，而无需提取值）
+    fn parse_term(&mut self) -> ParseResult<Term> {
         first_method! {
             self.starts_with;
             // 词项/外延集
-            self.format.compound.brackets_set_extension.0 => self.consume_compound_set_extension(),
+            self.format.compound.brackets_set_extension.0 => self.parse_compound_set_extension(),
             // 词项/内涵集
-            self.format.compound.brackets_set_intension.0 => self.consume_compound_set_intension(),
+            self.format.compound.brackets_set_intension.0 => self.parse_compound_set_intension(),
             // 词项/复合词项
-            self.format.compound.brackets.0 => self.consume_compound(),
+            self.format.compound.brackets.0 => self.parse_compound(),
             // 词项/陈述
-            self.format.statement.brackets.0 => self.consume_statement(),
+            self.format.statement.brackets.0 => self.parse_statement(),
             // 词项/原子（兜底）
-            _ => self.consume_atom()
+            _ => self.parse_atom()
         }
     }
 
     /// 消耗&置入/词项/复合（外延集）
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
-    fn consume_compound_set_extension(&mut self) {
+    fn parse_compound_set_extension(&mut self) -> ParseResult<Term> {
         // TODO: 有待完成
-        todo!()
+        self.err("TODO!")
     }
 
     /// 消耗&置入/词项/复合（内涵集）
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
-    fn consume_compound_set_intension(&mut self) {
+    fn parse_compound_set_intension(&mut self) -> ParseResult<Term> {
         // TODO: 有待完成
-        todo!()
+        self.err("TODO!")
     }
 
     /// 消耗&置入/词项/复合（括弧）
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
-    fn consume_compound(&mut self) {
+    fn parse_compound(&mut self) -> ParseResult<Term> {
         // TODO: 有待完成
-        todo!()
+        self.err("TODO!")
     }
 
     /// 消耗&置入/词项/陈述
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
-    fn consume_statement(&mut self) {
+    fn parse_statement(&mut self) -> ParseResult<Term> {
         // TODO: 有待完成
-        todo!()
+        self.err("TODO!")
     }
 
     /// 消耗&置入/词项/原子
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
-    fn consume_atom(&mut self) {
-        // TODO: 有待完成
-        todo!()
+    fn parse_atom(&mut self) -> ParseResult<Term> {
+        // 消耗前缀，并以此预置「词项」
+        let mut term;
+        first_method! {
+            self.starts_with;
+            // 占位符 | 此举相当于识别以「_」开头的词项
+            self.format.atom.prefix_placeholder => {
+                // 词项赋值
+                term = Term::new_placeholder();
+                // 头索引跳过
+                self.head_skip(self.format.atom.prefix_placeholder);
+            },
+            // 独立变量
+            self.format.atom.prefix_variable_independent => {
+                // 词项赋值
+                term = Term::new_variable_independent("");
+                // 头索引跳过
+                self.head_skip(self.format.atom.prefix_variable_independent);
+            },
+            // 非独变量
+            self.format.atom.prefix_variable_dependent => {
+                // 词项赋值
+                term = Term::new_variable_dependent("");
+                // 头索引跳过
+                self.head_skip(self.format.atom.prefix_variable_dependent);
+            },
+            // 查询变量
+            self.format.atom.prefix_variable_query => {
+                // 词项赋值
+                term = Term::new_variable_query("");
+                // 头索引跳过
+                self.head_skip(self.format.atom.prefix_variable_query);
+            },
+            // 间隔
+            self.format.atom.prefix_interval => {
+                // 词项赋值
+                term = Term::new_interval(0);
+                // 头索引跳过
+                self.head_skip(self.format.atom.prefix_interval);
+            },
+            // 操作符
+            self.format.atom.prefix_operator => {
+                // 词项赋值
+                term = Term::new_operator("");
+                // 头索引跳过
+                self.head_skip(self.format.atom.prefix_operator);
+            },
+            // 词语 | ⚠️必须以此兜底（空字串也算前缀）
+            self.format.atom.prefix_word => {
+                term = Term::new_word("");
+                // 头索引跳过
+                self.head_skip(self.format.atom.prefix_word);
+            },
+            _ => {
+                return self.err("未知的原子词项前缀")
+            }
+            //
+        }
+        // 新建缓冲区
+        let mut name_buffer = String::new();
+        let mut head_char;
+        // 可消耗时重复，加载进名称缓冲区
+        while self.can_consume() {
+            // 获取头部字符
+            head_char = self.head_char();
+            match head_char {
+                // 合法词项名字符⇒加入缓冲区&递进 //
+                // * 📝匹配守卫作用于整个匹配项，故无法混用「|」与「_ if」
+                // 特殊匹配：横杠/下划线
+                '-' | '_' => {
+                    // 加入缓冲区
+                    name_buffer.push(head_char);
+                    // 跳过当前字符
+                    self.head_step_one();
+                }
+                // * 📌标准：数字/文字
+                _ if head_char.is_alphanumeric() => {
+                    // 加入缓冲区
+                    name_buffer.push(head_char);
+                    // 跳过当前字符
+                    self.head_step_one();
+                }
+                // 非法字符⇒结束循环 | 此时已自动消耗到「下一起始位置」 //
+                _ => break,
+            }
+        }
+        // 尝试将缓冲区转为词项名，返回词项/错误
+        match term.set_atom_name(&name_buffer) {
+            // 成功⇒返回词项
+            Ok(_) => Ok(term),
+            // 失败⇒传播错误 | 💭总是要转换错误类型
+            Err(_) => self.err(&format!("非法词项名 {name_buffer:?}")),
+        }
     }
 
     // 组装 //
@@ -519,7 +762,7 @@ impl<'a> ParseState<'a, &str> {
     }
 }
 
-/// 总解析函数
+/// 总定义
 impl NarseseFormat<&str> {
     /// 构造解析状态
     pub fn build_parse_state<'a>(&'a self, input: &'a str) -> ParseState<'a, &str> {
@@ -539,17 +782,69 @@ impl NarseseFormat<&str> {
 /// 单元测试
 #[cfg(test)]
 mod tests_parse {
-    use crate::conversion::string::FORMAT_ASCII;
+    use crate::{
+        conversion::string::{impl_parser::NarseseResult, NarseseFormat, FORMAT_ASCII},
+        show,
+    };
+
+    /// 用于生成测试矩阵
+    macro_rules! f_matrix {
+        [
+            $f:ident;
+            $($format:expr),+ $(,)?;
+            $($input:expr),+ $(,)? $(;)?
+        ] => {
+            {
+                // 新建一个矩阵
+                let mut matrix = vec![];
+                // 生成行列
+                let formats = [$($format),+];
+                let inputs = [$($input),+];
+                // 给矩阵添加元素
+                for format in formats {
+                    // 新建一个列
+                    let mut col = vec![];
+                    // 生成列元素
+                    for input in inputs {
+                        col.push($f(format, input))
+                    }
+                    // 添加列
+                    matrix.push((format, col));
+                }
+                // 返回矩阵
+                matrix
+            }
+        };
+    }
+
+    fn _test_parse_atom(format: &NarseseFormat<&str>, input: &str) {
+        // 解析
+        let result = format.parse(input);
+        show!(&result);
+        // 检验
+        let term = match result {
+            // 词项⇒解析出词项
+            Ok(NarseseResult::Term(term)) => term,
+            // 错误
+            Err(e) => panic!("词项解析失败{e}"),
+            // 别的解析结果
+            _ => panic!("解析出来的不是词项！{result:?}"),
+        };
+        // 展示
+        show!(term);
+    }
+    #[test]
+    fn test_parse_atom() {
+        let format_ascii = FORMAT_ASCII;
+        let matrix = f_matrix! [
+            _test_parse_atom;
+            &format_ascii;
+            "word", "_", "$i_var", "#d_var", "?q_var", "+137", "^op";
+        ];
+        show!(matrix);
+    }
 
     // 词项
     #[test]
-    fn test_parse_term() {
-        let format = FORMAT_ASCII;
-        let input = "A";
-        let result = format.parse(input);
-        println!("result: {result:?}");
-        assert!(result.is_ok());
-        let term = result.unwrap();
-        println!("{term:?}");
-    }
+    fn test_parse_term() {}
 }

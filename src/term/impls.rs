@@ -4,7 +4,9 @@ use crate::GetTerm;
 
 use super::structs::*;
 use std::any::type_name;
+use std::error::Error;
 use std::hash::Hash;
+use std::io::ErrorKind;
 
 // 实现 //
 
@@ -59,7 +61,7 @@ fn from_term_settable_to_term_vec(settable: impl IntoIterator<Item = Term>) -> T
 /// * ⚠️若不合法，则panic
 fn test_term_vec_for_image(placeholder_index: usize, vec: &TermVecType) {
     // 检查 | 判断索引是否越界
-    // * 📌在`placeholder_index == vec.len()`时，相当于「像占位符在最后一个」的情况
+    // * 📌在`placeholder_index == vec.len()`时，相当于「占位符在最后一个」的情况
     if placeholder_index > vec.len() {
         panic!("占位符超出范围")
     }
@@ -73,7 +75,7 @@ fn new_term_vec_for_image(
     // 创建
     let vec = from_term_settable_to_term_vec(terms);
     // 检查 | 判断索引是否越界
-    // * 📌在`placeholder_index == vec.len()`时，相当于「像占位符在最后一个」的情况
+    // * 📌在`placeholder_index == vec.len()`时，相当于「占位符在最后一个」的情况
     test_term_vec_for_image(placeholder_index, &vec);
     // 返回
     vec
@@ -86,6 +88,11 @@ impl Term {
     /// 构造/词语
     pub fn new_word(word: &str) -> Self {
         Word(word.to_string())
+    }
+
+    /// 构造/占位符
+    pub fn new_placeholder() -> Self {
+        PlaceHolder
     }
 
     /// 构造/独立变量
@@ -229,9 +236,12 @@ impl Term {
         Term::new_inheritance(subject, Term::new_set_intension(vec![predicate]))
     }
 
-    /// 实例（派生） | {S} --> [P]
+    /// 实例属性（派生） | {S} --> [P]
     pub fn new_instance_property(subject: Term, predicate: Term) -> Self {
-        Term::new_inheritance(Term::new_set_extension(vec![subject]), Term::new_set_intension(vec![predicate]))
+        Term::new_inheritance(
+            Term::new_set_extension(vec![subject]),
+            Term::new_set_intension(vec![predicate]),
+        )
     }
 }
 
@@ -313,7 +323,7 @@ mod test_new {
         _universal(&Term::new_equivalence(a_c(), b_c()));
     }
 
-    /// 测试合法的像占位符位置
+    /// 测试合法的占位符位置
     /// * 复杂度：O(N²)
     #[test]
     fn valid_image() {
@@ -328,7 +338,7 @@ mod test_new {
                 vec.push(x.clone());
             }
             assert_eq!(vec.len(), len);
-            // 测试所有位置的像占位符
+            // 测试所有位置的占位符
             for i in 0..(len + 1) {
                 test_term_vec_for_image(i, &vec);
             }
@@ -365,6 +375,7 @@ impl Term {
         match self {
             // 原子词项
             Word(..)
+            | PlaceHolder
             | VariableIndependent(..)
             | VariableDependent(..)
             | VariableQuery(..)
@@ -397,6 +408,7 @@ impl Term {
         match self {
             // 原子词项
             Word(..)
+            | PlaceHolder
             | VariableIndependent(..)
             | VariableDependent(..)
             | VariableQuery(..)
@@ -467,7 +479,8 @@ impl Term {
     }
 
     /// 获取词项作为原子词项的字符串名
-    /// * 对「间隔」而言，会转换成字符串形式
+    /// * 🚩返回新字串，而非原字串
+    /// * 🚩对「间隔」而言，会转换成字符串形式
     /// * ⚠️对**非原子词项**会**panic**
     pub fn get_atom_name_unchecked(&self) -> String {
         match self {
@@ -476,18 +489,62 @@ impl Term {
             | VariableDependent(name)
             | VariableQuery(name)
             | Operator(name) => name.clone(),
+            // 特殊处理/占位符 ⇒ 空名
+            PlaceHolder => String::new(),
+            // 特殊处理/间隔 ⇒ 转换数值为字符串形式
             Interval(interval) => interval.to_string(),
+            // 其他词项 ⇒ panic
             other => panic!("`{}`并非原子词项", other.type_name()),
         }
     }
 
     /// 获取词项作为原子词项的字符串名
-    /// * 对「间隔」而言，会转换成字符串形式
+    /// * 📌名称**无前缀**
     /// * 📌当词项非原子词项时，返回[`None`]
+    /// * 🚩对「间隔」而言，会转换成字符串形式
     pub fn get_atom_name(&self) -> Option<String> {
         match self.is_atom() {
             true => Some(self.get_atom_name_unchecked()),
             false => None,
+        }
+    }
+
+    /// 设置词项作为原子词项的词项名
+    /// * ⚠️对其它情况：静默失败
+    /// * ⚠️对「占位符」：静默失败
+    /// * 📌对「间隔」会自动转换成数值类型
+    pub fn set_atom_name(&mut self, new_name: &str) -> Result<(), impl Error> {
+        match self {
+            // 原子词项
+            Word(name)
+            | VariableIndependent(name)
+            | VariableDependent(name)
+            | VariableQuery(name)
+            | Operator(name) => {
+                // 清空重建
+                name.clear();
+                name.push_str(new_name);
+                Ok(())
+            }
+            // 占位符⇒静默失败
+            PlaceHolder => Ok(()),
+            // 间隔⇒解析数值
+            Interval(interval) => match new_name.parse() {
+                Ok(new_interval) => {
+                    *interval = new_interval;
+                    Ok(())
+                }
+                // 需要转换类型
+                Err(_) => Err(std::io::Error::new(
+                    ErrorKind::InvalidInput,
+                    "尝试在间隔中设置无效的数值",
+                )),
+            },
+            // 其它情况：静默失败
+            _ => Err(std::io::Error::new(
+                ErrorKind::InvalidData,
+                "尝试在非原子词项中设置词项名",
+            )),
         }
     }
 
@@ -499,6 +556,7 @@ impl Term {
         match self {
             // 原子词项⇒返回自身
             Word(..)
+            | PlaceHolder
             | VariableIndependent(..)
             | VariableDependent(..)
             | VariableQuery(..)
@@ -561,11 +619,15 @@ fn hash_term_set<H: std::hash::Hasher>(set: &TermSetType, state: &mut H) {
 }
 
 /// 实现/散列化逻辑
+///
+/// ?【2024-02-21 14:21:10】是否一定要实现
+/// * 如「占位符」就没有「进一步散列化」的组分
 impl Hash for Term {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {
             // 原子词项 //
             Word(word) => word.hash(state),
+            PlaceHolder => "_".hash(state), // !【2024-02-21 14:21:59】目前暂时使用"_"来进行散列化
             VariableIndependent(name) => name.hash(state),
             VariableDependent(name) => name.hash(state),
             VariableQuery(name) => name.hash(state),
@@ -637,10 +699,12 @@ impl PartialEq for Term {
         match (self, other) {
             // 原子词项 //
             (Word(word), Word(other_word)) => word == other_word,
+            (PlaceHolder, PlaceHolder) => true,
             (VariableIndependent(name), VariableIndependent(other_name)) => name == other_name,
             (VariableDependent(name), VariableDependent(other_name)) => name == other_name,
             (VariableQuery(name), VariableQuery(other_name)) => name == other_name,
             (Interval(i1), Interval(i2)) => i1 == i2,
+            (Operator(name), Operator(other_name)) => name == other_name,
             // 复合词项 //
             (SetExtension(s1), SetExtension(s2)) => s1 == s2,
             (SetIntension(s1), SetIntension(s2)) => s1 == s2,
@@ -683,5 +747,55 @@ impl Eq for Term {}
 impl GetTerm for Term {
     fn get_term(&self) -> &Term {
         &self
+    }
+}
+
+/// 单元测试
+///
+/// TODO: 完善
+#[cfg(test)]
+mod tests {
+    use crate::show;
+
+    use super::*;
+
+    /// 测试一个普通词项
+    /// * 仅测试其作为普通词项的内涵
+    fn _test_term(term: Term) {
+        // 类型详尽性
+        assert!(term.is_atom() || term.is_compound() || term.is_statement());
+        // 展示类别
+        show!(term.get_category());
+        // 展示容量
+        show!(term.get_capacity());
+    }
+
+    /// 测试一个原子词项
+    fn _test_atom(atom: Term) {
+        // 确认是原子词项
+        assert!(atom.is_atom());
+        assert_eq!(atom.get_category(), TermCategory::Atom);
+        // 并非复合词项、陈述
+        assert!(!atom.is_compound());
+        assert!(!atom.is_statement());
+        // 获取（检查）名称
+        show!(atom.get_atom_name());
+        // 拷贝，并检查是否相等
+        assert_eq!(atom, atom.clone());
+    }
+
+    /// 有效性测试
+    #[test]
+    fn test_term() {
+        // 原子词项
+        _test_atom(Term::new_word("word"));
+        _test_atom(Term::new_placeholder());
+        _test_atom(Term::new_variable_independent("i_var"));
+        _test_atom(Term::new_variable_dependent("d_var"));
+        _test_atom(Term::new_variable_query("q_var"));
+        _test_atom(Term::new_interval(1));
+        _test_atom(Term::new_operator("op"));
+        // 复合词项 // TODO: 构造&完善
+        // 陈述 // TODO: 构造&完善
     }
 }

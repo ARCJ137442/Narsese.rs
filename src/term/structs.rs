@@ -18,6 +18,8 @@ pub enum Term {
     // 原子词项 //
     /// 词语
     Word(String),
+    /// 占位符 | 可用于构建「像」
+    PlaceHolder,
     /// 独立变量
     VariableIndependent(String),
     /// 非独变量
