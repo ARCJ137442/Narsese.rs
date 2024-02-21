@@ -649,8 +649,6 @@ impl<'a> ParseState<'a, &str> {
                             return self.err(&format!("{value_buffer:?}不是有效的数值"));
                         }
                     }
-                    // 跳过
-                    self.head_skip(separator);
                 }
                 // 尾括弧⇒跳出循环 | 「跳出尾括弧」在循环外操作
                 _ if self.starts_with(right_bracket) => {
