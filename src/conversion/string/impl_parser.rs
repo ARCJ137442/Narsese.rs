@@ -227,12 +227,12 @@ macro_rules! first_method {
         // * 传入所有的分支
         $( $pattern:expr => $branch:expr ),*,
         // * 传入「else」分支
-        _ => $branch_else:expr, $(,)?
+        _ => $branch_else:expr $(,)?
     } => {
+        // 插入`first!`宏中
         first! {
-            // 插入`first!`宏中
             $( $self_.$method_name($pattern) => $branch ),*,
-            _ => $branch_else,
+            _ => $branch_else
         }
     };
 }
@@ -291,107 +291,147 @@ impl<'a> ParseState<'a, &str> {
     /// * 产生值并置入「中间解析结果」
     ///
     /// * 此处使用`first!`代表「截断条件表达式」
+    /// * 📌该函数仅承担分支工作
+    ///   * 「头部索引位移」在分支中进行
     ///
     fn consume_one(&mut self) {
         first_method! {
             self.starts_with;
             // 空格⇒跳过 //
-            self.format.space => {
-                self.head += self.format.space.len();
-            },
+            self.format.space => self.head += self.format.space.len(),
             // 预算值 //
-            self.format.task.budget_brackets.0 => {
-                self.consume_budget()
-            },
-            // 标点 //
+            self.format.task.budget_brackets.0 => self.consume_budget(),
+            // 标点 // ⚠️因开头不同且无法兜底，故直接内联至此
             // 判断
-            self.format.sentence.punctuation_judgement => {
-                self.consume_punctuation_judgement()
-            },
+            self.format.sentence.punctuation_judgement => self.consume_punctuation_judgement(),
             // 目标
-            self.format.sentence.punctuation_goal => {
-                self.consume_punctuation_goal()
-            },
+            self.format.sentence.punctuation_goal => self.consume_punctuation_goal(),
             // 问题
-            self.format.sentence.punctuation_question => {
-                self.consume_punctuation_question()
-            },
+            self.format.sentence.punctuation_question => self.consume_punctuation_question(),
             // 请求
-            self.format.sentence.punctuation_quest => {
-                self.consume_punctuation_quest()
-            },
+            self.format.sentence.punctuation_quest => self.consume_punctuation_quest(),
             // 时间戳 //
-            self.format.sentence.stamp_brackets.0 => {
-                self.consume_stamp()
-            },
+            self.format.sentence.stamp_brackets.0 => self.consume_stamp(),
             // 真值 //
-            self.format.sentence.truth_brackets.0 => {
-                self.consume_truth()
-            },
-            // 词项 //
-            // 词项/外延集
-            self.format.compound.brackets_set_extension.0 => {
-                // 消耗外延集 | 头位移包含在内
-                self.consume_compound_set_extension()
-            },
-            // 词项/内涵集
-            self.format.compound.brackets_set_intension.0 => {
-                // 消耗内涵集 | 头位移包含在内
-                self.consume_compound_set_intension()
-            },
-            // 词项/复合词项
-            self.format.compound.brackets.0 => {
-                // 消耗复合词项 | 头位移包含在内
-                self.consume_compound()
-            },
-            // 词项/陈述
-            self.format.statement.brackets.0 => {
-                // 消耗陈述 | 头位移包含在内
-                self.consume_statement()
-            },
-            // 词项/原子（兜底）
-            _ => {
-                // 消耗原子 | 头位移包含在内
-                self.consume_atom()
-            }, // TODO: 有待完备
+            self.format.sentence.truth_brackets.0 => self.consume_truth(),
+            // 词项（兜底） //
+            _ => self.consume_term(),
         }
     }
 
     /// 消耗&置入/预算值
-    fn consume_budget(&mut self) {}
+    /// * 📌传入之前提：已识别出相应的「特征开头」
+    /// * 📌需要在此完成专有的挪位
+    fn consume_budget(&mut self) {
+        // TODO: 有待完成
+        todo!()
+    }
 
     /// 消耗&置入/标点/判断
-    fn consume_punctuation_judgement(&mut self) {}
+    /// * 📌传入之前提：已识别出相应的「特征开头」
+    /// * 📌需要在此完成专有的挪位
+    fn consume_punctuation_judgement(&mut self) {
+        // TODO: 有待完成
+        todo!()
+    }
 
     /// 消耗&置入/标点/目标
-    fn consume_punctuation_goal(&mut self) {}
+    /// * 📌传入之前提：已识别出相应的「特征开头」
+    /// * 📌需要在此完成专有的挪位
+    fn consume_punctuation_goal(&mut self) {
+        // TODO: 有待完成
+        todo!()
+    }
 
     /// 消耗&置入/标点/问题
-    fn consume_punctuation_question(&mut self) {}
+    /// * 📌传入之前提：已识别出相应的「特征开头」
+    /// * 📌需要在此完成专有的挪位
+    fn consume_punctuation_question(&mut self) {
+        // TODO: 有待完成
+        todo!()
+    }
 
     /// 消耗&置入/标点/请求
-    fn consume_punctuation_quest(&mut self) {}
+    /// * 📌传入之前提：已识别出相应的「特征开头」
+    /// * 📌需要在此完成专有的挪位
+    fn consume_punctuation_quest(&mut self) {
+        // TODO: 有待完成
+        todo!()
+    }
 
     /// 消耗&置入/时间戳
-    fn consume_stamp(&mut self) {}
+    /// * 📌传入之前提：已识别出相应的「特征开头」
+    /// * 📌需要在此完成专有的挪位
+    fn consume_stamp(&mut self) {
+        // TODO: 有待完成
+        todo!()
+    }
 
     /// 消耗&置入/真值
-    fn consume_truth(&mut self) {}
+    /// * 📌传入之前提：已识别出相应的「特征开头」
+    /// * 📌需要在此完成专有的挪位
+    fn consume_truth(&mut self) {
+        // TODO: 有待完成
+        todo!()
+    }
+
+    /// 消耗&置入/词项
+    /// * 🎯仍然只负责分派方法
+    fn consume_term(&mut self) {
+        first_method! {
+            self.starts_with;
+            // 词项/外延集
+            self.format.compound.brackets_set_extension.0 => self.consume_compound_set_extension(),
+            // 词项/内涵集
+            self.format.compound.brackets_set_intension.0 => self.consume_compound_set_intension(),
+            // 词项/复合词项
+            self.format.compound.brackets.0 => self.consume_compound(),
+            // 词项/陈述
+            self.format.statement.brackets.0 => self.consume_statement(),
+            // 词项/原子（兜底）
+            _ => self.consume_atom()
+        }
+    }
 
     /// 消耗&置入/词项/复合（外延集）
-    fn consume_compound_set_extension(&mut self) {}
+    /// * 📌传入之前提：已识别出相应的「特征开头」
+    /// * 📌需要在此完成专有的挪位
+    fn consume_compound_set_extension(&mut self) {
+        // TODO: 有待完成
+        todo!()
+    }
 
     /// 消耗&置入/词项/复合（内涵集）
-    fn consume_compound_set_intension(&mut self) {}
+    /// * 📌传入之前提：已识别出相应的「特征开头」
+    /// * 📌需要在此完成专有的挪位
+    fn consume_compound_set_intension(&mut self) {
+        // TODO: 有待完成
+        todo!()
+    }
 
     /// 消耗&置入/词项/复合（括弧）
-    fn consume_compound(&mut self) {}
+    /// * 📌传入之前提：已识别出相应的「特征开头」
+    /// * 📌需要在此完成专有的挪位
+    fn consume_compound(&mut self) {
+        // TODO: 有待完成
+        todo!()
+    }
 
     /// 消耗&置入/词项/陈述
-    fn consume_statement(&mut self) {}
+    /// * 📌传入之前提：已识别出相应的「特征开头」
+    /// * 📌需要在此完成专有的挪位
+    fn consume_statement(&mut self) {
+        // TODO: 有待完成
+        todo!()
+    }
 
     /// 消耗&置入/词项/原子
-    fn consume_atom(&mut self) {}
+    /// * 📌传入之前提：已识别出相应的「特征开头」
+    /// * 📌需要在此完成专有的挪位
+    fn consume_atom(&mut self) {
+        // TODO: 有待完成
+        todo!()
+    }
 
     // 组装 //
 
