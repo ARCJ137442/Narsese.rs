@@ -672,15 +672,33 @@ impl<'a> ParseState<'a, &str> {
                         }
                     }
                 }
-                // 尾括弧⇒跳出循环 | 「跳出尾括弧」在循环外操作
+                // 尾括弧⇒解析并存入数值&跳出循环 | 「跳出尾括弧」在循环外操作
                 _ if self.starts_with(right_bracket) => {
-                    break;
+                    // 解析并存入数值
+                    match value_buffer.parse::<FloatPrecision>() {
+                        // 有效数值
+                        Ok(value) => {
+                            // 填充数组
+                            result[i] = value;
+                            // 清空缓冲区
+                            value_buffer.clear();
+                            // 增加计数
+                            i += 1;
+                            // 跳出循环
+                            break;
+                        }
+                        // 无效数值
+                        Err(_) => {
+                            // 无效数值
+                            return self.err(&format!("{value_buffer:?}不是有效的数值"));
+                        }
+                    }
                 } // 其它⇒无效字符
                 c => return self.err(&format!("在解析浮点序列时出现无效字符{c:?}")),
             }
         }
         // 返回最终结果
-        Ok((result, i + 1))
+        Ok((result, i /* 计数已在跳出时增加 */))
     }
 
     /// 消耗&置入/时间戳
@@ -1160,7 +1178,10 @@ mod tests_parse {
             _test_parse_sentence;
             // 格式×输入
             &FORMAT_ASCII;
-            "判断. %1.0;0.9%", "目标! %.0;.9%", "问题?", "请求@"
+            "判断. %1.0;0.9%", "目标! %.0;.9%", "问题?", "请求@",
+            "单真值. %1.0%",
+            "单真值2. %.0%",
+            "空真值.",
         ];
         show!(matrix);
     }
@@ -1173,7 +1194,7 @@ mod tests_parse {
             _test_parse_task;
             // 格式×输入
             &FORMAT_ASCII;
-            "$0.5;0.5;0.5$ 判断. %1.0;0.9%",
+            "$0.5;0.5;0.5$ 判断. %1.0%",
             "$.7;.75;0.555$目标! %.0;.9%",
             "$1;1;1$ 问题?",
             "$0;0;0$请求@"
