@@ -19,7 +19,7 @@ pub enum Term {
     /// 词语
     Word(String),
     /// 占位符 | 可用于构建「像」
-    PlaceHolder,
+    Placeholder,
     /// 独立变量
     VariableIndependent(String),
     /// 非独变量

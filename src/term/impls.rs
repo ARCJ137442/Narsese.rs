@@ -92,7 +92,7 @@ impl Term {
 
     /// 构造/占位符
     pub fn new_placeholder() -> Self {
-        PlaceHolder
+        Placeholder
     }
 
     /// 构造/独立变量
@@ -375,7 +375,7 @@ impl Term {
         match self {
             // 原子词项
             Word(..)
-            | PlaceHolder
+            | Placeholder
             | VariableIndependent(..)
             | VariableDependent(..)
             | VariableQuery(..)
@@ -408,7 +408,7 @@ impl Term {
         match self {
             // 原子词项
             Word(..)
-            | PlaceHolder
+            | Placeholder
             | VariableIndependent(..)
             | VariableDependent(..)
             | VariableQuery(..)
@@ -490,7 +490,7 @@ impl Term {
             | VariableQuery(name)
             | Operator(name) => name.clone(),
             // 特殊处理/占位符 ⇒ 空名
-            PlaceHolder => String::new(),
+            Placeholder => String::new(),
             // 特殊处理/间隔 ⇒ 转换数值为字符串形式
             Interval(interval) => interval.to_string(),
             // 其他词项 ⇒ panic
@@ -527,7 +527,7 @@ impl Term {
                 Ok(())
             }
             // 占位符⇒静默失败
-            PlaceHolder => Ok(()),
+            Placeholder => Ok(()),
             // 间隔⇒解析数值
             Interval(interval) => match new_name.parse() {
                 Ok(new_interval) => {
@@ -556,7 +556,7 @@ impl Term {
         match self {
             // 原子词项⇒返回自身
             Word(..)
-            | PlaceHolder
+            | Placeholder
             | VariableIndependent(..)
             | VariableDependent(..)
             | VariableQuery(..)
@@ -627,7 +627,7 @@ impl Hash for Term {
         match self {
             // 原子词项 //
             Word(word) => word.hash(state),
-            PlaceHolder => "_".hash(state), // !【2024-02-21 14:21:59】目前暂时使用"_"来进行散列化
+            Placeholder => "_".hash(state), // !【2024-02-21 14:21:59】目前暂时使用"_"来进行散列化
             VariableIndependent(name) => name.hash(state),
             VariableDependent(name) => name.hash(state),
             VariableQuery(name) => name.hash(state),
@@ -699,7 +699,7 @@ impl PartialEq for Term {
         match (self, other) {
             // 原子词项 //
             (Word(word), Word(other_word)) => word == other_word,
-            (PlaceHolder, PlaceHolder) => true,
+            (Placeholder, Placeholder) => true,
             (VariableIndependent(name), VariableIndependent(other_name)) => name == other_name,
             (VariableDependent(name), VariableDependent(other_name)) => name == other_name,
             (VariableQuery(name), VariableQuery(other_name)) => name == other_name,

@@ -114,7 +114,7 @@ impl NarseseFormat<&str> {
         match term {
             // 原子词项
             Word(..) => self.format_atom(out, term, self.atom.prefix_word),
-            PlaceHolder => self.format_atom(out, term, self.atom.prefix_placeholder),
+            Placeholder => self.format_atom(out, term, self.atom.prefix_placeholder),
             VariableIndependent(..) => {
                 self.format_atom(out, term, self.atom.prefix_variable_independent)
             }

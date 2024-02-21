@@ -213,10 +213,12 @@ impl<'a, C> ParseState<'a, C> {
         self.head = 0;
     }
 
-    /// 生成「解析成功」结果：直接根据值内联自身解析状态
+    /// 生成「解析成功」结果：无需内联自身状态
     /// * 🎯用于最后「生成结果」的情况
     /// * 📝生成的结果不能与自身有任何瓜葛
-    pub fn ok(&self, result: NarseseResult) -> ParseResult {
+    /// * 📌自动内联
+    #[inline(always)]
+    pub fn ok(result: NarseseResult) -> ParseResult {
         Ok(result)
     }
 
@@ -225,13 +227,16 @@ impl<'a, C> ParseState<'a, C> {
     /// * 📝生成的结果不能与自身有任何瓜葛
     ///   * 📌后续「错误」中引用的「解析环境」可能在「状态销毁」后导致「悬垂引用」问题
     /// * 📝合并「消耗错误」结果：泛型参数可以自动捕获返回类型
+    /// * 📌自动内联
+    #[inline(always)]
     pub fn err<T>(&self, message: &str) -> ParseResult<T> {
         Err(ParseError::new(message, self.env.clone(), self.head))
     }
 
-    /// 生成「消耗成功」结果：直接根据值内联自身解析状态
+    /// 生成「消耗成功」结果：无需内联自身状态
     /// * 🎯用于中间「消耗字符」的情况
-    pub fn ok_consume(&self) -> ConsumeResult {
+    #[inline(always)]
+    pub fn ok_consume() -> ConsumeResult {
         Ok(())
     }
 }
@@ -396,11 +401,17 @@ impl<'a> ParseState<'a, &str> {
             self.consume_one()?;
         }
         // 返回「消耗成功」结果
-        self.ok_consume()
+        Self::ok_consume()
     }
 
     /// 检查自己的「解析环境」是否在「头部索引」处以指定字符串开头
     fn starts_with(&self, to_compare: &str) -> bool {
+        // 长度检验
+        if self.len_env - self.head < to_compare.chars().count() {
+            // 长度不够⇒肯定不匹配
+            return false;
+        }
+        // 逐个字符比较
         for (i, c) in to_compare.chars().enumerate() {
             if self.env[self.head + i] != c {
                 return false;
@@ -419,7 +430,9 @@ impl<'a> ParseState<'a, &str> {
     ///   * 「头部索引位移」在分支中进行
     ///   * 当前一分支失败（返回Err）时，自动尝试匹配下一个分支
     ///     * 🎯用于解决「『预算值』『独立变量』相互冲突」的问题
-    ///
+    /// * ⚠️【2024-02-21 17:17:58】此处引入「词项→标点」的固定顺序
+    ///   * 🎯为了解决如 `?查询变量vs问题?` 的冲突
+    ///     * 不应「先消耗为问题，然后消耗为词语，最后遇到重复标点」
     fn consume_one(&mut self) -> ConsumeResult {
         first_method_ok! {
             // 匹配开头
@@ -433,6 +446,29 @@ impl<'a> ParseState<'a, &str> {
             self.format.space => Ok(self.head_skip(self.format.space)),
             // 预算值 //
             self.format.task.budget_brackets.0 => self.consume_budget(),
+            // 时间戳 //
+            self.format.sentence.stamp_brackets.0 => self.consume_stamp(),
+            // 真值 //
+            self.format.sentence.truth_brackets.0 => self.consume_truth(),
+            // 词项→标点（兜底） //
+            _ => {
+                // 先解析词项
+                let result = self.consume_term();
+                // 然后软性消耗「标点」
+                if self.can_consume() {
+                    let _ = self.consume_punctuation();
+                }
+                // 返回词项的解析结果
+                result
+            },
+        }
+    }
+
+    /// 消耗
+    fn consume_punctuation(&mut self) -> ConsumeResult {
+        first_method! {
+            // 匹配开头
+            self.starts_with;
             // 标点 // ⚠️因开头不同且无法兜底，故直接内联至此
             // 判断
             self.format.sentence.punctuation_judgement => self.consume_punctuation_judgement(),
@@ -442,12 +478,8 @@ impl<'a> ParseState<'a, &str> {
             self.format.sentence.punctuation_question => self.consume_punctuation_question(),
             // 请求
             self.format.sentence.punctuation_quest => self.consume_punctuation_quest(),
-            // 时间戳 //
-            self.format.sentence.stamp_brackets.0 => self.consume_stamp(),
-            // 真值 //
-            self.format.sentence.truth_brackets.0 => self.consume_truth(),
-            // 词项（兜底） //
-            _ => self.consume_term(),
+            // 否则⇒错误
+            _ => self.err("未知的标点")
         }
     }
 
@@ -459,36 +491,87 @@ impl<'a> ParseState<'a, &str> {
         self.err("TODO!")
     }
 
+    /// 工具函数/尝试置入
+    /// * 🚩仅对单个[`Option`]对象
+    /// * 返回
+    ///   * 无（成功）
+    ///   * 格式化后的「错误消息」（失败）
+    ///     * 具体细节需要不可变引用进行补充
+    /// * 🎯统一格式化错误消息，并减少重复代码量
+    ///   * 用于「向『中间解析结果』插入值」
+    ///   * 📌缘由：无法引用「结构字段」
+    ///     * 💢明明[`Self::err`]、[`Option::insert`]互不干扰，但仍然会报所有权问题
+    /// * 📌自动内联
+    #[inline(always)]
+    fn try_set<T: std::fmt::Debug>(
+        option: &mut Option<T>,
+        new_value: T,
+        name: &str,
+    ) -> Option<String> {
+        match option {
+            // 已有⇒报错
+            Some(old_value) => Some(format!(
+                "尝试置入{name}「{new_value:?}」遇到已有{name}「{old_value:?}」"
+            )),
+            // 无⇒置入&结束
+            None => {
+                // 置入 // ! 无需使用其返回值
+                let _ = option.insert(new_value);
+                // 结束
+                None
+            }
+        }
+    }
+
+    /// 工具函数/尝试置入标点
+    /// * 📌自动内联
+    #[inline(always)]
+    fn _try_set_punctuation(&mut self, punctuation: Punctuation) -> ConsumeResult {
+        // 尝试置入
+        match Self::try_set(&mut self.mid_result.punctuation, punctuation, "标点") {
+            Some(message) => self.err(&message),
+            None => Self::ok_consume(),
+        }
+    }
+
     /// 消耗&置入/标点/判断
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
     fn consume_punctuation_judgement(&mut self) -> ConsumeResult {
-        // TODO: 有待完成
-        self.err("TODO!")
+        // 索引跳过
+        self.head_skip(self.format.sentence.punctuation_judgement);
+        // 尝试置入标点
+        self._try_set_punctuation(Punctuation::Judgement)
     }
 
     /// 消耗&置入/标点/目标
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
     fn consume_punctuation_goal(&mut self) -> ConsumeResult {
-        // TODO: 有待完成
-        self.err("TODO!")
+        // 索引跳过
+        self.head_skip(self.format.sentence.punctuation_goal);
+        // 尝试置入标点
+        self._try_set_punctuation(Punctuation::Goal)
     }
 
     /// 消耗&置入/标点/问题
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
     fn consume_punctuation_question(&mut self) -> ConsumeResult {
-        // TODO: 有待完成
-        self.err("TODO!")
+        // 索引跳过
+        self.head_skip(self.format.sentence.punctuation_question);
+        // 尝试置入标点
+        self._try_set_punctuation(Punctuation::Question)
     }
 
     /// 消耗&置入/标点/请求
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
     fn consume_punctuation_quest(&mut self) -> ConsumeResult {
-        // TODO: 有待完成
-        self.err("TODO!")
+        // 索引跳过
+        self.head_skip(self.format.sentence.punctuation_quest);
+        // 尝试置入标点
+        self._try_set_punctuation(Punctuation::Quest)
     }
 
     /// 消耗&置入/时间戳
@@ -513,17 +596,10 @@ impl<'a> ParseState<'a, &str> {
     fn consume_term(&mut self) -> ConsumeResult {
         // 先解析词项
         let term = self.parse_term()?;
-        // 置入词项
-        match self.mid_result.term {
-            // 已有⇒报错
-            Some(_) => self.err("重复的词项"),
-            // 无⇒置入&结束
-            None => {
-                // 置入 // ! 无需使用其返回值
-                let _ = self.mid_result.term.insert(term);
-                // 结束
-                self.ok_consume()
-            }
+        // 尝试置入词项
+        match Self::try_set(&mut self.mid_result.term, term, "词项") {
+            Some(message) => self.err(&message),
+            None => Self::ok_consume(),
         }
     }
 
@@ -576,6 +652,18 @@ impl<'a> ParseState<'a, &str> {
     fn parse_statement(&mut self) -> ParseResult<Term> {
         // TODO: 有待完成
         self.err("TODO!")
+    }
+
+    /// 工具函数/判断字符是否能作为「词项名」
+    /// * 🎯用于判断「合法词项名」
+    #[inline(always)]
+    fn is_valid_atom_name(c: char) -> bool {
+        match c {
+            // 特殊：横杠/下划线
+            '-' | '_' => true,
+            //  否则：判断是否为「字母/数字」
+            _ => c.is_alphabetic() || c.is_numeric(),
+        }
     }
 
     /// 消耗&置入/词项/原子
@@ -637,7 +725,6 @@ impl<'a> ParseState<'a, &str> {
             _ => {
                 return self.err("未知的原子词项前缀")
             }
-            //
         }
         // 新建缓冲区
         let mut name_buffer = String::new();
@@ -646,26 +733,25 @@ impl<'a> ParseState<'a, &str> {
         while self.can_consume() {
             // 获取头部字符
             head_char = self.head_char();
-            match head_char {
-                // 合法词项名字符⇒加入缓冲区&递进 //
-                // * 📝匹配守卫作用于整个匹配项，故无法混用「|」与「_ if」
-                // 特殊匹配：横杠/下划线
-                '-' | '_' => {
+            match Self::is_valid_atom_name(head_char) {
+                // 合法词项名字符⇒加入缓冲区&递进
+                true => {
                     // 加入缓冲区
                     name_buffer.push(head_char);
                     // 跳过当前字符
                     self.head_step_one();
                 }
-                // * 📌标准：数字/文字
-                _ if head_char.is_alphanumeric() => {
-                    // 加入缓冲区
-                    name_buffer.push(head_char);
-                    // 跳过当前字符
-                    self.head_step_one();
-                }
-                // 非法字符⇒结束循环 | 此时已自动消耗到「下一起始位置」 //
-                _ => break,
+                // 非法字符⇒结束循环 | 此时已自动消耗到「下一起始位置」
+                false => break,
             }
+        }
+        // 对「占位符」进行特殊处理：直接返回（忽略缓冲区）
+        if let Term::Placeholder = term {
+            return Ok(term);
+        }
+        // 非「占位符」检验名称非空
+        if name_buffer.is_empty() {
+            return self.err("词项名不能为空");
         }
         // 尝试将缓冲区转为词项名，返回词项/错误
         match term.set_atom_name(&name_buffer) {
@@ -742,21 +828,21 @@ impl<'a> ParseState<'a, &str> {
                 // !【2024-02-20 21:58:21】必须先进行可变借用
                 let value = self.form_task();
                 // 然后再进行不可变借用（以构造最终值）
-                self.ok(NarseseResult::Task(value))
+                Self::ok(NarseseResult::Task(value))
             }
             // else有标点&词项⇒语句
             (_, Some(_), Some(_), ..) => {
                 // !【2024-02-20 21:58:21】必须先进行可变借用
                 let value = self.form_sentence();
                 // 然后再进行不可变借用（以构造最终值）
-                self.ok(NarseseResult::Sentence(value))
+                Self::ok(NarseseResult::Sentence(value))
             }
             // else有词项⇒词项
             (_, Some(_), ..) => {
                 // !【2024-02-20 21:58:21】必须先进行可变借用
                 let value = self.form_term();
                 // 然后再进行不可变借用（以构造最终值）
-                self.ok(NarseseResult::Term(value))
+                Self::ok(NarseseResult::Term(value))
             }
         }
     }
@@ -784,10 +870,11 @@ impl NarseseFormat<&str> {
 mod tests_parse {
     use crate::{
         conversion::string::{impl_parser::NarseseResult, NarseseFormat, FORMAT_ASCII},
-        show,
+        fail_tests, show,
     };
 
-    /// 用于生成测试矩阵
+    /// 生成「矩阵」
+    /// * 结果：`Vec<(format, Vec<result>)>`
     macro_rules! f_matrix {
         [
             $f:ident;
@@ -817,6 +904,7 @@ mod tests_parse {
         };
     }
 
+    /// 通用测试/原子词项
     fn _test_parse_atom(format: &NarseseFormat<&str>, input: &str) {
         // 解析
         let result = format.parse(input);
@@ -826,20 +914,69 @@ mod tests_parse {
             // 词项⇒解析出词项
             Ok(NarseseResult::Term(term)) => term,
             // 错误
-            Err(e) => panic!("词项解析失败{e}"),
+            Err(e) => {
+                show!(e);
+                panic!("词项解析失败");
+            }
             // 别的解析结果
             _ => panic!("解析出来的不是词项！{result:?}"),
         };
         // 展示
         show!(term);
     }
+
+    /// 测试/原子词项
     #[test]
     fn test_parse_atom() {
         let format_ascii = FORMAT_ASCII;
         let matrix = f_matrix! [
+            // 应用的函数
             _test_parse_atom;
+            // 格式×输入
             &format_ascii;
             "word", "_", "$i_var", "#d_var", "?q_var", "+137", "^op";
+        ];
+        show!(matrix);
+    }
+
+    // 测试/原子词项/失败
+    fail_tests! {
+        test_parse_atom_fail_未知前缀 _test_parse_atom(&FORMAT_ASCII, "@word");
+        test_parse_atom_fail_未知前缀2 _test_parse_atom(&FORMAT_ASCII, "`word");
+        test_parse_atom_fail_非法字符1 _test_parse_atom(&FORMAT_ASCII, ",");
+        test_parse_atom_fail_非法字符2 _test_parse_atom(&FORMAT_ASCII, "wo:rd");
+        test_parse_atom_fail_非法字符3 _test_parse_atom(&FORMAT_ASCII, "wo[rd");
+        test_parse_atom_fail_非法字符4 _test_parse_atom(&FORMAT_ASCII, "wo啊/d");
+    }
+
+    /// 通用测试/语句
+    fn _test_parse_sentence(format: &NarseseFormat<&str>, input: &str) {
+        // 解析
+        let result = format.parse(input);
+        show!(&result);
+        // 检验
+        let term = match result {
+            // 语句⇒解析出语句
+            Ok(NarseseResult::Sentence(sentence)) => sentence,
+            // 错误
+            Err(e) => panic!("语句解析失败{e}"),
+            // 别的解析结果
+            _ => panic!("解析出来的不是语句！{result:?}"),
+        };
+        // 展示
+        show!(term);
+    }
+
+    /// 测试/标点（语句）
+    #[test]
+    fn test_parse_punctuation() {
+        let format_ascii = FORMAT_ASCII;
+        let matrix = f_matrix! [
+            // 应用的函数
+            _test_parse_sentence;
+            // 格式×输入
+            &format_ascii;
+            "判断.", "目标!", "问题?", "请求@", "?查询变量vs问题?"
         ];
         show!(matrix);
     }
