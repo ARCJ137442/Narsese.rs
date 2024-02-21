@@ -25,7 +25,11 @@
 //!   * 📌解析函数总是从某个「起始位置」开始，通过系列解析过程，返回「解析结果」以及
 //!     * ✨有相应的「结果索引」类型
 
-use crate::{first, util::FloatPrecision, Budget, Punctuation, Sentence, Stamp, Task, Term, Truth};
+use crate::{
+    first,
+    util::{FloatPrecision, IntPrecision},
+    Budget, Punctuation, Sentence, Stamp, Task, Term, Truth,
+};
 use std::{error::Error, fmt::Display, io::ErrorKind};
 
 use super::NarseseFormat;
@@ -260,7 +264,7 @@ impl<'a, C> ParseState<'a, C> {
     /// * 📝生成的结果不能与自身有任何瓜葛
     /// * 📌自动内联
     #[inline(always)]
-    pub fn ok(result: NarseseResult) -> ParseResult {
+    pub fn ok<T>(result: T) -> ParseResult<T> {
         Ok(result)
     }
 
@@ -305,20 +309,19 @@ macro_rules! first_method {
 }
 
 /// 匹配并执行第一个成功匹配的分支
-/// * 🎯用于快速识别开头并执行代码
+/// * 🎯用于简化执行代码
 ///   * 📌对匹配失败者：还原头索引，并继续下一匹配
 /// * 📌用于消歧义：💢「独立变量」和「预算值」开头撞了
+/// * 📌用于消歧义：💢「查询变量」和「问题」标点撞了
 /// 📝`self`是一个内容相关的关键字，必须向其中传递`self`作为参数
 macro_rules! first_method_ok {
     {
-        // * 传入「self.方法名」作为被调用的方法
-        $self_:ident . $method_name:ident;
         // * 传入「self.方法名」作为「移动头索引」的方法
         $self_move:ident . $method_move:ident;
         // * 传入「当前头索引」表达式
         $original_head:expr;
         // * 传入所有的分支
-        $( $pattern:expr => $branch:expr ),*,
+        $( $condition:expr => $branch:expr ),*,
         // * 传入「else」分支
         _ => $branch_else:expr $(,)?
     } => {
@@ -332,7 +335,7 @@ macro_rules! first_method_ok {
                     // 每一个条件分支
                     (
                         // 先决条件：匹配判别方法
-                        $self_.$method_name($pattern)
+                        $condition
                         // 后续条件：是否执行成功
                         && {
                             // 回到原始头索引
@@ -492,33 +495,46 @@ impl<'a> ParseState<'a, &str> {
     /// * ⚠️【2024-02-21 17:17:58】此处引入「词项→标点」的固定顺序
     ///   * 🎯为了解决如 `?查询变量vs问题?` 的冲突
     ///     * 不应「先消耗为问题，然后消耗为词语，最后遇到重复标点」
+    /// * 🚩【2024-02-21 23:33:25】现在使用「匹配到就跳过」的手段
+    ///   * 📌若已有词项，则一定不会再次消耗词项
     fn consume_one(&mut self) -> ConsumeResult {
         first_method_ok! {
-            // 匹配开头
-            self.starts_with;
             // 当匹配失败时移回原始索引
             self.head_move;
             // 要缓存的索引
             self.head;
 
             // 空格⇒跳过 //
-            self.format.space => Ok(self.head_skip(self.format.space)),
-            // 预算值 //
-            self.format.task.budget_brackets.0 => self.consume_budget(),
-            // 时间戳 //
-            self.format.sentence.stamp_brackets.0 => self.consume_stamp(),
-            // 真值 //
-            self.format.sentence.truth_brackets.0 => self.consume_truth(),
-            // 词项→标点（兜底） //
+            self.starts_with(self.format.space) => Ok(self.head_skip(self.format.space)),
+            // 1 预算值 //
+            (
+                self.starts_with(self.format.task.budget_brackets.0) &&
+                self.mid_result.budget.is_none()
+            ) => self.consume_budget(),
+            // 2 词项 //
+            (
+                // ! 此处没有特别的「前缀匹配」
+                self.mid_result.term.is_none()
+            ) => self.consume_term(),
+            // 3 标点 //
+            (
+                // ! 此处没有特别的「前缀匹配」 | 全靠「是否匹配成功」轮换流程
+                self.mid_result.punctuation.is_none()
+            ) => self.consume_punctuation(),
+            // 4 时间戳 //
+            (
+                self.starts_with(self.format.sentence.stamp_brackets.0) &&
+                self.mid_result.stamp.is_none()
+            )  => self.consume_stamp(),
+            // 5 真值 //
+            (
+                self.starts_with(self.format.sentence.truth_brackets.0) &&
+                self.mid_result.truth.is_none()
+            )  => self.consume_truth(),
+            // 不会存在的情况 //
             _ => {
-                // 先解析词项
-                let result = self.consume_term();
-                // 然后软性消耗「标点」
-                if self.can_consume() {
-                    let _ = self.consume_punctuation();
-                }
-                // 返回词项的解析结果
-                result
+                // *【2024-02-21 23:39:30】目前选择报错
+                self.err("没有可解析的token")
             },
         }
     }
@@ -542,57 +558,16 @@ impl<'a> ParseState<'a, &str> {
         }
     }
 
-    /// 工具函数/尝试置入
-    /// * 🚩仅对单个[`Option`]对象
-    /// * 返回
-    ///   * 无（成功）
-    ///   * 格式化后的「错误消息」（失败）
-    ///     * 具体细节需要不可变引用进行补充
-    /// * 🎯统一格式化错误消息，并减少重复代码量
-    ///   * 用于「向『中间解析结果』插入值」
-    ///   * 📌缘由：无法引用「结构字段」
-    ///     * 💢明明[`Self::err`]、[`Option::insert`]互不干扰，但仍然会报所有权问题
-    /// * 📌自动内联
-    #[inline(always)]
-    fn try_set<T: std::fmt::Debug>(
-        option: &mut Option<T>,
-        new_value: T,
-        name: &str,
-    ) -> Option<String> {
-        match option {
-            // 已有⇒报错
-            Some(old_value) => Some(format!(
-                "尝试置入{name}「{new_value:?}」遇到已有{name}「{old_value:?}」"
-            )),
-            // 无⇒置入&结束
-            None => {
-                // 置入 // ! 无需使用其返回值
-                let _ = option.insert(new_value);
-                // 结束
-                None
-            }
-        }
-    }
-
-    /// 工具函数/尝试置入标点
-    /// * 📌自动内联
-    #[inline(always)]
-    fn _try_set_punctuation(&mut self, punctuation: Punctuation) -> ConsumeResult {
-        // 尝试置入
-        match Self::try_set(&mut self.mid_result.punctuation, punctuation, "标点") {
-            Some(message) => self.err(&message),
-            None => Self::ok_consume(),
-        }
-    }
-
     /// 消耗&置入/标点/判断
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
     fn consume_punctuation_judgement(&mut self) -> ConsumeResult {
         // 索引跳过
         self.head_skip(self.format.sentence.punctuation_judgement);
-        // 尝试置入标点
-        self._try_set_punctuation(Punctuation::Judgement)
+        // 直接置入标点 | 因为先前`consume_one`已经假定「未曾置入标点」
+        let _ = self.mid_result.punctuation.insert(Punctuation::Judgement);
+        // 直接返回
+        Self::ok_consume()
     }
 
     /// 消耗&置入/标点/目标
@@ -601,8 +576,10 @@ impl<'a> ParseState<'a, &str> {
     fn consume_punctuation_goal(&mut self) -> ConsumeResult {
         // 索引跳过
         self.head_skip(self.format.sentence.punctuation_goal);
-        // 尝试置入标点
-        self._try_set_punctuation(Punctuation::Goal)
+        // 直接置入标点 | 因为先前`consume_one`已经假定「未曾置入标点」
+        let _ = self.mid_result.punctuation.insert(Punctuation::Goal);
+        // 直接返回
+        Self::ok_consume()
     }
 
     /// 消耗&置入/标点/问题
@@ -611,8 +588,10 @@ impl<'a> ParseState<'a, &str> {
     fn consume_punctuation_question(&mut self) -> ConsumeResult {
         // 索引跳过
         self.head_skip(self.format.sentence.punctuation_question);
-        // 尝试置入标点
-        self._try_set_punctuation(Punctuation::Question)
+        // 直接置入标点 | 因为先前`consume_one`已经假定「未曾置入标点」
+        let _ = self.mid_result.punctuation.insert(Punctuation::Question);
+        // 直接返回
+        Self::ok_consume()
     }
 
     /// 消耗&置入/标点/请求
@@ -621,8 +600,10 @@ impl<'a> ParseState<'a, &str> {
     fn consume_punctuation_quest(&mut self) -> ConsumeResult {
         // 索引跳过
         self.head_skip(self.format.sentence.punctuation_quest);
-        // 尝试置入标点
-        self._try_set_punctuation(Punctuation::Quest)
+        // 直接置入标点 | 因为先前`consume_one`已经假定「未曾置入标点」
+        let _ = self.mid_result.punctuation.insert(Punctuation::Quest);
+        // 直接返回
+        Self::ok_consume()
     }
 
     /// 解析&置入/固定次数分隔的浮点数
@@ -684,15 +665,12 @@ impl<'a> ParseState<'a, &str> {
                             value_buffer.clear();
                             // 增加计数
                             i += 1;
-                            // 跳出循环
-                            break;
                         }
-                        // 无效数值
-                        Err(_) => {
-                            // 无效数值
-                            return self.err(&format!("{value_buffer:?}不是有效的数值"));
-                        }
+                        // 无效数值⇒不做任何事
+                        Err(_) => {}
                     }
+                    // 跳出循环
+                    break;
                 } // 其它⇒无效字符
                 c => return self.err(&format!("在解析浮点序列时出现无效字符{c:?}")),
             }
@@ -701,12 +679,93 @@ impl<'a> ParseState<'a, &str> {
         Ok((result, i /* 计数已在跳出时增加 */))
     }
 
+    /// 工具函数/匹配有符号整数（`+/-` + digits）
+    /// * 🎯用于解析「固定」时间戳
+    /// * ⚠️非贪婪解析：解析到非法字符时停止
+    /// * 📌返回值：解析出的数值
+    fn parse_isize(&mut self) -> ParseResult<IntPrecision> {
+        // 顺序检索
+        let start = self.head;
+        let mut int_buffer = String::new();
+        // 逐个字符匹配
+        while self.can_consume()
+            && (
+                // 使用`is_ascii_digit`，数值/正负号 均可 | ✅已在EVCXR中实验过
+                self.head_char().is_ascii_digit() // ! 此处「混合直接匹配与带守卫匹配」导致无法使用`match`
+                    || self.head_char() == '+'
+                    || self.head_char() == '-'
+            )
+        {
+            // 向目标添加字符
+            int_buffer.push(self.head_char());
+            // 直接递进
+            self.head_step_one();
+        }
+        // 扫描后检查「是否有递进」 | 无递进⇒空整数值
+        if self.head == start {
+            return self.err("空的无符号整数值");
+        }
+        // 解析并存入数值
+        match int_buffer.parse::<IntPrecision>() {
+            // 有效数值
+            Ok(value) => Self::ok(value),
+            // 无效数值
+            Err(_) => {
+                // 无效数值
+                self.err(&format!("{int_buffer:?}不是有效的数值"))
+            }
+        }
+    }
+
     /// 消耗&置入/时间戳
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
     fn consume_stamp(&mut self) -> ConsumeResult {
-        // TODO: 有待完成
-        self.err("TODO!")
+        // 跳过左括弧
+        self.head_skip(self.format.sentence.stamp_brackets.0);
+        // 开始匹配时间戳类型标识符
+        let stamp = first_method! {
+            // 前缀匹配
+            self.starts_with;
+            // 固定
+            self.format.sentence.stamp_fixed => {
+                // 跳过自身
+                self.head_skip(self.format.sentence.stamp_fixed);
+                // 解析&跳过 整数值
+                let time = self.parse_isize()?;
+                // 生成时间戳
+                Stamp::Fixed(time)
+            },
+            // 过去
+            self.format.sentence.stamp_past => {
+                // 跳过自身
+                self.head_skip(self.format.sentence.stamp_past);
+                // 生成时间戳
+                Stamp::Past
+            },
+            // 现在
+            self.format.sentence.stamp_present => {
+                // 跳过自身
+                self.head_skip(self.format.sentence.stamp_present);
+                // 生成时间戳
+                Stamp::Present
+            },
+            // 未来
+            self.format.sentence.stamp_future => {
+                // 跳过自身
+                self.head_skip(self.format.sentence.stamp_future);
+                // 生成时间戳
+                Stamp::Future
+            },
+            // 无效类型
+            _ => return self.err("无效时间戳类型"),
+        };
+        // 置入时间戳
+        let _ = self.mid_result.stamp.insert(stamp);
+        // 跳过右括弧 | // ! ⚠️默认「匹配完类型后就是右括弧」
+        self.head_skip(self.format.sentence.stamp_brackets.1);
+        // 返回
+        Self::ok_consume()
     }
 
     /// 消耗&置入/真值
@@ -730,11 +789,9 @@ impl<'a> ParseState<'a, &str> {
         };
         // 跳过右括弧
         self.head_skip(self.format.sentence.truth_brackets.1);
-        // 尝试置入真值
-        match Self::try_set(&mut self.mid_result.truth, truth, "真值") {
-            Some(message) => self.err(&message),
-            None => Self::ok_consume(),
-        }
+        // 直接置入真值 | 因为先前`consume_one`已经假定「未曾置入真值」
+        let _ = self.mid_result.truth.insert(truth);
+        Self::ok_consume()
     }
 
     /// 消耗&置入/预算值
@@ -760,11 +817,9 @@ impl<'a> ParseState<'a, &str> {
         };
         // 跳过右括弧
         self.head_skip(self.format.task.budget_brackets.1);
-        // 尝试置入预算
-        match Self::try_set(&mut self.mid_result.budget, budget, "预算值") {
-            Some(message) => self.err(&message),
-            None => Self::ok_consume(),
-        }
+        // 直接置入预算值 | 因为先前`consume_one`已经假定「未曾置入预算值」
+        let _ = self.mid_result.budget.insert(budget);
+        Self::ok_consume()
     }
 
     /// 消耗&置入/词项
@@ -773,11 +828,9 @@ impl<'a> ParseState<'a, &str> {
     fn consume_term(&mut self) -> ConsumeResult {
         // 先解析词项
         let term = self.parse_term()?;
-        // 尝试置入词项
-        match Self::try_set(&mut self.mid_result.term, term, "词项") {
-            Some(message) => self.err(&message),
-            None => Self::ok_consume(),
-        }
+        // 直接置入词项 | 因为先前`consume_one`已经假定「未曾置入词项」
+        let _ = self.mid_result.term.insert(term);
+        Self::ok_consume()
     }
 
     /// 消耗&解析/词项
@@ -1181,7 +1234,28 @@ mod tests_parse {
             "判断. %1.0;0.9%", "目标! %.0;.9%", "问题?", "请求@",
             "单真值. %1.0%",
             "单真值2. %.0%",
-            "空真值.",
+            "空真值. %%",
+            "空真值2. %", // * 这个会预先退出
+            "空真值3.",
+        ];
+        show!(matrix);
+    }
+
+    /// 测试/时间戳（语句）
+    #[test]
+    fn test_parse_stamp() {
+        let matrix = f_matrix! [
+            // 应用的函数
+            _test_parse_sentence;
+            // 格式×输入
+            &FORMAT_ASCII;
+            "固定.:!114514:",
+            "固定正.:!+137:",
+            "固定负.:!-442:",
+            "过去.:\\:",
+            "现在? :|:",
+            "未来! :/:",
+            "永恒.",
         ];
         show!(matrix);
     }
@@ -1194,10 +1268,14 @@ mod tests_parse {
             _test_parse_task;
             // 格式×输入
             &FORMAT_ASCII;
-            "$0.5;0.5;0.5$ 判断. %1.0%",
-            "$.7;.75;0.555$目标! %.0;.9%",
-            "$1;1;1$ 问题?",
-            "$0;0;0$请求@"
+            // "$0.5;0.5;0.5$ 判断. %1.0%",
+            // "$.7;.75;0.555$目标! %.0;.9%",
+            // "$1;1;1$ 问题?",
+            // "$0;0;0$请求@",
+            // "$0;0$双预算?",
+            // "$0$单预算@",
+            // "$$空预算?",
+            "$$$独立变量vs空运算?",
         ];
         show!(matrix);
     }
