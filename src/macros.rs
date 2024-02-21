@@ -73,12 +73,12 @@
 #[macro_export]
 macro_rules! first {
     // 第一条规则：最后一条保留`_`
-    (
+    { // * 📝←左边的括号只是标注「推荐用括弧」而对实际解析无限定作用
         // ↓前边标注片段以「,」重复    后边分隔表达式↓
         $($guardian:expr => $value:expr),* ,
         // ↓对字面标识「_」无需`$(...)`引用
-        _ => $value_else:expr, $(,)?
-    ) => {
+        _ => $value_else:expr $(,)?
+    } => {
         // 💭实际上转换为`if-else if-else`亦非不可
         // 匹配无用的字符串常量`0`
         match 0 {

@@ -217,6 +217,26 @@ impl<'a, C> ParseState<'a, C> {
     }
 }
 
+/// 匹配并执行第一个匹配到的分支
+/// * 🎯用于快速识别开头
+/// 📝`self`是一个内容相关的关键字，必须向其中传递`self`作为参数
+macro_rules! first_method {
+    {
+        // * 传入「self.方法名」作为被调用的方法
+        $self_:ident.$method_name: ident;
+        // * 传入所有的分支
+        $( $pattern:expr => $branch:expr ),*,
+        // * 传入「else」分支
+        _ => $branch_else:expr, $(,)?
+    } => {
+        first! {
+            // 插入`first!`宏中
+            $( $self_.$method_name($pattern) => $branch ),*,
+            _ => $branch_else,
+        }
+    };
+}
+
 /// ✨实现/解析 @ 静态字串
 /// 🚩整体解析流程
 /// 1. 构建解析环境
@@ -270,40 +290,108 @@ impl<'a> ParseState<'a, &str> {
     ///   * 📌无需顾忌「是否越界」
     /// * 产生值并置入「中间解析结果」
     ///
-    /// 💡📝可使用`match`简化重复的`if-else`逻辑
-    /// ! 📝`match`箭头的左边只能是
+    /// * 此处使用`first!`代表「截断条件表达式」
     ///
     fn consume_one(&mut self) {
-        // * 此处使用`match`纯属为了代码风格
-        first! {
-            // 空格⇒跳过
-            self.starts_with(self.format.space) => {
+        first_method! {
+            self.starts_with;
+            // 空格⇒跳过 //
+            self.format.space => {
                 self.head += self.format.space.len();
             },
-            // 陈述括弧开头⇒解析陈述
-            self.starts_with(self.format.statement.brackets.0) => {
-                self.head += self.format.space.len();
+            // 预算值 //
+            self.format.task.budget_brackets.0 => {
+                self.consume_budget()
             },
-            // 空格⇒跳过
-            self.starts_with(self.format.space) => {
-                self.head += self.format.space.len();
+            // 标点 //
+            // 判断
+            self.format.sentence.punctuation_judgement => {
+                self.consume_punctuation_judgement()
             },
-            // 兜底⇒解析「原子词项」
+            // 目标
+            self.format.sentence.punctuation_goal => {
+                self.consume_punctuation_goal()
+            },
+            // 问题
+            self.format.sentence.punctuation_question => {
+                self.consume_punctuation_question()
+            },
+            // 请求
+            self.format.sentence.punctuation_quest => {
+                self.consume_punctuation_quest()
+            },
+            // 时间戳 //
+            self.format.sentence.stamp_brackets.0 => {
+                self.consume_stamp()
+            },
+            // 真值 //
+            self.format.sentence.truth_brackets.0 => {
+                self.consume_truth()
+            },
+            // 词项 //
+            // 词项/外延集
+            self.format.compound.brackets_set_extension.0 => {
+                // 消耗外延集 | 头位移包含在内
+                self.consume_compound_set_extension()
+            },
+            // 词项/内涵集
+            self.format.compound.brackets_set_intension.0 => {
+                // 消耗内涵集 | 头位移包含在内
+                self.consume_compound_set_intension()
+            },
+            // 词项/复合词项
+            self.format.compound.brackets.0 => {
+                // 消耗复合词项 | 头位移包含在内
+                self.consume_compound()
+            },
+            // 词项/陈述
+            self.format.statement.brackets.0 => {
+                // 消耗陈述 | 头位移包含在内
+                self.consume_statement()
+            },
+            // 词项/原子（兜底）
             _ => {
-                self.head += self.format.space.len();
+                // 消耗原子 | 头位移包含在内
+                self.consume_atom()
             }, // TODO: 有待完备
         }
     }
 
     /// 消耗&置入/预算值
-    /// 消耗&置入/词项/原子
-    /// 消耗&置入/词项/复合（括弧）
-    /// 消耗&置入/词项/复合（外延集）
-    /// 消耗&置入/词项/复合（内涵集）
-    /// 消耗&置入/词项/陈述
-    /// 消耗&置入/标点
+    fn consume_budget(&mut self) {}
+
+    /// 消耗&置入/标点/判断
+    fn consume_punctuation_judgement(&mut self) {}
+
+    /// 消耗&置入/标点/目标
+    fn consume_punctuation_goal(&mut self) {}
+
+    /// 消耗&置入/标点/问题
+    fn consume_punctuation_question(&mut self) {}
+
+    /// 消耗&置入/标点/请求
+    fn consume_punctuation_quest(&mut self) {}
+
     /// 消耗&置入/时间戳
+    fn consume_stamp(&mut self) {}
+
     /// 消耗&置入/真值
+    fn consume_truth(&mut self) {}
+
+    /// 消耗&置入/词项/复合（外延集）
+    fn consume_compound_set_extension(&mut self) {}
+
+    /// 消耗&置入/词项/复合（内涵集）
+    fn consume_compound_set_intension(&mut self) {}
+
+    /// 消耗&置入/词项/复合（括弧）
+    fn consume_compound(&mut self) {}
+
+    /// 消耗&置入/词项/陈述
+    fn consume_statement(&mut self) {}
+
+    /// 消耗&置入/词项/原子
+    fn consume_atom(&mut self) {}
 
     // 组装 //
 
