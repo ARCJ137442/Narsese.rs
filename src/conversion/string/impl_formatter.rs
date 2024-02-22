@@ -114,6 +114,7 @@ impl NarseseFormat<&str> {
         match term {
             // 原子词项
             Word(..) => self.format_atom(out, term, self.atom.prefix_word),
+            Placeholder => self.format_atom(out, term, self.atom.prefix_placeholder),
             VariableIndependent(..) => {
                 self.format_atom(out, term, self.atom.prefix_variable_independent)
             }
@@ -144,7 +145,7 @@ impl NarseseFormat<&str> {
             IntersectionIntension(..) => self.format_compound(
                 out,
                 term.get_components(),
-                self.compound.connector_intersection_intension,
+                self.compound.connecter_intersection_intension,
             ),
             DifferenceExtension(..) => self.format_compound(
                 out,
@@ -207,6 +208,36 @@ impl NarseseFormat<&str> {
             Equivalence(left, right) => {
                 self.format_statement(out, left, right, self.statement.copula_equivalence)
             }
+            ImplicationPredictive(left, right) => self.format_statement(
+                out,
+                left,
+                right,
+                self.statement.copula_implication_predictive,
+            ),
+            ImplicationConcurrent(left, right) => self.format_statement(
+                out,
+                left,
+                right,
+                self.statement.copula_implication_concurrent,
+            ),
+            ImplicationRetrospective(left, right) => self.format_statement(
+                out,
+                left,
+                right,
+                self.statement.copula_implication_retrospective,
+            ),
+            EquivalencePredictive(left, right) => self.format_statement(
+                out,
+                left,
+                right,
+                self.statement.copula_equivalence_predictive,
+            ),
+            EquivalenceConcurrent(left, right) => self.format_statement(
+                out,
+                left,
+                right,
+                self.statement.copula_equivalence_concurrent,
+            ), // ! 「回顾性等价」未有
         }
     }
 

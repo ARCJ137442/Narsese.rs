@@ -18,6 +18,8 @@ pub enum Term {
     // 原子词项 //
     /// 词语
     Word(String),
+    /// 占位符 | 可用于构建「像」
+    Placeholder,
     /// 独立变量
     VariableIndependent(String),
     /// 非独变量
@@ -66,6 +68,18 @@ pub enum Term {
     Implication(TermRefType, TermRefType),
     /// 等价 | 暂不考虑对称性，后续判等时会优化
     Equivalence(TermRefType, TermRefType),
+    /// 预测性蕴含 | 不能被解构的派生系词（不像NAL-2的可以有语法等价形式）
+    ImplicationPredictive(TermRefType, TermRefType),
+    /// 并发性蕴含 | 不能被解构的派生系词（不像NAL-2的可以有语法等价形式）
+    ImplicationConcurrent(TermRefType, TermRefType),
+    /// 回顾性蕴含 | 不能被解构的派生系词（不像NAL-2的可以有语法等价形式）
+    ImplicationRetrospective(TermRefType, TermRefType),
+    /// 预测性等价 | ⚠️非对称 |不能被解构的派生系词（不像NAL-2的可以有语法等价形式）
+    EquivalencePredictive(TermRefType, TermRefType),
+    /// 并发性等价 | 💭目前当作对称 | 不能被解构的派生系词（不像NAL-2的可以有语法等价形式）
+    EquivalenceConcurrent(TermRefType, TermRefType),
+    // !回顾性等价 | 可以被等价到「预测性等价」中
+    // EquivalenceRetrospective(TermRefType, TermRefType),
 }
 
 /// 词项类别
@@ -83,7 +97,7 @@ pub enum TermCategory {
 /// 词项容量
 /// * 🎯用于对词项快速分类
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TermCapability {
+pub enum TermCapacity {
     /// 原子
     Atom,
     /// 一元

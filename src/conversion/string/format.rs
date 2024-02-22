@@ -1,7 +1,7 @@
 //! 记录Narsese的格式（数据结构）
 //! * 🎯提供CommonNarsese中所有的语法信息
 //!   * ⚠️仅作为「信息」使用，不提供任何 解析时/格式化时 优化
-//! * 📄部分定义参照自JuNarsese
+//! * 📄部分定义参照自[JuNarsese](https://github.com/ARCJ137442/JuNarsese.jl)
 //!
 //! 📝词项类型分类树
 //! * 原子词项
@@ -33,7 +33,7 @@
 
 /// Narsese格式/原子词项
 /// * 格式预期：`{前缀}+词项字符串名`
-///   * 📌将「像占位符」也包含在内——相当于「只有前缀，没有内容」的词项
+///   * 📌将「占位符」也包含在内——相当于「只有前缀，没有内容」的词项
 /// * 核心：存储各个原子词项的**前缀**
 #[derive(Debug)]
 pub struct NarseseFormatAtom<Content> {
@@ -49,7 +49,7 @@ pub struct NarseseFormatAtom<Content> {
     pub prefix_interval: Content,
     /// 前缀/操作符 | `^`
     pub prefix_operator: Content,
-    /// 前缀/像占位符 | `_`
+    /// 前缀/占位符 | `_`
     pub prefix_placeholder: Content,
 }
 
@@ -75,7 +75,7 @@ pub struct NarseseFormatCompound<Content> {
     /// 连接符/外延交集 | `&`
     pub connecter_intersection_extension: Content,
     /// 连接符/内涵交集 | `|`
-    pub connector_intersection_intension: Content,
+    pub connecter_intersection_intension: Content,
     /// 连接符/外延差集 | `-`
     pub connecter_difference_extension: Content,
     /// 连接符/内涵差集 | `~`
@@ -125,18 +125,18 @@ pub struct NarseseFormatStatement<Content> {
     pub copula_instance_property: Content,
 
     /// 派生系词/预测性蕴含 | `=/>`
-    pub copula_predictive_implication: Content,
+    pub copula_implication_predictive: Content,
     /// 派生系词/并发性蕴含 | `=|>`
-    pub copula_concurrent_implication: Content,
+    pub copula_implication_concurrent: Content,
     /// 派生系词/回顾性蕴含 | `=\>`
-    pub copula_retrospective_implication: Content,
+    pub copula_implication_retrospective: Content,
 
     /// 派生系词/预测性等价 | `</>`
-    pub copula_predictive_equivalence: Content,
+    pub copula_equivalence_predictive: Content,
     /// 派生系词/并发性等价 | `<|>`
-    pub copula_concurrent_equivalence: Content,
+    pub copula_equivalence_concurrent: Content,
     /// 派生系词/回顾性等价 | `<\>`
-    pub copula_retrospective_equivalence: Content,
+    pub copula_equivalence_retrospective: Content,
 }
 
 /// Narsese格式/语句

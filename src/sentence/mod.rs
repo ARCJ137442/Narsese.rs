@@ -16,6 +16,10 @@ pub use truth::*;
 pub mod stamp;
 pub use stamp::*;
 
+// 标点 //
+pub mod punctuation;
+pub use punctuation::*;
+
 // 语句 //
 pub mod sentence;
 pub use sentence::*;
