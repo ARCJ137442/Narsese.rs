@@ -30,7 +30,7 @@ use crate::{
     util::{FloatPrecision, IntPrecision, ZeroOneFloat},
     Budget, Punctuation, Sentence, Stamp, Task, Term, Truth,
 };
-use std::{error::Error, fmt::Display, io::ErrorKind, vec};
+use std::{error::Error, fmt::Display, io::ErrorKind};
 
 use super::NarseseFormat;
 
@@ -246,8 +246,9 @@ impl<'a, C> ParseState<'a, C> {
     /// * 用于重定向上下文
     /// * 📌自动内联
     #[inline(always)]
-    pub fn reset_to(&mut self, env: ParseEnv, head: ParseIndex) {
-        self.env = env;
+    pub fn reset_to(&mut self, input: &str, head: ParseIndex) {
+        self.env = ParseState::_build_env(input);
+        self.len_env = self.env.len();
         self.head = head;
     }
 
@@ -1448,6 +1449,24 @@ impl NarseseFormat<&str> {
         state.parse()
         // ! 随后丢弃状态
     }
+
+    /// 主解析函数
+    pub fn parse_multi<'a>(&'a self, inputs: impl IntoIterator<Item=&'a str>) -> Vec<ParseResult> {
+        // 构造结果
+        let mut result = vec![];
+        // 构造空的解析状态
+        let mut state: ParseState<&str> = self.build_parse_state("");
+        // 复用状态进行解析
+        for input in inputs {
+            // 重置状态
+            state.reset_to(input, 0);
+            // 添加解析结果
+            result.push(state.parse());
+        }
+        // 返回所有结果
+        result
+        // ! 随后丢弃状态
+    }
 }
 
 /// 单元测试
@@ -1713,7 +1732,30 @@ mod tests_parse {
         &FORMAT_ASCII;
         "判断.", "目标!", "问题?", "请求@", "?查询变量vs问题?"
         ];
-        show!(matrix); // TODO: 失败测试
+        show!(matrix);
+    }
+
+    // 测试/标点/失败
+    fail_tests_parse! {
+        // 格式/测试函数
+        FORMAT_ASCII;
+        _test_parse_sentence;
+        // 情形
+        test_parse_compound_fail_无效标点1 => "无效~"
+        test_parse_compound_fail_无效标点2 => "无效`"
+        test_parse_compound_fail_无效标点3 => "无效#"
+        test_parse_compound_fail_无效标点4 => "无效$"
+        test_parse_compound_fail_无效标点5 => "无效%"
+        test_parse_compound_fail_无效标点6 => "无效^"
+        test_parse_compound_fail_无效标点7 => "无效&"
+        test_parse_compound_fail_无效标点8 => "无效*"
+        test_parse_compound_fail_无效标点9 => "无效|"
+        test_parse_compound_fail_无效标点10 => "无效\\"
+        test_parse_compound_fail_无效标点11 => "无效/"
+        test_parse_compound_fail_重复标点1 => "无效.."
+        test_parse_compound_fail_重复标点2 => "无效!!"
+        test_parse_compound_fail_重复标点3 => "无效??"
+        test_parse_compound_fail_重复标点4 => "无效@@"
     }
 
     /// 测试/真值（语句）
@@ -1726,12 +1768,14 @@ mod tests_parse {
             &FORMAT_ASCII;
             "判断. %1.0;0.9%", "目标! %.0;.9%", "问题?", "请求@",
             "单真值. %1.0%",
+            "单真值. %00%",
+            "单真值. %00.00%",
             "单真值2. %.0%",
-            "空真值. %%",
+            "空真值. %%", // * 视作空真值
             "空真值2. %", // * 这个会预先退出
             "空真值3.",
         ];
-        show!(matrix); // TODO: 失败测试
+        show!(matrix);
     }
 
     // 测试/真值/失败
@@ -1743,6 +1787,8 @@ mod tests_parse {
         test_parse_truth_fail_多个量 => "A. %1;1;1%"
         test_parse_truth_fail_超范围1 => "A. %-1;1%"
         test_parse_truth_fail_超范围2 => "A. %1;-1%"
+        test_parse_truth_fail_超范围3 => "A. %2;1%"
+        test_parse_truth_fail_超范围4 => "A. %1;2%"
     }
 
     /// 测试/预算值（任务）
@@ -1762,7 +1808,7 @@ mod tests_parse {
             "$$空预算?",
             "$$$独立变量vs空运算?",
         ];
-        show!(matrix); // TODO: 失败测试
+        show!(matrix);
     }
 
     // 测试/预算值/失败
@@ -1775,6 +1821,9 @@ mod tests_parse {
         test_parse_budget_fail_超范围1 => "$-1;1;1$ A."
         test_parse_budget_fail_超范围2 => "$1;-1;1$ A."
         test_parse_budget_fail_超范围3 => "$1;1;-1$ A."
+        test_parse_budget_fail_超范围4 => "$2;1;1$ A."
+        test_parse_budget_fail_超范围5 => "$1;2;1$ A."
+        test_parse_budget_fail_超范围6 => "$1;1;2$ A."
     }
 
     /// 测试/时间戳（语句）
@@ -1793,7 +1842,40 @@ mod tests_parse {
             "未来! :/:",
             "永恒.",
         ];
-        show!(matrix); // TODO: 失败测试
+        show!(matrix);
+    }
+
+    // 测试/时间戳/失败
+    fail_tests_parse! {
+        // 格式/测试函数
+        FORMAT_ASCII;
+        _test_parse_sentence;
+        // 情形
+        test_parse_truth_fail_无效类型1 => "A. :~:"
+        test_parse_truth_fail_无效类型2 => "A. :1:"
+        test_parse_truth_fail_无效类型3 => "A. :无:"
+        test_parse_truth_fail_无效类型4 => "A. :`:"
+        test_parse_truth_fail_无效类型5 => "A. :@:"
+        test_parse_truth_fail_无效类型6 => "A. :#:"
+        test_parse_truth_fail_无效类型7 => "A. :$:"
+        test_parse_truth_fail_无效类型8 => "A. :%:"
+        test_parse_truth_fail_无效类型9 => "A. :^:"
+        test_parse_truth_fail_无效类型10 => "A. :&:"
+        test_parse_truth_fail_无效类型11 => "A. :*:"
+        test_parse_truth_fail_无效类型12 => "A. :(:"
+        test_parse_truth_fail_无效类型13 => "A. :):"
+        test_parse_truth_fail_无效类型14 => "A. :-:"
+        test_parse_truth_fail_无效类型15 => "A. :_:"
+        test_parse_truth_fail_无效类型16 => "A. :+:"
+        test_parse_truth_fail_无效类型17 => "A. :=:"
+        test_parse_truth_fail_重复类型1 => r#"A. ://:"#
+        test_parse_truth_fail_重复类型2 => r#"A. :||:"#
+        test_parse_truth_fail_重复类型3 => r#"A. :\\:"#
+        test_parse_truth_fail_固定_无效值1 => "A. :!:"
+        test_parse_truth_fail_固定_无效值2 => "A. :!1.0:"
+        test_parse_truth_fail_固定_无效值3 => "A. :!--1:"
+        test_parse_truth_fail_固定_无效值4 => "A. :!+:"
+        test_parse_truth_fail_固定_无效值5 => "A. :!-:"
     }
 
     /// 通用/健壮性测试
@@ -1821,7 +1903,35 @@ mod tests_parse {
 
     /// 集成测试/解析器
     #[test]
-    fn test_parse_term() {
+    fn test_parse_multi() {
+        let format = &FORMAT_ASCII;
+        let inputs = vec![
+            "<(&&, <<$x-->A>==><$x-->B>>, <<$y-->C>==><$y-->D>>) ==> E>.",
+            "<{tim} --> (/,livingIn,_,{graz})>. %0%",
+            "<<(*,$1,sunglasses) --> own> ==> <$1 --> [aggressive]>>.",
+            "<(*,{tom},sunglasses) --> own>.",
+            "<<$1 --> [aggressive]> ==> <$1 --> murder>>.",
+            "<<$1 --> (/,livingIn,_,{graz})> ==> <$1 --> murder>>.",
+            "<{?who} --> murder>?",
+            "<{tim} --> (/,livingIn,_,{graz})>.",
+            "<{tim} --> (/,livingIn,_,{graz})>. %0%",
+            "<<(*,$1,sunglasses) --> own> ==> <$1 --> [aggressive]>>.",
+            "<(*,{tom},(&,[black],glasses)) --> own>.",
+            "<<$1 --> [aggressive]> ==> <$1 --> murder>>.",
+            "<<$1 --> (/,livingIn,_,{graz})> ==> <$1 --> murder>>.",
+            "<sunglasses --> (&,[black],glasses)>.",
+            "<{?who} --> murder>?",
+        ];
+        let results = format.parse_multi(inputs);
+        show!(&results);
+        for result in &results {
+            assert!(result.is_ok());
+        }
+    }
+
+    /// 集成测试/解析器
+    #[test]
+    fn test_parse_integrated() {
         let matrix = f_matrix! [
             // 应用的函数
             _test_parse_common;
