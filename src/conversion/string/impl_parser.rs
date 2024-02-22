@@ -189,7 +189,7 @@ impl Display for ParseError {
         // 输出
         write!(
             f,
-            "Narsese解析错误：{} @ {} in {}",
+            "Narsese解析错误：{} @ {} in {:?}",
             self.message,
             self.index,
             String::from_iter(self.env_slice.iter())
@@ -308,6 +308,33 @@ macro_rules! first_method {
     };
 }
 
+/// 匹配首个前缀匹配的分支，自动跳过前缀并执行代码
+/// * 🚩先跳过前缀，再执行代码
+/// * 🎯用于快速识别并跳过指定前缀
+/// * 🎯用于避免遗漏「跳过前缀」的操作
+/// 📝`self`是一个内容相关的关键字，必须向其中传递`self`作为参数
+macro_rules! first_prefix_and_skip {
+    {
+        // * 传入「self.方法名」作为被调用的方法
+        $self_:ident;
+        // * 传入所有的分支
+        $( $prefix:expr => $branch:expr ),*,
+        // * 传入「else」分支
+        _ => $branch_else:expr $(,)?
+    } => {
+        // 插入`first!`宏中
+        first! {
+            $( $self_.starts_with($prefix) => {
+                // ! 先跳过前缀
+                $self_.head_skip($prefix);
+                // * 再执行（并返回）代码
+                $branch
+            } ),*,
+            _ => $branch_else
+        }
+    };
+}
+
 /// 匹配并执行第一个成功匹配的分支
 /// * 🎯用于简化执行代码
 ///   * 📌对匹配失败者：还原头索引，并继续下一匹配
@@ -315,6 +342,7 @@ macro_rules! first_method {
 /// * 📌用于消歧义：💢「查询变量」和「问题」标点撞了
 /// 📝`self`是一个内容相关的关键字，必须向其中传递`self`作为参数
 macro_rules! first_method_ok {
+    // 不带「错误收集」的版本
     {
         // * 传入「self.方法名」作为「移动头索引」的方法
         $self_move:ident . $method_move:ident;
@@ -344,6 +372,58 @@ macro_rules! first_method_ok {
                             result = $branch;
                             // 尝试匹配模式：只有`Ok`能截断返回
                             matches!(result, Ok(_))
+                        }
+                    ) => result
+                ),*,
+                // 以上条件均失效时，匹配的分支
+                _ => $branch_else
+            }
+        }
+    };
+    // 用于在匹配时收集错误
+    // * 🎯用于在解析如`( --  , 我是被否定的, 我是多余的)`的词项时，
+    // *   不会只有「无token错误」而可显示「出错之前积累的错误」
+    {
+        // * 传入「self.方法名」作为「移动头索引」的方法
+        $self_move:ident . $method_move:ident;
+        // * 传入「当前头索引」表达式
+        $original_head:expr;
+        // * 传入「待收集错误向量」标识符
+        $to_collect:ident;
+        // * 传入所有的分支
+        $( $condition:expr => $branch:expr ),*,
+        // * 传入「else」分支
+        _ => $branch_else:expr $(,)?
+    } => {
+        {
+            // 缓存「头索引」
+            let original_head = $original_head;
+            let mut result: ConsumeResult;
+            // 插入`first!`宏中
+            first! {
+                $(
+                    // 每一个条件分支
+                    (
+                        // 先决条件：匹配判别方法
+                        $condition
+                        // 后续条件：是否执行成功
+                        && {
+                            // 回到原始头索引
+                            $self_move.$method_move(original_head);
+                            // 预先计算结果
+                            result = $branch;
+                            // 尝试只读地匹配模式
+                            match &result {
+                                // 只有`Ok`能截断返回
+                                Ok(_) => true,
+                                // 为`Err`时，收集错误并继续匹配
+                                Err(err) => {
+                                    // 收集错误：追加至末尾
+                                    $to_collect.push(err.to_string());
+                                    // 尝试继续匹配
+                                    false
+                                }
+                            }
                         }
                     ) => result
                 ),*,
@@ -539,12 +619,17 @@ impl<'a> ParseState<'a, &str> {
     ///     * 不应「先消耗为问题，然后消耗为词语，最后遇到重复标点」
     /// * 🚩【2024-02-21 23:33:25】现在使用「匹配到就跳过」的手段
     ///   * 📌若已有词项，则一定不会再次消耗词项
+    /// * 🚩现在使用「自动录入错误集」来追溯错误来源
+    ///   * 📌若`errs`直接存储错误对象，会导致所有权问题（部分借用返回值）
     fn consume_one(&mut self) -> ConsumeResult {
+        let mut errs: Vec<String> = vec![];
         first_method_ok! {
             // 当匹配失败时移回原始索引
             self.head_move;
             // 要缓存的索引
             self.head;
+            // ! s要缓存进的错误集
+            errs;
 
             // 空格⇒跳过 //
             self.starts_with(self.format.space) => Ok(self.head_skip(self.format.space)),
@@ -576,7 +661,18 @@ impl<'a> ParseState<'a, &str> {
             // 不会存在的情况 //
             _ => {
                 // *【2024-02-21 23:39:30】目前选择报错
-                self.err("没有可解析的token")
+                match errs.is_empty() {
+                    // 无追踪⇒直接呈现
+                    true => self.err("没有可解析的token"),
+                    // 有追踪⇒链式呈现
+                    false => {
+                        // 链式呈现
+                        self.err(&format!(
+                            "没有可解析的token from [ {} ]",
+                            errs.join(" |> "),
+                        ))
+                    },
+                }
             },
         }
     }
@@ -877,6 +973,7 @@ impl<'a> ParseState<'a, &str> {
 
     /// 消耗&解析/词项
     /// * 🎯仍然只负责分派方法
+    /// * ⚠️解析的同时跳过词项
     ///   * 乃至无需`?`语法糖（错误直接传递，而无需提取值）
     fn parse_term(&mut self) -> ParseResult<Term> {
         first_method! {
@@ -895,6 +992,9 @@ impl<'a> ParseState<'a, &str> {
     }
 
     /// 工具函数：解析系列词项（并置入相应数组）
+    /// * ⚠️必须保证从「可消耗的词项」开始
+    ///   * ✅"term1, term2"
+    ///   * ❌" term1, term2"
     /// * 📌自动内联
     #[inline(always)]
     fn parse_compound_terms(
@@ -903,11 +1003,6 @@ impl<'a> ParseState<'a, &str> {
         right_bracket: &str,
     ) -> ConsumeResult {
         while self.can_consume() {
-            // 置入词项
-            target.push(
-                // 消耗&解析词项
-                self.parse_term()?,
-            );
             first_method! {
                 // 检查开头
                 self.starts_with;
@@ -917,8 +1012,11 @@ impl<'a> ParseState<'a, &str> {
                 self.format.compound.separator => self.head_skip(self.format.compound.separator),
                 // 右括号⇒停止 // ! 跳过的逻辑交由调用者
                 right_bracket => break,
-                // 其它⇒报错
-                _ => return self.err("非法的词项序列字符"),
+                // 其它⇒尝试置入词项
+                _ => target.push(
+                    // 消耗&解析词项
+                    self.parse_term()?,
+                ),
             };
         }
         // 返回成功
@@ -926,6 +1024,7 @@ impl<'a> ParseState<'a, &str> {
     }
 
     /// 工具函数/解析形如`{词项, 词项, ...}`的「词项集」语法
+    /// * ⚠️不允许空集
     /// * 📌自动内联
     #[inline(always)]
     fn parse_term_set(
@@ -940,8 +1039,13 @@ impl<'a> ParseState<'a, &str> {
         self.parse_compound_terms(&mut terms, right_bracket)?;
         // 跳过连续空白&右括弧
         self.head_skip_after_spaces(right_bracket);
-        // 返回
-        Self::ok(terms)
+        // 判空&返回
+        match terms.is_empty() {
+            // 空集⇒驳回
+            true => self.err("词项集为空"),
+            // 非空⇒成功
+            false => Self::ok(terms),
+        }
     }
 
     /// 消耗&置入/词项/复合（外延集）
@@ -1003,8 +1107,20 @@ impl<'a> ParseState<'a, &str> {
         // 跳过左括弧&连续空白
         self.head_skip_and_spaces(self.format.compound.brackets.0);
         // 解析连接符
-        let mut term = first_method! {
-            self.starts_with;
+        let mut term = first_prefix_and_skip! {
+            self;
+            // NAL-5 // ! ⚠️长的`&&`必须比短的`&`先匹配（`||`、`--`同理）
+            // 合取 | 🚩空数组
+            self.format.compound.connecter_conjunction => Term::new_conjunction(vec![]),
+            // 析取 | 🚩空数组
+            self.format.compound.connecter_disjunction => Term::new_disjunction(vec![]),
+            // 否定 | 🚩使用占位符初始化，后续将被覆盖
+            self.format.compound.connecter_negation => Term::new_negation(Term::Placeholder),
+            // NAL-7 //
+            // 顺序合取 | 🚩空数组
+            self.format.compound.connecter_conjunction_sequential => Term::new_conjunction_sequential(vec![]),
+            // 平行合取 | 🚩空数组
+            self.format.compound.connecter_conjunction_parallel => Term::new_conjunction_parallel(vec![]),
             // NAL-3 //
             // 外延交 | 🚩空数组
             self.format.compound.connecter_intersection_extension => Term::new_intersection_extension(vec![]),
@@ -1021,18 +1137,6 @@ impl<'a> ParseState<'a, &str> {
             self.format.compound.connecter_image_extension => Term::new_image_extension(0, vec![]),
             // 内涵像 | 🚩空数组&0索引
             self.format.compound.connecter_image_intension => Term::new_image_intension(0, vec![]),
-            // NAL-5 //
-            // 合取 | 🚩空数组
-            self.format.compound.connecter_conjunction => Term::new_conjunction(vec![]),
-            // 析取 | 🚩空数组
-            self.format.compound.connecter_disjunction => Term::new_disjunction(vec![]),
-            // 否定 | 🚩使用占位符初始化，后续将被覆盖
-            self.format.compound.connecter_negation => Term::new_negation(Term::Placeholder),
-            // NAL-7 //
-            // 顺序合取 | 🚩空数组
-            self.format.compound.connecter_conjunction_sequential => Term::new_conjunction_sequential(vec![]),
-            // 平行合取 | 🚩空数组
-            self.format.compound.connecter_conjunction_parallel => Term::new_conjunction_parallel(vec![]),
             // 未知 //
             _ => return self.err("未知的复合词项连接符"),
         };
@@ -1120,62 +1224,27 @@ impl<'a> ParseState<'a, &str> {
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
     fn parse_atom(&mut self) -> ParseResult<Term> {
-        // 消耗前缀，并以此预置「词项」
-        let mut term;
-        first_method! {
-            self.starts_with;
+        // 匹配并消耗前缀，并以此预置「词项」
+        let mut term = first_prefix_and_skip! {
+            self;
             // 占位符 | 此举相当于识别以「_」开头的词项
-            self.format.atom.prefix_placeholder => {
-                // 词项赋值
-                term = Term::new_placeholder();
-                // 头索引跳过
-                self.head_skip(self.format.atom.prefix_placeholder);
-            },
+            self.format.atom.prefix_placeholder => Term::new_placeholder(),
             // 独立变量
-            self.format.atom.prefix_variable_independent => {
-                // 词项赋值
-                term = Term::new_variable_independent("");
-                // 头索引跳过
-                self.head_skip(self.format.atom.prefix_variable_independent);
-            },
+            self.format.atom.prefix_variable_independent => Term::new_variable_independent(""),
             // 非独变量
-            self.format.atom.prefix_variable_dependent => {
-                // 词项赋值
-                term = Term::new_variable_dependent("");
-                // 头索引跳过
-                self.head_skip(self.format.atom.prefix_variable_dependent);
-            },
+            self.format.atom.prefix_variable_dependent => Term::new_variable_dependent(""),
             // 查询变量
-            self.format.atom.prefix_variable_query => {
-                // 词项赋值
-                term = Term::new_variable_query("");
-                // 头索引跳过
-                self.head_skip(self.format.atom.prefix_variable_query);
-            },
+            self.format.atom.prefix_variable_query => Term::new_variable_query(""),
             // 间隔
-            self.format.atom.prefix_interval => {
-                // 词项赋值
-                term = Term::new_interval(0);
-                // 头索引跳过
-                self.head_skip(self.format.atom.prefix_interval);
-            },
+            self.format.atom.prefix_interval => Term::new_interval(0),
             // 操作符
-            self.format.atom.prefix_operator => {
-                // 词项赋值
-                term = Term::new_operator("");
-                // 头索引跳过
-                self.head_skip(self.format.atom.prefix_operator);
-            },
+            self.format.atom.prefix_operator => Term::new_operator(""),
             // 词语 | ⚠️必须以此兜底（空字串也算前缀）
-            self.format.atom.prefix_word => {
-                term = Term::new_word("");
-                // 头索引跳过
-                self.head_skip(self.format.atom.prefix_word);
-            },
+            self.format.atom.prefix_word => Term::new_word(""),
             _ => {
                 return self.err("未知的原子词项前缀")
             }
-        }
+        };
         // 新建缓冲区
         let mut name_buffer = String::new();
         let mut head_char;
@@ -1324,6 +1393,8 @@ mod tests_parse {
         fail_tests, show, Sentence, Task, Term,
     };
 
+    use super::NarseseResult;
+
     /// 生成「矩阵」
     /// * 结果：`Vec<(format, Vec<result>)>`
     macro_rules! f_matrix {
@@ -1355,23 +1426,43 @@ mod tests_parse {
         };
     }
 
-    /// 通用测试/词项
-    fn _test_parse_term(format: &NarseseFormat<&str>, input: &str) {
+    /// 通通用测试/尝试解析并返回错误
+    fn __test_parse(format: &NarseseFormat<&str>, input: &str) -> NarseseResult {
         // 解析
         let result = format.parse(input);
-        show!(&result);
         // 检验
-        let term: Term = match result {
+        match result {
             // 词项⇒解析出词项
-            Ok(result) => result.try_into().unwrap(),
+            Ok(result) => result,
             // 错误
             Err(e) => {
-                show!(e);
-                panic!("词项解析失败");
+                panic!("{}", e);
             }
-        };
+        }
+    }
+
+    /// 通用测试/词项
+    fn _test_parse_term(format: &NarseseFormat<&str>, input: &str) {
+        // 尝试解析并检验
+        let term: Term = __test_parse(format, input).try_into().unwrap();
         // 展示
         show!(term);
+    }
+
+    /// 通用测试/语句
+    fn _test_parse_sentence(format: &NarseseFormat<&str>, input: &str) {
+        // 尝试解析并检验
+        let sentence: Sentence = __test_parse(format, input).try_into().unwrap();
+        // 展示
+        show!(sentence);
+    }
+
+    /// 通用测试/任务
+    fn _test_parse_task(format: &NarseseFormat<&str>, input: &str) {
+        // 尝试解析并检验
+        let task: Task = __test_parse(format, input).try_into().unwrap();
+        // 展示
+        show!(task);
     }
 
     /// 测试/原子词项
@@ -1383,7 +1474,8 @@ mod tests_parse {
             _test_parse_term;
             // 格式×输入
             &format_ascii;
-            "word", "_", "$i_var", "#d_var", "?q_var", "+137", "^op";
+            "word", "_", "$i_var", "#d_var", "?q_var", "+137", "^op",
+            "^go-to" // * ←该操作符OpenNARS可解析，而ONA、PyNARS不能
         ];
         show!(matrix);
     }
@@ -1407,13 +1499,26 @@ mod tests_parse {
             _test_parse_term;
             // 格式×输入
             &format_ascii;
-            "{word}",
-             "[_]",
-             "(*, $i_var)",
-             "(/, _, #d_var)",
-             "(\\, ?q_var, _)",
-             "(&, +137)",
-             "(|, ^op)";
+            "{word, w2}",
+            "{{word}, {w2}}",
+            "{{{{{{嵌套狂魔}}}}}}",
+            "[1 , 2 , 3  , 4 ,   5 ]",
+            "[_ , _ , _  , _ ,   _ ]", // ! 看起来是五个，实际上因为是「集合」只有一个
+            "(&, word, $i_var, #d_var, ?q_var, _, +137, ^op)",
+            "(|, word, $i_var, #d_var, ?q_var, _, +137, ^op)",
+            "(-, {被减的}, [减去的])",
+            "(~, {[被减的]}, [{减去的}])",
+            "(~, (-, 被减的被减的, {[被减的减去的]}), [{减去的}])",
+            "(*, word, $i_var, #d_var, ?q_var, _, +137, ^op)",
+            "(/, word, _, $i_var, #d_var, ?q_var, +137, ^op)",
+            "(\\,word,$i_var,#d_var,?q_var,_,+137,^op)",
+            "(/, _, 0)",
+            "(\\, 0, _)",
+            "( &&  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )",
+            "( ||  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )",
+            "( --  , 我是被否定的)",
+            "( &/  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )",
+            "( &|  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )",
         ];
         show!(matrix);
     }
@@ -1421,28 +1526,21 @@ mod tests_parse {
     // 测试/复合词项/失败
     fail_tests! {
         // TODO: 完善
-        // test_parse_compound_fail_未知前缀 _test_parse_term(&FORMAT_ASCII, "@word");
-        // test_parse_compound_fail_未知前缀2 _test_parse_term(&FORMAT_ASCII, "`word");
-        // test_parse_compound_fail_非法字符1 _test_parse_term(&FORMAT_ASCII, ",");
-        // test_parse_compound_fail_非法字符2 _test_parse_term(&FORMAT_ASCII, "wo:rd");
-        // test_parse_compound_fail_非法字符3 _test_parse_term(&FORMAT_ASCII, "wo[rd");
-        // test_parse_compound_fail_非法字符4 _test_parse_term(&FORMAT_ASCII, "wo啊/d");
-    }
-
-    /// 通用测试/语句
-    fn _test_parse_sentence(format: &NarseseFormat<&str>, input: &str) {
-        // 解析
-        let result = format.parse(input);
-        show!(&result);
-        // 检验
-        let sentence: Sentence = match result {
-            // 语句⇒解析出语句
-            Ok(result) => result.try_into().unwrap(),
-            // 错误
-            Err(e) => panic!("语句解析失败{e}"),
-        };
-        // 展示
-        show!(sentence);
+        test_parse_compound_fail_无起始符1 _test_parse_term(&FORMAT_ASCII, ")");
+        test_parse_compound_fail_无起始符2 _test_parse_term(&FORMAT_ASCII, "}");
+        test_parse_compound_fail_无起始符3 _test_parse_term(&FORMAT_ASCII, "]");
+        test_parse_compound_fail_无终止符1 _test_parse_term(&FORMAT_ASCII, "(");
+        test_parse_compound_fail_无终止符2 _test_parse_term(&FORMAT_ASCII, "{");
+        test_parse_compound_fail_无终止符3 _test_parse_term(&FORMAT_ASCII, "[");
+        test_parse_compound_fail_空_外延集 _test_parse_term(&FORMAT_ASCII, "{}");
+        test_parse_compound_fail_空_内涵集 _test_parse_term(&FORMAT_ASCII, "[]");
+        test_parse_compound_fail_空_复合词项 _test_parse_term(&FORMAT_ASCII, "(&/, )");
+        test_parse_compound_fail_多余元素_外延差 _test_parse_term(&FORMAT_ASCII, "( -, 要被减掉, 被减掉了, 我是多余的)");
+        test_parse_compound_fail_多余元素_内涵差 _test_parse_term(&FORMAT_ASCII, "( ~, 要被减掉, 被减掉了, 我是多余的)");
+        test_parse_compound_fail_缺少占位符_外延像 _test_parse_term(&FORMAT_ASCII, "( /, 为什么, 这里没有, 占位符呢)");
+        test_parse_compound_fail_缺少占位符_内涵像 _test_parse_term(&FORMAT_ASCII, "( \\, 为什么, 这里没有, 占位符呢)");
+        test_parse_compound_fail_多余元素_否定 _test_parse_term(&FORMAT_ASCII, "( --  , 我是被否定的, 我是多余的)");
+        test_parse_compound_fail_未知连接符 _test_parse_term(&FORMAT_ASCII, "(我是未知的, word, ^op)");
     }
 
     /// 测试/标点（语句）
@@ -1456,22 +1554,6 @@ mod tests_parse {
         "判断.", "目标!", "问题?", "请求@", "?查询变量vs问题?"
         ];
         show!(matrix); // TODO: 失败测试
-    }
-
-    /// 通用测试/任务
-    fn _test_parse_task(format: &NarseseFormat<&str>, input: &str) {
-        // 解析
-        let result = format.parse(input);
-        show!(&result);
-        // 检验
-        let task: Task = match result {
-            // 任务⇒解析出任务
-            Ok(result) => result.try_into().unwrap(),
-            // 错误
-            Err(e) => panic!("任务解析失败{e}"),
-        };
-        // 展示
-        show!(task);
     }
 
     /// 测试/真值（语句）
