@@ -208,6 +208,36 @@ impl NarseseFormat<&str> {
             Equivalence(left, right) => {
                 self.format_statement(out, left, right, self.statement.copula_equivalence)
             }
+            ImplicationPredictive(left, right) => self.format_statement(
+                out,
+                left,
+                right,
+                self.statement.copula_implication_predictive,
+            ),
+            ImplicationConcurrent(left, right) => self.format_statement(
+                out,
+                left,
+                right,
+                self.statement.copula_implication_concurrent,
+            ),
+            ImplicationRetrospective(left, right) => self.format_statement(
+                out,
+                left,
+                right,
+                self.statement.copula_implication_retrospective,
+            ),
+            EquivalencePredictive(left, right) => self.format_statement(
+                out,
+                left,
+                right,
+                self.statement.copula_equivalence_predictive,
+            ),
+            EquivalenceConcurrent(left, right) => self.format_statement(
+                out,
+                left,
+                right,
+                self.statement.copula_equivalence_concurrent,
+            ), // ! 「回顾性等价」未有
         }
     }
 

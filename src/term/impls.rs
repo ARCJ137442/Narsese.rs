@@ -244,6 +244,38 @@ impl Term {
         )
     }
 
+    /// 预测性蕴含 | A =/> C
+    pub fn new_implication_predictive(antecedent: Term, consequent: Term) -> Self {
+        Term::ImplicationPredictive(new_term_ref_type(antecedent), new_term_ref_type(consequent))
+    }
+
+    /// 并发性蕴含 | A =|> C
+    pub fn new_implication_concurrent(antecedent: Term, consequent: Term) -> Self {
+        Term::ImplicationConcurrent(new_term_ref_type(antecedent), new_term_ref_type(consequent))
+    }
+
+    /// 回顾性蕴含 | A =\> C
+    pub fn new_implication_retrospective(antecedent: Term, consequent: Term) -> Self {
+        Term::ImplicationRetrospective(new_term_ref_type(antecedent), new_term_ref_type(consequent))
+    }
+
+    /// 预测性等价 | A </> C
+    pub fn new_equivalence_predictive(antecedent: Term, consequent: Term) -> Self {
+        Term::EquivalencePredictive(new_term_ref_type(antecedent), new_term_ref_type(consequent))
+    }
+
+    /// 并发性等价 | A <|> C
+    pub fn new_equivalence_concurrent(antecedent: Term, consequent: Term) -> Self {
+        Term::EquivalenceConcurrent(new_term_ref_type(antecedent), new_term_ref_type(consequent))
+    }
+
+    /// 回顾性等价 | A <\> C
+    /// * ⚠️自动转换成「预测性等价」
+    ///   * 转换后形式：`C <\> A`
+    pub fn new_equivalence_retrospective(antecedent: Term, consequent: Term) -> Self {
+        Term::new_equivalence_predictive(consequent, antecedent)
+    }
+
     // 特殊初始化 //
 
     /// 工具函数/像：伴随占位符的初始化
@@ -453,9 +485,15 @@ impl Term {
             | ConjunctionSequential(..)
             | ConjunctionParallel(..) => TermCategory::Compound,
             // 陈述
-            Inheritance(..) | Similarity(..) | Implication(..) | Equivalence(..) => {
-                TermCategory::Statement
-            }
+            Inheritance(..)
+            | Similarity(..)
+            | Implication(..)
+            | Equivalence(..)
+            | ImplicationPredictive(..)
+            | ImplicationConcurrent(..)
+            | ImplicationRetrospective(..)
+            | EquivalencePredictive(..)
+            | EquivalenceConcurrent(..) => TermCategory::Statement,
         }
     }
 
@@ -476,9 +514,13 @@ impl Term {
             DifferenceExtension(..)
             | DifferenceIntension(..)
             | Inheritance(..)
-            | Implication(..) => TermCapacity::BinaryVec,
+            | Implication(..)
+            | ImplicationPredictive(..)
+            | ImplicationConcurrent(..)
+            | ImplicationRetrospective(..)
+            | EquivalencePredictive(..) => TermCapacity::BinaryVec,
             // 二元集合
-            Similarity(..) | Equivalence(..) => TermCapacity::BinarySet,
+            Similarity(..) | Equivalence(..) | EquivalenceConcurrent(..) => TermCapacity::BinarySet,
             // 序列
             Product(..) | ImageExtension(..) | ImageIntension(..) | ConjunctionSequential(..) => {
                 TermCapacity::Vec
@@ -628,7 +670,12 @@ impl Term {
             | Inheritance(term1, term2)
             | Similarity(term1, term2)
             | Implication(term1, term2)
-            | Equivalence(term1, term2) => vec![term1, term2],
+            | Equivalence(term1, term2)
+            | ImplicationPredictive(term1, term2)
+            | ImplicationConcurrent(term1, term2)
+            | ImplicationRetrospective(term1, term2)
+            | EquivalencePredictive(term1, term2)
+            | EquivalenceConcurrent(term1, term2) => vec![term1, term2],
 
             // 有序容器⇒返回拷贝后的容器
             Product(vec)
@@ -782,19 +829,15 @@ impl Hash for Term {
             }
             ConjunctionParallel(set) => hash_term_set(set, state),
             // 陈述
-            Inheritance(t1, t2) => {
-                t1.hash(state);
-                t2.hash(state);
-            }
-            Similarity(t1, t2) => {
-                t1.hash(state);
-                t2.hash(state);
-            }
-            Implication(t1, t2) => {
-                t1.hash(state);
-                t2.hash(state);
-            }
-            Equivalence(t1, t2) => {
+            Inheritance(t1, t2)
+            | Similarity(t1, t2)
+            | Implication(t1, t2)
+            | Equivalence(t1, t2)
+            | ImplicationPredictive(t1, t2)
+            | ImplicationConcurrent(t1, t2)
+            | ImplicationRetrospective(t1, t2)
+            | EquivalencePredictive(t1, t2)
+            | EquivalenceConcurrent(t1, t2) => {
                 t1.hash(state);
                 t2.hash(state);
             }
@@ -902,6 +945,11 @@ mod tests {
             Term::new_similarity(a.clone(), b.clone()),
             Term::new_implication(a.clone(), b.clone()),
             Term::new_equivalence(a.clone(), b.clone()),
+            Term::new_implication_predictive(a.clone(), b.clone()),
+            Term::new_implication_concurrent(a.clone(), b.clone()),
+            Term::new_implication_retrospective(a.clone(), b.clone()),
+            Term::new_equivalence_predictive(a.clone(), b.clone()),
+            Term::new_equivalence_concurrent(a.clone(), b.clone()),
         ]
     }
 

@@ -125,18 +125,18 @@ pub struct NarseseFormatStatement<Content> {
     pub copula_instance_property: Content,
 
     /// 派生系词/预测性蕴含 | `=/>`
-    pub copula_predictive_implication: Content,
+    pub copula_implication_predictive: Content,
     /// 派生系词/并发性蕴含 | `=|>`
-    pub copula_concurrent_implication: Content,
+    pub copula_implication_concurrent: Content,
     /// 派生系词/回顾性蕴含 | `=\>`
-    pub copula_retrospective_implication: Content,
+    pub copula_implication_retrospective: Content,
 
     /// 派生系词/预测性等价 | `</>`
-    pub copula_predictive_equivalence: Content,
+    pub copula_equivalence_predictive: Content,
     /// 派生系词/并发性等价 | `<|>`
-    pub copula_concurrent_equivalence: Content,
+    pub copula_equivalence_concurrent: Content,
     /// 派生系词/回顾性等价 | `<\>`
-    pub copula_retrospective_equivalence: Content,
+    pub copula_equivalence_retrospective: Content,
 }
 
 /// Narsese格式/语句

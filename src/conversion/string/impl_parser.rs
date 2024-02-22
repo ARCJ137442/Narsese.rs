@@ -313,7 +313,7 @@ macro_rules! first_method {
 /// * 🎯用于快速识别并跳过指定前缀
 /// * 🎯用于避免遗漏「跳过前缀」的操作
 /// 📝`self`是一个内容相关的关键字，必须向其中传递`self`作为参数
-macro_rules! first_prefix_and_skip {
+macro_rules! first_prefix_and_skip_first {
     {
         // * 传入「self.方法名」作为被调用的方法
         $self_:ident;
@@ -831,7 +831,7 @@ impl<'a> ParseState<'a, &str> {
                 // 使用`is_ascii_digit`，数值/正负号 均可 | ✅已在EVCXR中实验过
                 self.head_char().is_ascii_digit() // ! 此处「混合直接匹配与带守卫匹配」导致无法使用`match`
                     || self.head_char() == '+'
-                    || self.head_char() == '-'
+                 || self.head_char() == '-'
             )
         {
             // 向目标添加字符
@@ -1107,7 +1107,7 @@ impl<'a> ParseState<'a, &str> {
         // 跳过左括弧&连续空白
         self.head_skip_and_spaces(self.format.compound.brackets.0);
         // 解析连接符
-        let mut term = first_prefix_and_skip! {
+        let mut term = first_prefix_and_skip_first! {
             self;
             // NAL-5 // ! ⚠️长的`&&`必须比短的`&`先匹配（`||`、`--`同理）
             // 合取 | 🚩空数组
@@ -1115,7 +1115,7 @@ impl<'a> ParseState<'a, &str> {
             // 析取 | 🚩空数组
             self.format.compound.connecter_disjunction => Term::new_disjunction(vec![]),
             // 否定 | 🚩使用占位符初始化，后续将被覆盖
-            self.format.compound.connecter_negation => Term::new_negation(Term::Placeholder),
+            self.format.compound.connecter_negation => Term::new_negation(Term::new_placeholder()),
             // NAL-7 //
             // 顺序合取 | 🚩空数组
             self.format.compound.connecter_conjunction_sequential => Term::new_conjunction_sequential(vec![]),
@@ -1127,9 +1127,9 @@ impl<'a> ParseState<'a, &str> {
             // 内涵交 | 🚩空数组
             self.format.compound.connecter_intersection_intension => Term::new_intersection_intension(vec![]),
             // 外延差 | 🚩使用占位符初始化，后续将被覆盖
-            self.format.compound.connecter_difference_extension => Term::new_difference_extension(Term::Placeholder,Term::Placeholder),
+            self.format.compound.connecter_difference_extension => Term::new_difference_extension(Term::new_placeholder(),Term::new_placeholder()),
             // 内涵差 | 🚩使用占位符初始化，后续将被覆盖
-            self.format.compound.connecter_difference_intension => Term::new_difference_intension(Term::Placeholder,Term::Placeholder),
+            self.format.compound.connecter_difference_intension => Term::new_difference_intension(Term::new_placeholder(),Term::new_placeholder()),
             // NAL-4 //
             // 乘积 | 🚩空数组
             self.format.compound.connecter_product => Term::new_product(vec![]),
@@ -1204,8 +1204,60 @@ impl<'a> ParseState<'a, &str> {
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
     fn parse_statement(&mut self) -> ParseResult<Term> {
-        // TODO: 有待完成
-        self.err("TODO!")
+        // 跳过左括弧&连续空白
+        self.head_skip_and_spaces(self.format.statement.brackets.0);
+        // 解析主词
+        let subject = self.parse_term()?;
+        // 跳过空白
+        self.head_skip_spaces();
+        // 使用闭包简化「跳过空白⇒解析谓词」的操作
+        // * 💭实际上是一种「先进行后处理，然后处理中间分派的结果」的思想
+        // * 📌产生原因：先根据遇到的「连接词」生成词项，然后才能解析并置入后边的谓词
+        // * 📝此中不能直接捕获`self`（会捕获所有权），需要引入`Self`类型的可变引用作为参数
+        //    * 保证对象安全
+        let parse_predicate = |self_: &mut Self| {
+            // 跳过空白
+            self_.head_skip_spaces();
+            // 解析谓词
+            self_.parse_term()
+        };
+        // 解析系词
+        let term = first_prefix_and_skip_first! {
+            // 先匹配，然后跳过，再执行分支内的代码
+            self;
+            // 继承
+            self.format.statement.copula_inheritance => Term::new_inheritance(subject, parse_predicate(self)?),
+            // 相似
+            self.format.statement.copula_similarity => Term::new_similarity(subject, parse_predicate(self)?),
+            // 蕴含
+            self.format.statement.copula_implication => Term::new_implication(subject, parse_predicate(self)?),
+            // 等价
+            self.format.statement.copula_equivalence => Term::new_equivalence(subject, parse_predicate(self)?),
+            // 实例
+            self.format.statement.copula_instance => Term::new_instance(subject, parse_predicate(self)?),
+            // 属性
+            self.format.statement.copula_property => Term::new_property(subject, parse_predicate(self)?),
+            // 实例属性
+            self.format.statement.copula_instance_property => Term::new_instance_property(subject, parse_predicate(self)?),
+            // 预测性蕴含
+            self.format.statement.copula_implication_predictive => Term::new_implication_predictive(subject, parse_predicate(self)?),
+            // 并发性蕴含
+            self.format.statement.copula_implication_concurrent => Term::new_implication_concurrent(subject, parse_predicate(self)?),
+            // 回顾性蕴含
+            self.format.statement.copula_implication_retrospective => Term::new_implication_retrospective(subject, parse_predicate(self)?),
+            // 预测性等价
+            self.format.statement.copula_equivalence_predictive => Term::new_equivalence_predictive(subject, parse_predicate(self)?),
+            // 并发性等价
+            self.format.statement.copula_equivalence_concurrent => Term::new_equivalence_concurrent(subject, parse_predicate(self)?),
+            // 回顾性等价 | ⚠️会在构造时自动转换
+            self.format.statement.copula_equivalence_retrospective => Term::new_equivalence_retrospective(subject, parse_predicate(self)?),
+            // 未知 //
+            _ => return self.err("未知的陈述系词"),
+        };
+        // 跳过连续空白&右括弧
+        self.head_skip_after_spaces(self.format.statement.brackets.1);
+        // 返回
+        Self::ok(term)
     }
 
     /// 工具函数/判断字符是否能作为「词项名」
@@ -1214,7 +1266,9 @@ impl<'a> ParseState<'a, &str> {
     fn is_valid_atom_name(c: char) -> bool {
         match c {
             // 特殊：横杠/下划线
-            '-' | '_' => true,
+            // ! ↓【2024-02-22 14:46:16】现因需兼顾`<主词-->谓词>`的结构（防止系词中的`-`被消耗），故不再兼容`-`
+            /* '-' |  */
+            '_' => true,
             //  否则：判断是否为「字母/数字」
             _ => c.is_alphabetic() || c.is_numeric(),
         }
@@ -1225,7 +1279,7 @@ impl<'a> ParseState<'a, &str> {
     /// * 📌需要在此完成专有的挪位
     fn parse_atom(&mut self) -> ParseResult<Term> {
         // 匹配并消耗前缀，并以此预置「词项」
-        let mut term = first_prefix_and_skip! {
+        let mut term = first_prefix_and_skip_first! {
             self;
             // 占位符 | 此举相当于识别以「_」开头的词项
             self.format.atom.prefix_placeholder => Term::new_placeholder(),
@@ -1475,7 +1529,8 @@ mod tests_parse {
             // 格式×输入
             &format_ascii;
             "word", "_", "$i_var", "#d_var", "?q_var", "+137", "^op",
-            "^go-to" // * ←该操作符OpenNARS可解析，而ONA、PyNARS不能
+            // "^go-to" // * ←该操作符OpenNARS可解析，而ONA、PyNARS不能
+            // ! ↑【2024-02-22 14:46:16】现因需兼顾`<主词-->谓词>`的结构（防止系词中的`-`被消耗），故不再兼容
         ];
         show!(matrix);
     }
@@ -1525,7 +1580,6 @@ mod tests_parse {
 
     // 测试/复合词项/失败
     fail_tests! {
-        // TODO: 完善
         test_parse_compound_fail_无起始符1 _test_parse_term(&FORMAT_ASCII, ")");
         test_parse_compound_fail_无起始符2 _test_parse_term(&FORMAT_ASCII, "}");
         test_parse_compound_fail_无起始符3 _test_parse_term(&FORMAT_ASCII, "]");
@@ -1542,6 +1596,44 @@ mod tests_parse {
         test_parse_compound_fail_多余元素_否定 _test_parse_term(&FORMAT_ASCII, "( --  , 我是被否定的, 我是多余的)");
         test_parse_compound_fail_未知连接符 _test_parse_term(&FORMAT_ASCII, "(我是未知的, word, ^op)");
     }
+
+    /// 测试/陈述
+    #[test]
+    fn test_parse_statement() {
+        let format_ascii = FORMAT_ASCII;
+        let matrix = f_matrix! [
+            // 应用的函数
+            _test_parse_term;
+            // 格式×输入
+            &format_ascii;
+            // 普通情况
+            "<外延-->内涵>",
+            "<我是右边的外延 --> 我是左边的内涵>",
+            "<前提 ==> 结论>",
+            "<等价物 <=> 等價物>",
+            // 派生系词
+            "<实例 {-- 类型>",
+            "<类型 --] 属性>",
+            "<实例 {-] 属性>",
+            r#"<当下行动 =/> 未来预期>"#,
+            r#"<当下条件 =|> 当下结论>"#,
+            r#"<当下结果 =\> 过往原因>"#,
+            r#"<统一前提 </> 未来等价>"#,
+            r#"<统一前提 <|> 当下等价>"#,
+            r#"<统一前提 <\> 过往等价>"#, // ! ⚠️允许出现，但会被自动转换为「未来等价」
+
+            // 集成测试：原子&复合
+            "<[蕴含]==>{怪论}>",
+            "<$我很相似 <-> #我也是>",
+            "<^咱俩相同<->^咱俩相同>",
+            "<+123<->加一二三>",
+            "<(*, {SELF}) --> ^left>",
+        ];
+        show!(matrix);
+    }
+
+    // 测试/陈述/失败
+    fail_tests! {}
 
     /// 测试/标点（语句）
     #[test]
