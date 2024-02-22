@@ -759,7 +759,7 @@ impl<'a> ParseState<'a, &str> {
         let mut value_buffer = String::new();
         // 填充数组
         let mut i: usize = 0;
-        while self.can_consume() {
+        while self.can_consume() && i < N {
             match self.head_char() {
                 // 空白⇒跳过
                 _ if self.starts_with(self.format.space) => self.head_skip(self.format.space),
@@ -1731,6 +1731,29 @@ mod tests_parse {
         ];
         show!(matrix); // TODO: 失败测试
     }
+
+    /// 通用/健壮性测试
+    /// * 🎯仅用于检测是否会panic
+    fn _test_parse_stability(format: &NarseseFormat<&str>, input: &str) {
+        // 解析，忽略结果
+        let _ = format.parse(input);
+    }
+
+    /// 集成测试/健壮性测试
+    /// * 🎯用于检验是否可能panic
+    #[test]
+    fn test_parse_stability_cases() {
+        f_matrix! [
+            // 应用的函数
+            _test_parse_stability;
+            // 格式×输入
+            &FORMAT_ASCII;
+            // 多个真值/预算值 // ! 可能的数组越界
+            "1. %1;1;1%"
+            "$1;1;1$ 1."
+        ];
+    }
+        
 
     /// 集成测试/解析器
     #[test]
