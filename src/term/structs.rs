@@ -85,7 +85,7 @@ pub enum TermCategory {
 /// 词项容量
 /// * 🎯用于对词项快速分类
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TermCapability {
+pub enum TermCapacity {
     /// 原子
     Atom,
     /// 一元

@@ -30,7 +30,7 @@ use crate::{
     util::{FloatPrecision, IntPrecision},
     Budget, Punctuation, Sentence, Stamp, Task, Term, Truth,
 };
-use std::{error::Error, fmt::Display, io::ErrorKind};
+use std::{error::Error, fmt::Display, io::ErrorKind, vec};
 
 use super::NarseseFormat;
 
@@ -435,6 +435,24 @@ impl<'a> ParseState<'a, &str> {
         // 跳过「字符数」个字符
         self.head_step(to_be_skip.chars().count())
     }
+    /*
+    /// 头索引尝试跳过
+    /// * 🎯用于抽象「头部索引先判断是否开头，然后跳过」的过程
+    /// * 🚩逻辑：头部索引根据「是否开头」决定跳过
+    ///   * 并返回一个[`ConsumeResult`]决定是否「跳过成功」
+    ///   * 💭一般而言，跳过失败是需要报错的
+    /// * 📌自动内联
+    #[inline(always)]
+    fn head_try_skip(&mut self, to_be_skip: &str, err_message: &str) -> ConsumeResult {
+        // 匹配开头
+        match self.starts_with(to_be_skip) {
+            true => {
+                self.head_skip(to_be_skip);
+                Self::ok_consume()
+            }
+            false => self.err(err_message),
+        }
+    } */
 
     /// 头索引跳过系列空白
     /// * 🎯用于抽象「头部索引跳过空白序列」的过程
@@ -445,6 +463,30 @@ impl<'a> ParseState<'a, &str> {
         while self.starts_with(self.format.space) {
             self.head_skip(self.format.space);
         }
+    }
+
+    /// 头索引跳过某字串，连同系列空白
+    /// * 🎯用于抽象「头部索引跳过字符串及之后的空白序列」的过程
+    /// * 🚩逻辑：合并上述代码
+    /// * 📌自动内联
+    #[inline(always)]
+    fn head_skip_and_spaces(&mut self, to_be_skip: &str) {
+        // 跳过字符串
+        self.head_skip(to_be_skip);
+        // 跳过空白
+        self.head_skip_spaces();
+    }
+
+    /// 头索引跳过系列空白，连同某字串
+    /// * 🎯用于抽象「头部索引跳过空白序列及之后的字符串」的过程
+    /// * 🚩逻辑：合并上述代码
+    /// * 📌自动内联
+    #[inline(always)]
+    fn head_skip_after_spaces(&mut self, to_be_skip: &str) {
+        // 跳过空白
+        self.head_skip_spaces();
+        // 跳过字符串
+        self.head_skip(to_be_skip);
     }
 
     /// 构建「中间解析结果」/入口
@@ -722,7 +764,7 @@ impl<'a> ParseState<'a, &str> {
     /// * 📌需要在此完成专有的挪位
     fn consume_stamp(&mut self) -> ConsumeResult {
         // 跳过左括弧
-        self.head_skip(self.format.sentence.stamp_brackets.0);
+        self.head_skip_and_spaces(self.format.sentence.stamp_brackets.0);
         // 开始匹配时间戳类型标识符
         let stamp = first_method! {
             // 前缀匹配
@@ -763,7 +805,7 @@ impl<'a> ParseState<'a, &str> {
         // 置入时间戳
         let _ = self.mid_result.stamp.insert(stamp);
         // 跳过右括弧 | // ! ⚠️默认「匹配完类型后就是右括弧」
-        self.head_skip(self.format.sentence.stamp_brackets.1);
+        self.head_skip_after_spaces(self.format.sentence.stamp_brackets.1);
         // 返回
         Self::ok_consume()
     }
@@ -773,7 +815,7 @@ impl<'a> ParseState<'a, &str> {
     /// * 📌需要在此完成专有的挪位
     fn consume_truth(&mut self) -> ConsumeResult {
         // 跳过左括弧
-        self.head_skip(self.format.sentence.truth_brackets.0);
+        self.head_skip_and_spaces(self.format.sentence.truth_brackets.0);
         let ([f, c], num) = self.parse_separated_floats::<2>(
             self.format.sentence.truth_separator,
             self.format.sentence.truth_brackets.1,
@@ -788,7 +830,7 @@ impl<'a> ParseState<'a, &str> {
             _ => Truth::Double(f, c),
         };
         // 跳过右括弧
-        self.head_skip(self.format.sentence.truth_brackets.1);
+        self.head_skip_after_spaces(self.format.sentence.truth_brackets.1);
         // 直接置入真值 | 因为先前`consume_one`已经假定「未曾置入真值」
         let _ = self.mid_result.truth.insert(truth);
         Self::ok_consume()
@@ -799,7 +841,7 @@ impl<'a> ParseState<'a, &str> {
     /// * 📌需要在此完成专有的挪位
     fn consume_budget(&mut self) -> ConsumeResult {
         // 跳过左括弧
-        self.head_skip(self.format.task.budget_brackets.0);
+        self.head_skip_and_spaces(self.format.task.budget_brackets.0);
         let ([p, d, q], num) = self.parse_separated_floats::<3>(
             self.format.task.budget_separator,
             self.format.task.budget_brackets.1,
@@ -816,7 +858,7 @@ impl<'a> ParseState<'a, &str> {
             _ => Budget::Triple(p, d, q),
         };
         // 跳过右括弧
-        self.head_skip(self.format.task.budget_brackets.1);
+        self.head_skip_after_spaces(self.format.task.budget_brackets.1);
         // 直接置入预算值 | 因为先前`consume_one`已经假定「未曾置入预算值」
         let _ = self.mid_result.budget.insert(budget);
         Self::ok_consume()
@@ -852,28 +894,206 @@ impl<'a> ParseState<'a, &str> {
         }
     }
 
+    /// 工具函数：解析系列词项（并置入相应数组）
+    /// * 📌自动内联
+    #[inline(always)]
+    fn parse_compound_terms(
+        &mut self,
+        target: &mut Vec<Term>,
+        right_bracket: &str,
+    ) -> ConsumeResult {
+        while self.can_consume() {
+            // 置入词项
+            target.push(
+                // 消耗&解析词项
+                self.parse_term()?,
+            );
+            first_method! {
+                // 检查开头
+                self.starts_with;
+                // 空白⇒跳过
+                self.format.space => self.head_skip(self.format.space),
+                // 分隔符⇒跳过
+                self.format.compound.separator => self.head_skip(self.format.compound.separator),
+                // 右括号⇒停止 // ! 跳过的逻辑交由调用者
+                right_bracket => break,
+                // 其它⇒报错
+                _ => return self.err("非法的词项序列字符"),
+            };
+        }
+        // 返回成功
+        Self::ok_consume()
+    }
+
+    /// 工具函数/解析形如`{词项, 词项, ...}`的「词项集」语法
+    /// * 📌自动内联
+    #[inline(always)]
+    fn parse_term_set(
+        &mut self,
+        mut terms: Vec<Term>,
+        left_bracket: &str,
+        right_bracket: &str,
+    ) -> ParseResult<Vec<Term>> {
+        // 跳过左括弧&连续空白
+        self.head_skip_and_spaces(left_bracket);
+        // 填充词项序列
+        self.parse_compound_terms(&mut terms, right_bracket)?;
+        // 跳过连续空白&右括弧
+        self.head_skip_after_spaces(right_bracket);
+        // 返回
+        Self::ok(terms)
+    }
+
     /// 消耗&置入/词项/复合（外延集）
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
     fn parse_compound_set_extension(&mut self) -> ParseResult<Term> {
-        // TODO: 有待完成
-        self.err("TODO!")
+        // 解析词项集&组分
+        let terms = self.parse_term_set(
+            vec![],
+            self.format.compound.brackets_set_extension.0,
+            self.format.compound.brackets_set_extension.1,
+        )?; // * 📝不用考虑空间开销，编译器自己懂得内联
+            // 返回成功
+        Self::ok(Term::new_set_extension(terms))
     }
 
     /// 消耗&置入/词项/复合（内涵集）
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
     fn parse_compound_set_intension(&mut self) -> ParseResult<Term> {
-        // TODO: 有待完成
-        self.err("TODO!")
+        // 解析词项集&组分
+        let terms = self.parse_term_set(
+            vec![],
+            self.format.compound.brackets_set_intension.0,
+            self.format.compound.brackets_set_intension.1,
+        )?; // * 📝不用考虑空间开销，编译器自己懂得内联
+            // 返回成功
+        Self::ok(Term::new_set_intension(terms))
+    }
+
+    /// 工具函数/像
+    /// * 🚩找到并删除首个像占位符，并返回索引
+    /// * 📌自动内联
+    #[inline(always)]
+    fn parse_terms_with_image(&self, terms: &mut Vec<Term>) -> ParseResult<usize> {
+        // 找到首个像占位符的位置
+        let placeholder_index = terms.iter().position(|term| *term == Term::Placeholder);
+        // 分「找到/没找到」讨论
+        match placeholder_index {
+            // 找到⇒删除&返回
+            Some(index) => {
+                // 删除此处的像占位符
+                terms.remove(index);
+                // 返回成功
+                Self::ok(index)
+            }
+            // 返回失败
+            None => self.err("未在词项序列中找到占位符"),
+        }
     }
 
     /// 消耗&置入/词项/复合（括弧）
     /// * 📌传入之前提：已识别出相应的「特征开头」
     /// * 📌需要在此完成专有的挪位
+    /// * 🚩采用「先构造词项，再填充元素」的构造方法
+    ///   * ❗因为需要「根据连接符取得相应类型」且「根据后边序列取得元素」
+    ///   * 📌对于「创建时就需指定所有元素」的「一元复合词项」「二元复合词项」，使用「占位符」预先占位
     fn parse_compound(&mut self) -> ParseResult<Term> {
-        // TODO: 有待完成
-        self.err("TODO!")
+        // 跳过左括弧&连续空白
+        self.head_skip_and_spaces(self.format.compound.brackets.0);
+        // 解析连接符
+        let mut term = first_method! {
+            self.starts_with;
+            // NAL-3 //
+            // 外延交 | 🚩空数组
+            self.format.compound.connecter_intersection_extension => Term::new_intersection_extension(vec![]),
+            // 内涵交 | 🚩空数组
+            self.format.compound.connecter_intersection_intension => Term::new_intersection_intension(vec![]),
+            // 外延差 | 🚩使用占位符初始化，后续将被覆盖
+            self.format.compound.connecter_difference_extension => Term::new_difference_extension(Term::Placeholder,Term::Placeholder),
+            // 内涵差 | 🚩使用占位符初始化，后续将被覆盖
+            self.format.compound.connecter_difference_intension => Term::new_difference_intension(Term::Placeholder,Term::Placeholder),
+            // NAL-4 //
+            // 乘积 | 🚩空数组
+            self.format.compound.connecter_product => Term::new_product(vec![]),
+            // 外延像 | 🚩空数组&0索引
+            self.format.compound.connecter_image_extension => Term::new_image_extension(0, vec![]),
+            // 内涵像 | 🚩空数组&0索引
+            self.format.compound.connecter_image_intension => Term::new_image_intension(0, vec![]),
+            // NAL-5 //
+            // 合取 | 🚩空数组
+            self.format.compound.connecter_conjunction => Term::new_conjunction(vec![]),
+            // 析取 | 🚩空数组
+            self.format.compound.connecter_disjunction => Term::new_disjunction(vec![]),
+            // 否定 | 🚩使用占位符初始化，后续将被覆盖
+            self.format.compound.connecter_negation => Term::new_negation(Term::Placeholder),
+            // NAL-7 //
+            // 顺序合取 | 🚩空数组
+            self.format.compound.connecter_conjunction_sequential => Term::new_conjunction_sequential(vec![]),
+            // 平行合取 | 🚩空数组
+            self.format.compound.connecter_conjunction_parallel => Term::new_conjunction_parallel(vec![]),
+            // 未知 //
+            _ => return self.err("未知的复合词项连接符"),
+        };
+        // 解析组分
+        let mut terms = vec![];
+        self.parse_compound_terms(&mut terms, self.format.compound.brackets.1)?;
+        // ! 不允许空集
+        if terms.is_empty() {
+            return self.err("复合词项内容不能为空");
+        }
+        // 填充组分 | 此处类似「针对容量」但实际上还是需要「具体类型具体填充」
+        match &mut term {
+            // 一元复合词项：覆盖
+            Term::Negation(inner_box) => {
+                // 检查长度
+                if terms.len() != 1 {
+                    return self.err("一元内容长度不为1");
+                }
+                // 解包并追加进第一个元素
+                // 📝Rust支持对函数结果（只要是引用）进行「解引用赋值」
+                *inner_box.as_mut() = unsafe { terms.pop().unwrap_unchecked() };
+                // ! ↑SAFETY: 上方「检查长度」已确保是非空集
+            }
+            // 二元序列⇒覆盖 | 📌实际上「蕴含」「等价」都算
+            Term::DifferenceExtension(ref1, ref2)
+            | Term::DifferenceIntension(ref1, ref2)
+            | Term::Inheritance(ref1, ref2)
+            | Term::Implication(ref1, ref2)
+            | Term::Similarity(ref1, ref2)
+            | Term::Equivalence(ref1, ref2) => {
+                // 检查长度
+                if terms.len() != 2 {
+                    return self.err("二元序列长度不为2");
+                }
+                // 解包并倒序追加俩元素
+                // ! ↑SAFETY: 上方「检查长度」已确保是非空集
+                *ref2.as_mut() = unsafe { terms.pop().unwrap_unchecked() };
+                *ref1.as_mut() = unsafe { terms.pop().unwrap_unchecked() };
+            }
+            // 二元集合⇒清空&重新添加 | ⚠️暂时没有
+            // 像：特殊处理
+            Term::ImageExtension(index, vec) | Term::ImageIntension(index, vec) => {
+                // 计算词项序列（提取占位符索引）
+                let i = self.parse_terms_with_image(&mut terms)?;
+                // 更新索引
+                *index = i;
+                // 追加词项
+                vec.extend(terms);
+            }
+            // 其它（序列/集合）⇒直接添加 | 📌其一定为复合词项，但对「二元词项」会报错
+            _ => {
+                // 直接识别并传播错误
+                if let Err(err) = term.push_components(terms) {
+                    return self.err(&err.to_string());
+                }
+            }
+        }
+        // 跳过连续空白&右括弧
+        self.head_skip_after_spaces(self.format.compound.brackets.1);
+        // 返回
+        Self::ok(term)
     }
 
     /// 消耗&置入/词项/陈述
@@ -1135,8 +1355,8 @@ mod tests_parse {
         };
     }
 
-    /// 通用测试/原子词项
-    fn _test_parse_atom(format: &NarseseFormat<&str>, input: &str) {
+    /// 通用测试/词项
+    fn _test_parse_term(format: &NarseseFormat<&str>, input: &str) {
         // 解析
         let result = format.parse(input);
         show!(&result);
@@ -1160,7 +1380,7 @@ mod tests_parse {
         let format_ascii = FORMAT_ASCII;
         let matrix = f_matrix! [
             // 应用的函数
-            _test_parse_atom;
+            _test_parse_term;
             // 格式×输入
             &format_ascii;
             "word", "_", "$i_var", "#d_var", "?q_var", "+137", "^op";
@@ -1170,12 +1390,43 @@ mod tests_parse {
 
     // 测试/原子词项/失败
     fail_tests! {
-        test_parse_atom_fail_未知前缀 _test_parse_atom(&FORMAT_ASCII, "@word");
-        test_parse_atom_fail_未知前缀2 _test_parse_atom(&FORMAT_ASCII, "`word");
-        test_parse_atom_fail_非法字符1 _test_parse_atom(&FORMAT_ASCII, ",");
-        test_parse_atom_fail_非法字符2 _test_parse_atom(&FORMAT_ASCII, "wo:rd");
-        test_parse_atom_fail_非法字符3 _test_parse_atom(&FORMAT_ASCII, "wo[rd");
-        test_parse_atom_fail_非法字符4 _test_parse_atom(&FORMAT_ASCII, "wo啊/d");
+        test_parse_atom_fail_未知前缀 _test_parse_term(&FORMAT_ASCII, "@word");
+        test_parse_atom_fail_未知前缀2 _test_parse_term(&FORMAT_ASCII, "`word");
+        test_parse_atom_fail_非法字符1 _test_parse_term(&FORMAT_ASCII, ",");
+        test_parse_atom_fail_非法字符2 _test_parse_term(&FORMAT_ASCII, "wo:rd");
+        test_parse_atom_fail_非法字符3 _test_parse_term(&FORMAT_ASCII, "wo[rd");
+        test_parse_atom_fail_非法字符4 _test_parse_term(&FORMAT_ASCII, "wo啊/d");
+    }
+
+    /// 测试/复合词项
+    #[test]
+    fn test_parse_compound() {
+        let format_ascii = FORMAT_ASCII;
+        let matrix = f_matrix! [
+            // 应用的函数
+            _test_parse_term;
+            // 格式×输入
+            &format_ascii;
+            "{word}",
+             "[_]",
+             "(*, $i_var)",
+             "(/, _, #d_var)",
+             "(\\, ?q_var, _)",
+             "(&, +137)",
+             "(|, ^op)";
+        ];
+        show!(matrix);
+    }
+
+    // 测试/复合词项/失败
+    fail_tests! {
+        // TODO: 完善
+        // test_parse_compound_fail_未知前缀 _test_parse_term(&FORMAT_ASCII, "@word");
+        // test_parse_compound_fail_未知前缀2 _test_parse_term(&FORMAT_ASCII, "`word");
+        // test_parse_compound_fail_非法字符1 _test_parse_term(&FORMAT_ASCII, ",");
+        // test_parse_compound_fail_非法字符2 _test_parse_term(&FORMAT_ASCII, "wo:rd");
+        // test_parse_compound_fail_非法字符3 _test_parse_term(&FORMAT_ASCII, "wo[rd");
+        // test_parse_compound_fail_非法字符4 _test_parse_term(&FORMAT_ASCII, "wo啊/d");
     }
 
     /// 通用测试/语句
@@ -1204,7 +1455,7 @@ mod tests_parse {
         &FORMAT_ASCII;
         "判断.", "目标!", "问题?", "请求@", "?查询变量vs问题?"
         ];
-        show!(matrix);
+        show!(matrix); // TODO: 失败测试
     }
 
     /// 通用测试/任务
@@ -1238,7 +1489,7 @@ mod tests_parse {
             "空真值2. %", // * 这个会预先退出
             "空真值3.",
         ];
-        show!(matrix);
+        show!(matrix); // TODO: 失败测试
     }
 
     /// 测试/时间戳（语句）
@@ -1257,7 +1508,7 @@ mod tests_parse {
             "未来! :/:",
             "永恒.",
         ];
-        show!(matrix);
+        show!(matrix); // TODO: 失败测试
     }
 
     /// 测试/预算值（任务）
@@ -1277,7 +1528,7 @@ mod tests_parse {
             // "$$空预算?",
             "$$$独立变量vs空运算?",
         ];
-        show!(matrix);
+        show!(matrix); // TODO: 失败测试
     }
 
     // 词项

@@ -75,7 +75,7 @@ pub struct NarseseFormatCompound<Content> {
     /// 连接符/外延交集 | `&`
     pub connecter_intersection_extension: Content,
     /// 连接符/内涵交集 | `|`
-    pub connector_intersection_intension: Content,
+    pub connecter_intersection_intension: Content,
     /// 连接符/外延差集 | `-`
     pub connecter_difference_extension: Content,
     /// 连接符/内涵差集 | `~`

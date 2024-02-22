@@ -145,7 +145,7 @@ impl NarseseFormat<&str> {
             IntersectionIntension(..) => self.format_compound(
                 out,
                 term.get_components(),
-                self.compound.connector_intersection_intension,
+                self.compound.connecter_intersection_intension,
             ),
             DifferenceExtension(..) => self.format_compound(
                 out,

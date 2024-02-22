@@ -19,7 +19,7 @@ pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
         brackets_set_extension: ("{", "}"),
         brackets_set_intension: ("[", "]"),
         connecter_intersection_extension: "&",
-        connector_intersection_intension: "|",
+        connecter_intersection_intension: "|",
         connecter_difference_extension: "-",
         connecter_difference_intension: "~",
         connecter_product: "*",
