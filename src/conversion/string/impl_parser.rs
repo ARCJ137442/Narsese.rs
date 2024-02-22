@@ -382,7 +382,7 @@ macro_rules! first_method_ok {
     };
     // 用于在匹配时收集错误
     // * 🎯用于在解析如`( --  , 我是被否定的, 我是多余的)`的词项时，
-    // *   不会只有「无token错误」而可显示「出错之前积累的错误」
+    // *   不会只有「无条目错误」而可显示「出错之前积累的错误」
     {
         // * 传入「self.方法名」作为「移动头索引」的方法
         $self_move:ident . $method_move:ident;
@@ -663,13 +663,13 @@ impl<'a> ParseState<'a, &str> {
                 // *【2024-02-21 23:39:30】目前选择报错
                 match errs.is_empty() {
                     // 无追踪⇒直接呈现
-                    true => self.err("没有可解析的token"),
+                    true => self.err("没有可解析的条目"),
                     // 有追踪⇒链式呈现
                     false => {
                         // 链式呈现
                         self.err(&format!(
-                            "没有可解析的token from [ {} ]",
-                            errs.join(" |> "),
+                            "没有可解析的条目 from [\n\t{}\n]",
+                            errs.join("\n\t"),
                         ))
                     },
                 }
@@ -1109,6 +1109,8 @@ impl<'a> ParseState<'a, &str> {
         // 解析连接符
         let mut term = first_prefix_and_skip_first! {
             self;
+            // ! 暂不支持OpenNARS风格操作
+            self.format.atom.prefix_operator => return self.err("暂不支持OpenNARS风格`(^操作名, 参数)`操作，建议使用`<(*, 参数) --> 操作名>`代替"),
             // NAL-5 // ! ⚠️长的`&&`必须比短的`&`先匹配（`||`、`--`同理）
             // 合取 | 🚩空数组
             self.format.compound.connecter_conjunction => Term::new_conjunction(vec![]),
@@ -1454,8 +1456,9 @@ mod tests_parse {
     macro_rules! f_matrix {
         [
             $f:ident;
-            $($format:expr),+ $(,)?;
-            $($input:expr),+ $(,)? $(;)?
+            $($format:expr $(,)?)+ ;
+            $($input:expr $(,)?)+ $(;)?
+            // *【2024-02-22 15:32:02】↑现在所有逗号都可选了
         ] => {
             {
                 // 新建一个矩阵
@@ -1491,6 +1494,29 @@ mod tests_parse {
             // 错误
             Err(e) => {
                 panic!("{}", e);
+            }
+        }
+    }
+
+    /// 通用测试/CommonNarsese对象
+    fn _test_parse_common(format: &NarseseFormat<&str>, input: &str) {
+        // 尝试解析并检验
+        let narsese = __test_parse(format, input);
+        match narsese {
+            // 词项
+            NarseseResult::Term(term) => {
+                // 展示
+                println!("[词项] {term:#?}");
+            }
+            // 语句
+            NarseseResult::Sentence(sentence) => {
+                // 展示
+                println!("[语句] {sentence:#?}");
+            }
+            // 任务
+            NarseseResult::Task(task) => {
+                // 展示
+                println!("[任务] {task:#?}");
             }
         }
     }
@@ -1580,6 +1606,7 @@ mod tests_parse {
 
     // 测试/复合词项/失败
     fail_tests! {
+        test_parse_compound_fail_唯一操作表达式 _test_parse_term(&FORMAT_ASCII, "(^操作名, 参数)");
         test_parse_compound_fail_无起始符1 _test_parse_term(&FORMAT_ASCII, ")");
         test_parse_compound_fail_无起始符2 _test_parse_term(&FORMAT_ASCII, "}");
         test_parse_compound_fail_无起始符3 _test_parse_term(&FORMAT_ASCII, "]");
@@ -1693,19 +1720,75 @@ mod tests_parse {
             _test_parse_task;
             // 格式×输入
             &FORMAT_ASCII;
-            // "$0.5;0.5;0.5$ 判断. %1.0%",
-            // "$.7;.75;0.555$目标! %.0;.9%",
-            // "$1;1;1$ 问题?",
-            // "$0;0;0$请求@",
-            // "$0;0$双预算?",
-            // "$0$单预算@",
-            // "$$空预算?",
+            "$0.5;0.5;0.5$ 判断. %1.0%",
+            "$.7;.75;0.555$目标! %.0;.9%",
+            "$1;1;1$ 问题?",
+            "$0;0;0$请求@",
+            "$0;0$双预算?",
+            "$0$单预算@",
+            "$$空预算?",
             "$$$独立变量vs空运算?",
         ];
         show!(matrix); // TODO: 失败测试
     }
 
-    // 词项
+    /// 集成测试/解析器
     #[test]
-    fn test_parse_term() {}
+    fn test_parse_term() {
+        let matrix = f_matrix! [
+            // 应用的函数
+            _test_parse_common;
+            // 格式×输入
+            &FORMAT_ASCII;
+            // 变量测试1
+            "<(&&, <<$x-->A>==><$x-->B>>, <<$y-->C>==><$y-->D>>) ==> E>."
+            // `long_term_stability.nal`
+            "<{tim} --> (/,livingIn,_,{graz})>. %0%"
+            "<<(*,$1,sunglasses) --> own> ==> <$1 --> [aggressive]>>."
+            "<(*,{tom},sunglasses) --> own>."
+            "<<$1 --> [aggressive]> ==> <$1 --> murder>>."
+            "<<$1 --> (/,livingIn,_,{graz})> ==> <$1 --> murder>>."
+            "<{?who} --> murder>?"
+            "<{tim} --> (/,livingIn,_,{graz})>."
+            "<{tim} --> (/,livingIn,_,{graz})>. %0%"
+            "<<(*,$1,sunglasses) --> own> ==> <$1 --> [aggressive]>>."
+            "<(*,{tom},(&,[black],glasses)) --> own>."
+            "<<$1 --> [aggressive]> ==> <$1 --> murder>>."
+            "<<$1 --> (/,livingIn,_,{graz})> ==> <$1 --> murder>>."
+            "<sunglasses --> (&,[black],glasses)>."
+            "<{?who} --> murder>?"
+            "<(*,toothbrush,plastic) --> made_of>."
+            "<(&/,<(*,$1,plastic) --> made_of>,<(*,{SELF},$1) --> ^lighter>) =/> <$1 --> [heated]>>."
+            "<<$1 --> [heated]> =/> <$1 --> [melted]>>."
+            "<<$1 --> [melted]> <|> <$1 --> [pliable]>>."
+            "<(&/,<$1 --> [pliable]>,<(*,{SELF},$1) --> ^reshape>) =/> <$1 --> [hardened]>>."
+            "<<$1 --> [hardened]> =|> <$1 --> [unscrewing]>>."
+            "<toothbrush --> object>."
+            "(&&,<#1 --> object>,<#1 --> [unscrewing]>)!"
+            "<{SELF} --> [hurt]>! %0%"
+            "<{SELF} --> [hurt]>. :|: %0%"
+            "<(&/,<(*,{SELF},wolf) --> close_to>,+1000) =/> <{SELF} --> [hurt]>>."
+            "<(*,{SELF},wolf) --> close_to>. :|:"
+            "<(&|,<(*,{SELF},$1,FALSE) --> ^want>,<(*,{SELF},$1) --> ^anticipate>) =|> <(*,{SELF},$1) --> afraid_of>>."
+            "<(*,{SELF},?what) --> afraid_of>?"
+            "<a --> A>. :|: %1.00;0.90%"
+            "<b --> B>. :|: %1.00;0.90%"
+            "<c --> C>. :|: %1.00;0.90%"
+            "<a --> A>. :|: %1.00;0.90%"
+            "<b --> B>. :|: %1.00;0.90%"
+            "<?1 =/> <c --> C>>?"
+            "<(*,cup,plastic) --> made_of>."
+            "<cup --> object>."
+            "<cup --> [bendable]>."
+            "<toothbrush --> [bendable]>."
+            "<toothbrush --> object>."
+            "<(&/,<(*,$1,plastic) --> made_of>,<(*,{SELF},$1) --> ^lighter>) =/> <$1 --> [heated]>>."
+            "<<$1 --> [heated]> =/> <$1 --> [melted]>>."
+            "<<$1 --> [melted]> <|> <$1 --> [pliable]>>."
+            "<(&/,<$1 --> [pliable]>,<(*,{SELF},$1) --> ^reshape>) =/> <$1 --> [hardened]>>."
+            "<<$1 --> [hardened]> =|> <$1 --> [unscrewing]>>."
+            "(&&,<#1 --> object>,<#1 --> [unscrewing]>)!"
+        ];
+        show!(matrix);
+    }
 }

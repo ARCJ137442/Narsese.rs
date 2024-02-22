@@ -3,6 +3,7 @@
         ".\\Cargo.toml"
     ],
     "cSpell.words": [
-        "tomllib"
+        "tomllib",
+        "EVCXR"
     ]
 }
