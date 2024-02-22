@@ -27,7 +27,7 @@
 
 use crate::{
     first,
-    util::{FloatPrecision, IntPrecision},
+    util::{FloatPrecision, IntPrecision, ZeroOneFloat},
     Budget, Punctuation, Sentence, Stamp, Task, Term, Truth,
 };
 use std::{error::Error, fmt::Display, io::ErrorKind, vec};
@@ -574,6 +574,8 @@ impl<'a> ParseState<'a, &str> {
     ///   * 1 不断从「解析环境」中消耗文本（头部索引`head`右移）并置入「中间解析结果」中
     ///   * 2 直到「头部索引」超过文本长度（越界）
     fn build_mid_result(&mut self) -> ConsumeResult {
+        // 初始化可收集的错误
+        let mut errs: Vec<String> = vec![];
         // 在「可以继续消耗」时
         while self.can_consume() {
             // 索引跳过系列空白 | 用于处理对象之间的空白
@@ -581,7 +583,7 @@ impl<'a> ParseState<'a, &str> {
             // 仍能继续消耗⇒消耗文本
             if self.can_consume() {
                 // 消耗文本&置入「中间结果」
-                self.consume_one()?;
+                self.consume_one(&mut errs)?;
             }
         }
         // 返回「消耗成功」结果
@@ -621,8 +623,7 @@ impl<'a> ParseState<'a, &str> {
     ///   * 📌若已有词项，则一定不会再次消耗词项
     /// * 🚩现在使用「自动录入错误集」来追溯错误来源
     ///   * 📌若`errs`直接存储错误对象，会导致所有权问题（部分借用返回值）
-    fn consume_one(&mut self) -> ConsumeResult {
-        let mut errs: Vec<String> = vec![];
+    fn consume_one(&mut self, errs: &mut Vec<String>) -> ConsumeResult {
         first_method_ok! {
             // 当匹配失败时移回原始索引
             self.head_move;
@@ -916,14 +917,18 @@ impl<'a> ParseState<'a, &str> {
             self.format.sentence.truth_separator,
             self.format.sentence.truth_brackets.1,
         )?;
+        // 验证真值合法性
+        if !f.is_in_01() || !c.is_in_01() {
+            return self.err("「0-1」区间外的值（建议：`0<x<1`）");
+        }
         // 构造真值
         let truth = match num {
             // 无⇒空真值
-            0 => Truth::Empty,
+            0 => Truth::new_empty(),
             // 单⇒单真值
-            1 => Truth::Single(f),
+            1 => Truth::new_single(f),
             // 双⇒双真值
-            _ => Truth::Double(f, c),
+            _ => Truth::new_double(f, c),
         };
         // 跳过右括弧
         self.head_skip_after_spaces(self.format.sentence.truth_brackets.1);
@@ -942,16 +947,20 @@ impl<'a> ParseState<'a, &str> {
             self.format.task.budget_separator,
             self.format.task.budget_brackets.1,
         )?;
+        // 验证预算值合法性
+        if !p.is_in_01() || !d.is_in_01() || !q.is_in_01() {
+            return self.err("「0-1」区间外的值（建议：`0<x<1`）");
+        }
         // 构造预算
         let budget = match num {
             // 无⇒空预算
-            0 => Budget::Empty,
+            0 => Budget::new_empty(),
             // 单⇒单预算
-            1 => Budget::Single(p),
+            1 => Budget::new_single(p),
             // 双⇒双预算
-            2 => Budget::Double(p, d),
+            2 => Budget::new_double(p, d),
             // 三⇒三预算
-            _ => Budget::Triple(p, d, q),
+            _ => Budget::new_triple(p, d, q),
         };
         // 跳过右括弧
         self.head_skip_after_spaces(self.format.task.budget_brackets.1);
@@ -1364,7 +1373,7 @@ impl<'a> ParseState<'a, &str> {
             // ! 默认时间戳为「永恒」
             self.mid_result.stamp.take().unwrap_or(Stamp::Eternal),
             // ! 默认真值为「空真值」
-            self.mid_result.truth.take().unwrap_or(Truth::Empty),
+            self.mid_result.truth.take().unwrap_or(Truth::new_empty()),
         )
     }
 
@@ -1561,14 +1570,42 @@ mod tests_parse {
         show!(matrix);
     }
 
+    /// 宏/统一简化生成「失败测试」
+    /// * 🎯针对重复代码再优化
+    /// * 📌仅需输入必要的信息
+    macro_rules! fail_tests_parse {
+        // 匹配表达式
+        {
+            // 使用的格式
+            $format:ident;
+            // 使用的函数
+            $test_f:ident;
+            // 所有情况：函数⇒被解析文本
+            $($name:ident => $to_parse:expr)*
+        } => {
+            $(
+                /// 失败测试_$name
+                #[test]
+                #[should_panic]
+                fn $name() {
+                    $test_f(&$format, $to_parse);
+                }
+            )*
+        };
+    }
+
     // 测试/原子词项/失败
-    fail_tests! {
-        test_parse_atom_fail_未知前缀 _test_parse_term(&FORMAT_ASCII, "@word");
-        test_parse_atom_fail_未知前缀2 _test_parse_term(&FORMAT_ASCII, "`word");
-        test_parse_atom_fail_非法字符1 _test_parse_term(&FORMAT_ASCII, ",");
-        test_parse_atom_fail_非法字符2 _test_parse_term(&FORMAT_ASCII, "wo:rd");
-        test_parse_atom_fail_非法字符3 _test_parse_term(&FORMAT_ASCII, "wo[rd");
-        test_parse_atom_fail_非法字符4 _test_parse_term(&FORMAT_ASCII, "wo啊/d");
+    fail_tests_parse! {
+        // 格式 & 测试函数
+        FORMAT_ASCII;
+        _test_parse_term;
+        // 情形
+        test_parse_atom_fail_未知前缀 => "@word"
+        test_parse_atom_fail_未知前缀2 => "`word"
+        test_parse_atom_fail_非法字符1 => ","
+        test_parse_atom_fail_非法字符2 => "wo:rd"
+        test_parse_atom_fail_非法字符3 => "wo[rd"
+        test_parse_atom_fail_非法字符4 => "wo啊/d"
     }
 
     /// 测试/复合词项
@@ -1605,23 +1642,27 @@ mod tests_parse {
     }
 
     // 测试/复合词项/失败
-    fail_tests! {
-        test_parse_compound_fail_唯一操作表达式 _test_parse_term(&FORMAT_ASCII, "(^操作名, 参数)");
-        test_parse_compound_fail_无起始符1 _test_parse_term(&FORMAT_ASCII, ")");
-        test_parse_compound_fail_无起始符2 _test_parse_term(&FORMAT_ASCII, "}");
-        test_parse_compound_fail_无起始符3 _test_parse_term(&FORMAT_ASCII, "]");
-        test_parse_compound_fail_无终止符1 _test_parse_term(&FORMAT_ASCII, "(");
-        test_parse_compound_fail_无终止符2 _test_parse_term(&FORMAT_ASCII, "{");
-        test_parse_compound_fail_无终止符3 _test_parse_term(&FORMAT_ASCII, "[");
-        test_parse_compound_fail_空_外延集 _test_parse_term(&FORMAT_ASCII, "{}");
-        test_parse_compound_fail_空_内涵集 _test_parse_term(&FORMAT_ASCII, "[]");
-        test_parse_compound_fail_空_复合词项 _test_parse_term(&FORMAT_ASCII, "(&/, )");
-        test_parse_compound_fail_多余元素_外延差 _test_parse_term(&FORMAT_ASCII, "( -, 要被减掉, 被减掉了, 我是多余的)");
-        test_parse_compound_fail_多余元素_内涵差 _test_parse_term(&FORMAT_ASCII, "( ~, 要被减掉, 被减掉了, 我是多余的)");
-        test_parse_compound_fail_缺少占位符_外延像 _test_parse_term(&FORMAT_ASCII, "( /, 为什么, 这里没有, 占位符呢)");
-        test_parse_compound_fail_缺少占位符_内涵像 _test_parse_term(&FORMAT_ASCII, "( \\, 为什么, 这里没有, 占位符呢)");
-        test_parse_compound_fail_多余元素_否定 _test_parse_term(&FORMAT_ASCII, "( --  , 我是被否定的, 我是多余的)");
-        test_parse_compound_fail_未知连接符 _test_parse_term(&FORMAT_ASCII, "(我是未知的, word, ^op)");
+    fail_tests_parse! {
+        // 格式/测试函数
+        FORMAT_ASCII;
+        _test_parse_term;
+        // 情形
+        test_parse_compound_fail_唯一操作表达式 => "(^操作名, 参数)"
+        test_parse_compound_fail_无起始符1 => ")"
+        test_parse_compound_fail_无起始符2 => "}"
+        test_parse_compound_fail_无起始符3 => "]"
+        test_parse_compound_fail_无终止符1 => "("
+        test_parse_compound_fail_无终止符2 => "{"
+        test_parse_compound_fail_无终止符3 => "["
+        test_parse_compound_fail_空_外延集 => "{}"
+        test_parse_compound_fail_空_内涵集 => "[]"
+        test_parse_compound_fail_空_复合词项 => "(&/, )"
+        test_parse_compound_fail_多余元素_外延差 => "( -, 要被减掉, 被减掉了, 我是多余的)"
+        test_parse_compound_fail_多余元素_内涵差 => "( ~, 要被减掉, 被减掉了, 我是多余的)"
+        test_parse_compound_fail_缺少占位符_外延像 => "( /, 为什么, 这里没有, 占位符呢)"
+        test_parse_compound_fail_缺少占位符_内涵像 => "( \\, 为什么, 这里没有, 占位符呢)"
+        test_parse_compound_fail_多余元素_否定 => "( --  , 我是被否定的, 我是多余的)"
+        test_parse_compound_fail_未知连接符 => "(我是未知的, word, ^op)"
     }
 
     /// 测试/陈述
@@ -1693,23 +1734,15 @@ mod tests_parse {
         show!(matrix); // TODO: 失败测试
     }
 
-    /// 测试/时间戳（语句）
-    #[test]
-    fn test_parse_stamp() {
-        let matrix = f_matrix! [
-            // 应用的函数
-            _test_parse_sentence;
-            // 格式×输入
-            &FORMAT_ASCII;
-            "固定.:!114514:",
-            "固定正.:!+137:",
-            "固定负.:!-442:",
-            "过去.:\\:",
-            "现在? :|:",
-            "未来! :/:",
-            "永恒.",
-        ];
-        show!(matrix); // TODO: 失败测试
+    // 测试/真值/失败
+    fail_tests_parse! {
+        // 格式/测试函数
+        FORMAT_ASCII;
+        _test_parse_sentence;
+        // 情形
+        test_parse_truth_fail_多个量 => "A. %1;1;1%"
+        test_parse_truth_fail_超范围1 => "A. %-1;1%"
+        test_parse_truth_fail_超范围2 => "A. %1;-1%"
     }
 
     /// 测试/预算值（任务）
@@ -1732,6 +1765,37 @@ mod tests_parse {
         show!(matrix); // TODO: 失败测试
     }
 
+    // 测试/预算值/失败
+    fail_tests_parse! {
+        // 格式/测试函数
+        FORMAT_ASCII;
+        _test_parse_task;
+        // 情形
+        test_parse_budget_fail_多个量 => "$1;1;1;1$ A."
+        test_parse_budget_fail_超范围1 => "$-1;1;1$ A."
+        test_parse_budget_fail_超范围2 => "$1;-1;1$ A."
+        test_parse_budget_fail_超范围3 => "$1;1;-1$ A."
+    }
+
+    /// 测试/时间戳（语句）
+    #[test]
+    fn test_parse_stamp() {
+        let matrix = f_matrix! [
+            // 应用的函数
+            _test_parse_sentence;
+            // 格式×输入
+            &FORMAT_ASCII;
+            "固定.:!114514:",
+            "固定正.:!+137:",
+            "固定负.:!-442:",
+            "过去.:\\:",
+            "现在? :|:",
+            "未来! :/:",
+            "永恒.",
+        ];
+        show!(matrix); // TODO: 失败测试
+    }
+
     /// 通用/健壮性测试
     /// * 🎯仅用于检测是否会panic
     fn _test_parse_stability(format: &NarseseFormat<&str>, input: &str) {
@@ -1750,10 +1814,10 @@ mod tests_parse {
             &FORMAT_ASCII;
             // 多个真值/预算值 // ! 可能的数组越界
             "1. %1;1;1%"
-            "$1;1;1$ 1."
+            "$1;1;1;1$ 1."
+            "$1;1;1;1;1;1;1;1;1;1;1$ 1. %1;1;1;1;1;1;1;1;1%"
         ];
     }
-        
 
     /// 集成测试/解析器
     #[test]

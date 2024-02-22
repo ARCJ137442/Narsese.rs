@@ -23,13 +23,19 @@ pub type IntPrecision = isize;
 /// 📌通过特征为浮点数添加「0-1 限制」方法
 ///   * 📝而非直接`impl FloatPrecision`：孤儿规则
 pub trait ZeroOneFloat {
+    /// 判断是否在范围内
+    fn is_in_01(&self) -> bool;
     /// 验证「0-1」合法性
     /// * 📌短暂借走所有权，比对后归还
+    /// * ⚠️若不在范围内，则产生panic
     fn validate_01(self) -> Self;
 }
 
 /// 实现
 impl ZeroOneFloat for FloatPrecision {
+    fn is_in_01(&self) -> bool {
+         *self >= 0.0 && *self <= 1.0 
+    }
     fn validate_01(self) -> Self {
         if self < 0.0 || self > 1.0 {
             panic!("「0-1」区间外的值（建议：`0<x<1`）");
