@@ -594,7 +594,7 @@ impl<'a> ParseState<'a, &str> {
     /// 检查自己的「解析环境」是否在「头部索引」处以指定字符串开头
     fn starts_with(&self, to_compare: &str) -> bool {
         // 长度检验
-        if self.len_env - self.head < to_compare.chars().count() {
+        if self.len_env < self.head + to_compare.chars().count() {
             // 长度不够⇒肯定不匹配
             return false;
         }
@@ -1451,7 +1451,10 @@ impl NarseseFormat<&str> {
     }
 
     /// 主解析函数
-    pub fn parse_multi<'a>(&'a self, inputs: impl IntoIterator<Item=&'a str>) -> Vec<ParseResult> {
+    pub fn parse_multi<'a>(
+        &'a self,
+        inputs: impl IntoIterator<Item = &'a str>,
+    ) -> Vec<ParseResult> {
         // 构造结果
         let mut result = vec![];
         // 构造空的解析状态
@@ -1898,6 +1901,7 @@ mod tests_parse {
             "1. %1;1;1%"
             "$1;1;1;1$ 1."
             "$1;1;1;1;1;1;1;1;1;1;1$ 1. %1;1;1;1;1;1;1;1;1%"
+            "<(&/, <{powerup_good_front} --> [seen]>, +30000, <(*, {SELF}) --> ^right>, +30000) =/> <{SELF} --> [powered]" // !【2024-02-25 15:57:16】索引溢出：长度计算欠完备
         ];
     }
 
