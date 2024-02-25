@@ -210,6 +210,46 @@ pub struct NarseseFormat<Content> {
 
     /// 语句的格式
     pub sentence: NarseseFormatSentence<Content>,
+
     /// 任务的格式
     pub task: NarseseFormatTask<Content>,
+
+    /// 是否启用「关键字截断」
+    /// * 🎯用于像「漢文」这类「将【可作为词项名】的字符作为系词，并因无分隔符而导致歧义」的格式
+    /// * 📌from case: `「我是谁」`
+    ///   * ⚠️贪婪式识别成了词项`我是谁`，导致系词无法识别
+    pub enable_keyword_truncation: bool,
+}
+
+impl NarseseFormat<&str> {
+    /// 创建「保留关键字」数组
+    /// * 📌仅保留开头字符（用于前缀识别）
+    /// * ⚠️纯功能性：不判断「是否启用」
+    pub fn generate_reserved_keywords(&self) -> Vec<char> {
+        // 创建&填充数组
+        vec![
+            // * （主要）陈述系词
+            self.statement.copula_inheritance,
+            self.statement.copula_similarity,
+            self.statement.copula_implication,
+            self.statement.copula_equivalence,
+            self.statement.copula_instance,
+            self.statement.copula_property,
+            self.statement.copula_instance_property,
+            self.statement.copula_implication_predictive,
+            self.statement.copula_implication_concurrent,
+            self.statement.copula_implication_retrospective,
+            self.statement.copula_equivalence_predictive,
+            self.statement.copula_equivalence_concurrent,
+            self.statement.copula_equivalence_retrospective,
+        ]
+        // 取迭代器
+        .iter()
+        // 过滤空字串
+        .filter(|s| !s.is_empty())
+        // 取第一个字符
+        .map(|s| s.chars().next().unwrap())
+        // 整理成数组
+        .collect()
+    }
 }

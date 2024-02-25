@@ -152,6 +152,7 @@ mod tests {
             FORMAT_HAN;
             _test_parse_and_format => [
                 "预0.5、0.75、0.4算「（同时，「『ball』是【left】」，「（积，『SELF』，任一any，其一some ）是操作do」）得「『SELF』是【good】」」。时刻=-1真值=1真0.9信"
+                "「我是谁」" // ! 先前的failed case
             ]
             _test_format_and_parse => [
                 _sample_task()

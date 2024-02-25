@@ -7,5 +7,8 @@
         "Rightarrow",
         "tomllib",
         "Uparrow"
+    ],
+    "conventionalCommits.scopes": [
+        "解析器&格式化"
     ]
 }

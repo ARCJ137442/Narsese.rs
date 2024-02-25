@@ -212,36 +212,15 @@ pub struct ParseState<'a, Content> {
     head: ParseIndex,
     /// 「中间解析结果」
     mid_result: MidParseResult,
+    /// 「保留关键字」
+    /// * 🎯用于「关键字截断」机制
+    /// * 📌仅存储开头字符
+    /// * 📄具体参看[`super::format::NarseseFormat::enable_keyword_truncation`]
+    reserved_keywords: Vec<char>,
 }
 
-/// 实现/构造、重置、生成
+/// 实现/通用：重置、生成
 impl<'a, C> ParseState<'a, C> {
-    /// 根据格式构造parser
-    /// * 🚩方法：默认状态+重定向
-    pub fn new(
-        format: &'a NarseseFormat<C>,
-        input: &'a str,
-        head: ParseIndex,
-    ) -> ParseState<'a, C> {
-        // 生成解析环境
-        let env = ParseState::_build_env(input);
-        // 生成环境长度 // ! 直接插入会有「同时引用」的所有权问题
-        let len_env = env.len();
-        // 构造结构体
-        ParseState {
-            // 直接指向格式
-            format,
-            // 置入环境
-            env,
-            // 置入环境长度
-            len_env,
-            // 从首个索引开始
-            head,
-            // 从空结果开始
-            mid_result: MidParseResult::new(),
-        }
-    }
-
     /// 重置状态到指定情形
     /// * 用于重定向上下文
     /// * 📌自动内联
@@ -449,6 +428,38 @@ impl<'a> ParseState<'a, &str> {
     fn _build_env(input: &'a str) -> ParseEnv {
         input.chars().collect()
     }
+
+    /// 根据格式构造parser
+    /// * 🚩方法：默认状态+重定向
+    pub fn new(
+        format: &'a NarseseFormat<&str>,
+        input: &'a str,
+        head: ParseIndex,
+    ) -> ParseState<'a, &'a str> {
+        // 生成解析环境
+        let env = ParseState::_build_env(input);
+        // 生成环境长度 // ! 直接插入会有「同时引用」的所有权问题
+        let len_env = env.len();
+        // 构造结构体
+        ParseState {
+            // 直接指向格式
+            format,
+            // 置入环境
+            env,
+            // 置入环境长度
+            len_env,
+            // 从首个索引开始
+            head,
+            // 从空结果开始
+            mid_result: MidParseResult::new(),
+            // 根据「是否启用关键字截断」选择性置入「保留关键字」
+            reserved_keywords: match format.enable_keyword_truncation {
+                true => format.generate_reserved_keywords(),
+                false => Vec::new(),
+            },
+        }
+    }
+
     /// 解析总入口 | 全部使用自身状态
     pub fn parse(&mut self) -> ParseResult {
         // 消耗文本，构建「中间解析结果」
@@ -764,7 +775,9 @@ impl<'a> ParseState<'a, &str> {
         while self.can_consume() && i < N {
             match self.head_char() {
                 // 空白⇒跳过
-                _ if self.starts_with(self.format.space.parse) => self.head_skip(self.format.space.parse),
+                _ if self.starts_with(self.format.space.parse) => {
+                    self.head_skip(self.format.space.parse)
+                }
                 // 小数点
                 // 数值|小数点⇒计入缓冲区&跳过
                 '.' | '0'..='9' => {
@@ -1318,6 +1331,11 @@ impl<'a> ParseState<'a, &str> {
         while self.can_consume() {
             // 获取头部字符
             head_char = self.head_char();
+            // 绕过关键字（如「可作为词项名的系词」等）
+            if self.reserved_keywords.iter().any(|&head| head == head_char) {
+                break;
+            }
+            // 尝试解析
             match Self::is_valid_atom_name(head_char) {
                 // 合法词项名字符⇒加入缓冲区&递进
                 true => {

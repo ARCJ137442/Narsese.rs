@@ -5,8 +5,6 @@ use super::format::*;
 /// * 另可参考：<https://github.com/opennars/opennars/wiki/Narsese-Grammar-(Input-Output-Format)>
 /// * 可用于打印Narsese的默认形式
 pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
-    
-    
     space : NarseseFormatSpace {
         parse: " ", // ! 解析时忽略空格
         format_terms: " ", // 格式化时，词项间需要空格（英文如此）
@@ -73,6 +71,8 @@ pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
         budget_brackets: ("$", "$"),
         budget_separator: ";",
     },
+    // * ASCII格式中，系词等符号并非「标识符字符」，故无需启用「关键字」
+    enable_keyword_truncation: false,
 };
 
 /// LaTeX扩展
@@ -146,6 +146,8 @@ pub const FORMAT_LATEX: NarseseFormat<&str> = NarseseFormat {
         budget_brackets: (r"\$", r"\$"),
         budget_separator: ";",
     },
+    // * LaTeX格式中，系词等符号的开头均非「标识符字符」，故无需启用「关键字」
+    enable_keyword_truncation: false,
 };
 
 /// 漢文扩展
@@ -217,6 +219,8 @@ pub const FORMAT_HAN: NarseseFormat<&str> = NarseseFormat {
         budget_brackets: ("预", "算"),
         budget_separator: "、",
     },
+    // * 漢文则需要：由此可省略空格分隔
+    enable_keyword_truncation: true,
 };
 
 /// 单元测试
