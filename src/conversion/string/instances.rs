@@ -1,8 +1,17 @@
 use super::format::*;
 
-/// ASCII格式
+/// 通用 ASCII格式
+/// * 来源：文档 `NARS ASCII Input.pdf`
+/// * 另可参考：<https://github.com/opennars/opennars/wiki/Narsese-Grammar-(Input-Output-Format)>
+/// * 可用于打印Narsese的默认形式
 pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
-    space: " ",
+    
+    
+    space : NarseseFormatSpace {
+        parse: " ", // ! 解析时忽略空格
+        format_terms: " ", // 格式化时，词项间需要空格（英文如此）
+        format_items: " ", // 格式化时，条目间需要空格（英文如此）
+    },
 
     atom: NarseseFormatAtom {
         prefix_word: "",
@@ -24,7 +33,7 @@ pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
         connecter_difference_intension: "~",
         connecter_product: "*",
         connecter_image_extension: "/",
-        connecter_image_intension: "\\",
+        connecter_image_intension: r"\",
         connecter_conjunction: "&&",
         connecter_disjunction: "||",
         connecter_negation: "--",
@@ -53,7 +62,7 @@ pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
         punctuation_question: "?",
         punctuation_quest: "@",
         stamp_brackets: (":", ":"),
-        stamp_past: "\\",
+        stamp_past: r"\",
         stamp_present: "|",
         stamp_future: "/",
         stamp_fixed: "!",
@@ -66,6 +75,150 @@ pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
     },
 };
 
+/// LaTeX扩展
+/// * 来源：文档 `NARS ASCII Input.pdf`
+/// * 【20230809 10:22:34】注：暂未找到官方格式模板，此仅基于个人观察
+/// * 【20230811 0:26:55】不能很好地兼容「二元运算」表达（需要更专业者优化）
+pub const FORMAT_LATEX: NarseseFormat<&str> = NarseseFormat {
+    space: NarseseFormatSpace {
+        parse: " ",        // ! 解析时可跳过空格
+        format_terms: " ", // 格式化时，词项间需要分隔（避免代码粘连）
+        format_items: " ", // 格式化时，条目间需要分隔（避免代码粘连）
+    },
+
+    atom: NarseseFormatAtom {
+        prefix_word: "",
+        prefix_variable_independent: r"\$",
+        prefix_variable_dependent: r"\#",
+        prefix_variable_query: "?",
+        prefix_interval: "+",
+        prefix_operator: r"\Uparrow ",
+        prefix_placeholder: r"\diamond ",
+    },
+    compound: NarseseFormatCompound {
+        brackets: (r"\left(", r"\right)"),
+        separator: " ",
+        brackets_set_extension: (r"\left\{", r"\right\}"), // ! 此中`{` `}`需要转义
+        brackets_set_intension: (r"\left[", r"\right]"),
+        connecter_intersection_extension: r"\cap ",
+        connecter_intersection_intension: r"\cup ",
+        connecter_difference_extension: r"\minus ",
+        connecter_difference_intension: r"\sim ",
+        connecter_product: r"\times ",
+        connecter_image_extension: "/",
+        connecter_image_intension: r"\backslash ",
+        connecter_conjunction: r"\wedge ",
+        connecter_disjunction: r"\vee ",
+        connecter_negation: r"\neg ",
+        connecter_conjunction_sequential: ";",
+        connecter_conjunction_parallel: ",",
+    },
+    statement: NarseseFormatStatement {
+        brackets: (r"\left<", r"\right>"),
+        copula_inheritance: r"\rightarrow ",
+        copula_similarity: r"\leftrightarrow ",
+        copula_implication: r"\Rightarrow ",
+        copula_equivalence: r"\Leftrightarrow ",
+        copula_instance: r"\circ\!\!\!\rightarrow  ",
+        copula_property: r"\rightarrow\!\!\!\circ  ",
+        copula_instance_property: r"\circ\!\!\!\rightarrow\!\!\!\circ  ",
+        copula_implication_predictive: r"\\!\!\!\!\Rightarrow ",
+        copula_implication_concurrent: r"|\!\!\!\!\Rightarrow ",
+        copula_implication_retrospective: r"/\!\!\!\!\Rightarrow ",
+        copula_equivalence_predictive: r"\\!\!\!\!\Leftrightarrow ",
+        copula_equivalence_concurrent: r"|\!\!\!\!\Leftrightarrow ",
+        copula_equivalence_retrospective: r"/\!\!\!\!\Leftrightarrow ",
+    },
+    sentence: NarseseFormatSentence {
+        punctuation_judgement: ".",
+        punctuation_goal: "?",
+        punctuation_question: "!",
+        punctuation_quest: "¿", // 【20230806 23:46:18】倒问号没有对应的LaTeX。。。
+        stamp_brackets: ("", ""), // !【2024-02-25 16:31:38】此处时态没括号。。
+        stamp_past: r"\\!\!\!\!\Rightarrow",
+        stamp_present: r"|\!\!\!\!\Rightarrow",
+        stamp_future: r"/\!\!\!\!\Rightarrow",
+        stamp_fixed: "t=", // ? LaTeX语法未知
+        truth_brackets: (r"\langle", r"\rangle"),
+        truth_separator: ",",
+    },
+    task: NarseseFormatTask {
+        budget_brackets: (r"\$", r"\$"),
+        budget_separator: ";",
+    },
+};
+
+/// 漢文扩展
+/// * 📌原创
+pub const FORMAT_HAN: NarseseFormat<&str> = NarseseFormat {
+    space: NarseseFormatSpace {
+        parse: " ",       // ! 解析时忽略空格
+        format_terms: "", // 格式化时，词项间无需分隔（避免太过松散）
+        format_items: " ", // 格式化时，条目间需要分隔（避免太过密集）
+    },
+
+    atom: NarseseFormatAtom {
+        prefix_word: "", // 置空
+        prefix_variable_independent: "任一",
+        prefix_variable_dependent: "其一",
+        prefix_variable_query: "所问",
+        prefix_interval: "间隔",
+        prefix_operator: "操作",
+        prefix_placeholder: "某",
+    },
+    compound: NarseseFormatCompound {
+        brackets: ("（", "）"),
+        separator: "，",
+        brackets_set_extension: ("『", "』"), // ! 此中`{` `}`需要转义
+        brackets_set_intension: ("【", "】"),
+        connecter_intersection_extension: "外交",
+        connecter_intersection_intension: "内交",
+        connecter_difference_extension: "外差",
+        connecter_difference_intension: "内差",
+        connecter_product: "积",
+        connecter_image_extension: "外像",
+        connecter_image_intension: "内像",
+        connecter_conjunction: "与",
+        connecter_disjunction: "或",
+        connecter_negation: "非",
+        connecter_conjunction_sequential: "同时",
+        connecter_conjunction_parallel: "接连",
+    },
+    statement: NarseseFormatStatement {
+        brackets: ("「", "」"),
+        copula_inheritance: "是",
+        copula_similarity: "似",
+        copula_implication: "得",
+        copula_equivalence: "同",
+        copula_instance: "为",
+        copula_property: "有",
+        copula_instance_property: "具有",
+        copula_implication_predictive: "曾得",
+        copula_implication_concurrent: "现得",
+        copula_implication_retrospective: "将得",
+        copula_equivalence_predictive: "曾同",
+        copula_equivalence_concurrent: "现同",
+        copula_equivalence_retrospective: "将同",
+    },
+    sentence: NarseseFormatSentence {
+        punctuation_judgement: "。",
+        punctuation_goal: "？",
+        punctuation_question: "！",
+        punctuation_quest: "；", // 【20230806 23:46:18】倒问号没有对应的LaTeX。。。
+        stamp_brackets: ("", ""), // !【2024-02-25 16:31:38】此处时态没括号。。
+        stamp_past: "曾经",
+        stamp_present: "现在",
+        stamp_future: "将来",
+        stamp_fixed: "时刻=",
+        truth_brackets: ("真值=", "信"),
+        truth_separator: "真",
+    },
+    task: NarseseFormatTask {
+        budget_brackets: ("预", "算"),
+        budget_separator: "、",
+    },
+};
+
 /// 单元测试
 #[cfg(test)]
 mod tests {
@@ -73,7 +226,9 @@ mod tests {
     use super::*;
     use crate::*;
 
-    fn test_format(format: NarseseFormat<&str>) {
+    fn test_format(label: &str, format: NarseseFormat<&str>) {
+        // 展示格式
+        println!("{label} format: {format:#?}");
         // 构造词项
         let ball_left = Term::new_instance_property(Term::new_word("ball"), Term::new_word("left"));
         let conditional_operation = Term::new_conjunction_sequential(vec![
@@ -98,20 +253,20 @@ mod tests {
         let task = Task::new(sentence.clone(), budget);
         // 展示
         println!(
-            "ASCII formatted term: {:#?}",
+            "{label} formatted term: {:#?}",
             format.format_term(&self_good)
         );
         println!(
-            "ASCII formatted sentence: {:#?}",
+            "{label} formatted sentence: {:#?}",
             format.format_sentence(&sentence)
         );
-        println!("ASCII formatted task: {:#?}", format.format_task(&task));
+        println!("{label} formatted task: {:#?}", format.format_task(&task));
     }
 
     #[test]
-    fn test_ascii() {
-        let format = FORMAT_ASCII;
-        println!("ASCII format: {format:#?}");
-        test_format(format);
+    fn tests() {
+        test_format("ASCII", FORMAT_ASCII);
+        test_format("LaTeX", FORMAT_LATEX);
+        test_format("漢", FORMAT_HAN);
     }
 }

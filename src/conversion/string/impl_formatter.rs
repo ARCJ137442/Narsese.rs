@@ -19,7 +19,7 @@ impl NarseseFormat<&str> {
             // 逗号
             if i != 0 {
                 out.push_str(self.compound.separator);
-                out.push_str(self.space);
+                out.push_str(self.space.format_terms);
             }
             // 词项
             out.push_str(&self.format_term(term));
@@ -49,7 +49,7 @@ impl NarseseFormat<&str> {
         // 连接符
         out.push_str(connecter);
         out.push_str(self.compound.separator);
-        out.push_str(self.space);
+        out.push_str(self.space.format_terms);
         // 逐个词项加入
         self.format_components(out, components);
         // 括号结束
@@ -69,19 +69,19 @@ impl NarseseFormat<&str> {
         // 连接符
         out.push_str(connecter);
         out.push_str(self.compound.separator);
-        out.push_str(self.space);
+        out.push_str(self.space.format_terms);
         //各个元素
         for (i, term) in components.iter().enumerate() {
             // 插入占位符
             if i == index {
                 out.push_str(self.atom.prefix_placeholder);
                 out.push_str(self.compound.separator);
-                out.push_str(self.space);
+                out.push_str(self.space.format_terms);
             }
             // 逗号
             if i != 0 {
                 out.push_str(self.compound.separator);
-                out.push_str(self.space);
+                out.push_str(self.space.format_terms);
             }
             // 词项
             self._format_term(out, term);
@@ -94,9 +94,9 @@ impl NarseseFormat<&str> {
     fn format_statement(&self, out: &mut String, left: &Term, right: &Term, copula: &str) {
         out.push_str(self.statement.brackets.0);
         self._format_term(out, left);
-        out.push_str(self.space);
+        out.push_str(self.space.format_terms);
         out.push_str(copula);
-        out.push_str(self.space);
+        out.push_str(self.space.format_terms);
         self._format_term(out, right);
         out.push_str(self.statement.brackets.1);
     }
@@ -334,7 +334,7 @@ impl NarseseFormat<&str> {
         out.push_str(self.sentence.stamp_brackets.1);
     }
 
-    /// 工具函数/语句
+    /// 工具函数/有内容时前缀分隔符
     /// * 关键在「避免无用分隔符」
     fn add_space_if_necessary_and_flush_buffer(&self, out: &mut String, buffer: &mut String) {
         match buffer.is_empty() {
@@ -342,7 +342,7 @@ impl NarseseFormat<&str> {
             true => {}
             // 非空⇒预置分隔符，推送并清空
             false => {
-                out.push_str(self.space);
+                out.push_str(self.space.format_items);
                 out.push_str(buffer);
                 buffer.clear();
             }

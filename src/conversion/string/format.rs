@@ -179,13 +179,25 @@ pub struct NarseseFormatTask<Content> {
     pub budget_separator: Content,
 }
 
+#[derive(Debug)]
+pub struct NarseseFormatSpace<Content> {
+    /// 空白符（解析用）
+    pub parse: Content,
+    /// 空白符（格式化/分隔词项）
+    /// * 🎯复合词项/陈述
+    pub format_terms: Content,
+    /// 空白符（格式化/分隔条目）
+    /// * 🎯「预算 词项标点 时间戳 真值」
+    pub format_items: Content,
+}
+
 /// Narsese格式
 /// * 📌记录「枚举Narsese」的各类常量
 ///   * ⚠️只用于存储数据，后续需要载入「解析器状态」
 #[derive(Debug)]
 pub struct NarseseFormat<Content> {
-    /// 空白符（装饰用）
-    pub space: Content,
+    /// 空白符
+    pub space: NarseseFormatSpace<Content>,
 
     /// 原子词项的格式
     pub atom: NarseseFormatAtom<Content>,

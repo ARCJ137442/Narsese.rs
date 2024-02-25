@@ -3,7 +3,9 @@
         ".\\Cargo.toml"
     ],
     "cSpell.words": [
+        "EVCXR",
+        "Rightarrow",
         "tomllib",
-        "EVCXR"
+        "Uparrow"
     ]
 }

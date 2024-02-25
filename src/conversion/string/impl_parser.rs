@@ -541,8 +541,8 @@ impl<'a> ParseState<'a, &str> {
     /// * 📌自动内联
     #[inline(always)]
     fn head_skip_spaces(&mut self) {
-        while self.starts_with(self.format.space) {
-            self.head_skip(self.format.space);
+        while self.starts_with(self.format.space.parse) {
+            self.head_skip(self.format.space.parse);
         }
     }
 
@@ -634,7 +634,7 @@ impl<'a> ParseState<'a, &str> {
             errs;
 
             // 空格⇒跳过 //
-            self.starts_with(self.format.space) => Ok(self.head_skip(self.format.space)),
+            self.starts_with(self.format.space.parse) => Ok(self.head_skip(self.format.space.parse)),
             // 1 预算值 //
             (
                 self.starts_with(self.format.task.budget_brackets.0) &&
@@ -764,7 +764,7 @@ impl<'a> ParseState<'a, &str> {
         while self.can_consume() && i < N {
             match self.head_char() {
                 // 空白⇒跳过
-                _ if self.starts_with(self.format.space) => self.head_skip(self.format.space),
+                _ if self.starts_with(self.format.space.parse) => self.head_skip(self.format.space.parse),
                 // 小数点
                 // 数值|小数点⇒计入缓冲区&跳过
                 '.' | '0'..='9' => {
@@ -1017,7 +1017,7 @@ impl<'a> ParseState<'a, &str> {
                 // 检查开头
                 self.starts_with;
                 // 空白⇒跳过
-                self.format.space => self.head_skip(self.format.space),
+                self.format.space.parse => self.head_skip(self.format.space.parse),
                 // 分隔符⇒跳过
                 self.format.compound.separator => self.head_skip(self.format.compound.separator),
                 // 右括号⇒停止 // ! 跳过的逻辑交由调用者
