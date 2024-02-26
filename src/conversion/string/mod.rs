@@ -134,6 +134,7 @@ mod tests {
             FORMAT_ASCII;
             _test_parse_and_format => [
                 "<(&/, <{powerup_good_front} --> [seen]>, +30000, <(*, {SELF}) --> ^right>, +30000) =/> <{SELF} --> [powered]>>. :|: %1.0;0.99%"
+                "$$ 空预算要表示出来_空真值因为标点而无需必要. :|:"
             ]
             _test_format_and_parse => [
                 _sample_task()
@@ -142,7 +143,7 @@ mod tests {
         test_matrix! {
             FORMAT_LATEX;
             _test_parse_and_format => [
-                r"\$0.5;0.75;0.4\$ \left<\left(;  \left<\left\{ball\right\} \rightarrow  \left[left\right]\right>  \left<\left(\times   \left\{SELF\right\}  \$any  \#some\right) \rightarrow  \Uparrow do\right>\right) \Rightarrow  \left<\left\{SELF\right\} \rightarrow  \left[good\right]\right>\right>. t=-1 \langle1,0.9\rangle"
+                r"\$0.5;0.75;0.4\$ \left<\left(,  \left<\left\{ball\right\} \rightarrow  \left[left\right]\right>  \left<\left(\times   \left\{SELF\right\}  \$any  \#some\right) \rightarrow  \Uparrow do\right>\right) \Rightarrow  \left<\left\{SELF\right\} \rightarrow  \left[good\right]\right>\right>. t=-1 \langle1,0.9\rangle"
             ]
             _test_format_and_parse => [
                 _sample_task()
@@ -151,7 +152,7 @@ mod tests {
         test_matrix! {
             FORMAT_HAN;
             _test_parse_and_format => [
-                "预0.5、0.75、0.4算「（同时，「『ball』是【left】」，「（积，『SELF』，任一any，其一some ）是操作do」）得「『SELF』是【good】」」。时刻=-1真值=1真0.9信"
+                "预0.5、0.75、0.4算「（顺序，「『ball』是【left】」，「（积，『SELF』，任一any，其一some ）是操作do」）得「『SELF』是【good】」」。 发生在-1 真1、0.9值"
                 "「我是谁」" // ! 先前的failed case
             ]
             _test_format_and_parse => [
