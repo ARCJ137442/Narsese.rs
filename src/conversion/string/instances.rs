@@ -110,8 +110,8 @@ pub const FORMAT_LATEX: NarseseFormat<&str> = NarseseFormat {
         connecter_conjunction: r"\wedge ",
         connecter_disjunction: r"\vee ",
         connecter_negation: r"\neg ",
-        connecter_conjunction_sequential: ";",
-        connecter_conjunction_parallel: ",",
+        connecter_conjunction_sequential: ",",
+        connecter_conjunction_parallel: ";",
     },
     statement: NarseseFormatStatement {
         brackets: (r"\left<", r"\right>"),
@@ -122,17 +122,17 @@ pub const FORMAT_LATEX: NarseseFormat<&str> = NarseseFormat {
         copula_instance: r"\circ\!\!\!\rightarrow  ",
         copula_property: r"\rightarrow\!\!\!\circ  ",
         copula_instance_property: r"\circ\!\!\!\rightarrow\!\!\!\circ  ",
-        copula_implication_predictive: r"\\!\!\!\!\Rightarrow ",
+        copula_implication_predictive: r"/\!\!\!\!\Rightarrow ",
         copula_implication_concurrent: r"|\!\!\!\!\Rightarrow ",
-        copula_implication_retrospective: r"/\!\!\!\!\Rightarrow ",
-        copula_equivalence_predictive: r"\\!\!\!\!\Leftrightarrow ",
+        copula_implication_retrospective: r"\backslash\!\!\!\!\Rightarrow ",
+        copula_equivalence_predictive: r"/\!\!\!\!\Leftrightarrow ",
         copula_equivalence_concurrent: r"|\!\!\!\!\Leftrightarrow ",
-        copula_equivalence_retrospective: r"/\!\!\!\!\Leftrightarrow ",
+        copula_equivalence_retrospective: r"\backslash\!\!\!\!\Leftrightarrow ",
     },
     sentence: NarseseFormatSentence {
         punctuation_judgement: ".",
-        punctuation_goal: "?",
-        punctuation_question: "!",
+        punctuation_goal: "!",
+        punctuation_question: "?",
         punctuation_quest: "¿", // 【20230806 23:46:18】倒问号没有对应的LaTeX。。。
         stamp_brackets: ("", ""), // !【2024-02-25 16:31:38】此处时态没括号。。
         stamp_past: r"\\!\!\!\!\Rightarrow",
@@ -171,7 +171,7 @@ pub const FORMAT_HAN: NarseseFormat<&str> = NarseseFormat {
     compound: NarseseFormatCompound {
         brackets: ("（", "）"),
         separator: "，",
-        brackets_set_extension: ("『", "』"), // ! 此中`{` `}`需要转义
+        brackets_set_extension: ("『", "』"),
         brackets_set_intension: ("【", "】"),
         connecter_intersection_extension: "外交",
         connecter_intersection_intension: "内交",
@@ -183,8 +183,8 @@ pub const FORMAT_HAN: NarseseFormat<&str> = NarseseFormat {
         connecter_conjunction: "与",
         connecter_disjunction: "或",
         connecter_negation: "非",
-        connecter_conjunction_sequential: "同时",
-        connecter_conjunction_parallel: "接连",
+        connecter_conjunction_sequential: "接连",
+        connecter_conjunction_parallel: "同时",
     },
     statement: NarseseFormatStatement {
         brackets: ("「", "」"),
@@ -195,25 +195,25 @@ pub const FORMAT_HAN: NarseseFormat<&str> = NarseseFormat {
         copula_instance: "为",
         copula_property: "有",
         copula_instance_property: "具有",
-        copula_implication_predictive: "曾得",
+        copula_implication_predictive: "将得",
         copula_implication_concurrent: "现得",
-        copula_implication_retrospective: "将得",
-        copula_equivalence_predictive: "曾同",
+        copula_implication_retrospective: "曾得",
+        copula_equivalence_predictive: "将同",
         copula_equivalence_concurrent: "现同",
-        copula_equivalence_retrospective: "将同",
+        copula_equivalence_retrospective: "曾同",
     },
     sentence: NarseseFormatSentence {
         punctuation_judgement: "。",
-        punctuation_goal: "？",
-        punctuation_question: "！",
-        punctuation_quest: "；", // 【20230806 23:46:18】倒问号没有对应的LaTeX。。。
+        punctuation_goal: "！",
+        punctuation_question: "？",
+        punctuation_quest: "；", // 暂且没有更合适、更方便输入的全角标点
         stamp_brackets: ("", ""), // !【2024-02-25 16:31:38】此处时态没括号。。
-        stamp_past: "曾经",
+        stamp_past: "过去",
         stamp_present: "现在",
         stamp_future: "将来",
-        stamp_fixed: "时刻=",
-        truth_brackets: ("真值=", "信"),
-        truth_separator: "真",
+        stamp_fixed: "发生在", // 另一个候选是「时为」，但欠缺可读性
+        truth_brackets: ("真", "值"), // 大改：兼容单真值、空真值
+        truth_separator: "、",
     },
     task: NarseseFormatTask {
         budget_brackets: ("预", "算"),
@@ -271,6 +271,6 @@ mod tests {
     fn tests() {
         test_format("ASCII", FORMAT_ASCII);
         test_format("LaTeX", FORMAT_LATEX);
-        test_format("漢", FORMAT_HAN);
+        test_format("漢文", FORMAT_HAN);
     }
 }
