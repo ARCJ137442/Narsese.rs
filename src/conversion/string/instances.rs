@@ -10,7 +10,6 @@ pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
         format_terms: " ", // 格式化时，词项间需要空格（英文如此）
         format_items: " ", // 格式化时，条目间需要空格（英文如此）
     },
-
     atom: NarseseFormatAtom {
         prefix_word: "",
         prefix_variable_independent: "$",
@@ -85,7 +84,6 @@ pub const FORMAT_LATEX: NarseseFormat<&str> = NarseseFormat {
         format_terms: " ", // 格式化时，词项间需要分隔（避免代码粘连）
         format_items: " ", // 格式化时，条目间需要分隔（避免代码粘连）
     },
-
     atom: NarseseFormatAtom {
         prefix_word: "",
         prefix_variable_independent: r"\$",
@@ -135,7 +133,7 @@ pub const FORMAT_LATEX: NarseseFormat<&str> = NarseseFormat {
         punctuation_question: "?",
         punctuation_quest: "¿", // 【20230806 23:46:18】倒问号没有对应的LaTeX。。。
         stamp_brackets: ("", ""), // !【2024-02-25 16:31:38】此处时态没括号。。
-        stamp_past: r"\\!\!\!\!\Rightarrow",
+        stamp_past: r"\backslash\!\!\!\!\Rightarrow",
         stamp_present: r"|\!\!\!\!\Rightarrow",
         stamp_future: r"/\!\!\!\!\Rightarrow",
         stamp_fixed: "t=", // ? LaTeX语法未知
@@ -158,7 +156,6 @@ pub const FORMAT_HAN: NarseseFormat<&str> = NarseseFormat {
         format_terms: "", // 格式化时，词项间无需分隔（避免太过松散）
         format_items: " ", // 格式化时，条目间需要分隔（避免太过密集）
     },
-
     atom: NarseseFormatAtom {
         prefix_word: "", // 置空
         prefix_variable_independent: "任一",
