@@ -349,7 +349,7 @@ impl NarseseFormat<&str> {
         }
     }
 
-    /// 工具函数/标点
+    /// 格式化函数/标点
     fn format_punctuation(&self, out: &mut String, sentence: &Sentence) {
         out.push_str(match sentence {
             Judgement(..) => self.sentence.punctuation_judgement,
@@ -394,8 +394,8 @@ impl NarseseFormat<&str> {
     /// 总格式化函数/预算值
     fn _format_budget(&self, out: &mut String, budget: &Budget) {
         match budget {
-            // 空预算⇒直接为空
-            Budget::Empty => {}
+            // 空预算⇒空数组，仅含括弧 // ! 若无括弧，解析器将识别成语句
+            Budget::Empty => self.format_floats_budget(out, &[]),
             // 单预算⇒单元素数组
             Budget::Single(p) => self.format_floats_budget(out, &[*p]),
             // 双预算⇒二元数组
