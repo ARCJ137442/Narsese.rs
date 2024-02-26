@@ -120,12 +120,12 @@ pub const FORMAT_LATEX: NarseseFormat<&str> = NarseseFormat {
         copula_instance: r"\circ\!\!\!\rightarrow  ",
         copula_property: r"\rightarrow\!\!\!\circ  ",
         copula_instance_property: r"\circ\!\!\!\rightarrow\!\!\!\circ  ",
-        copula_implication_predictive: r"/\!\!\!\!\Rightarrow ",
-        copula_implication_concurrent: r"|\!\!\!\!\Rightarrow ",
-        copula_implication_retrospective: r"\backslash\!\!\!\!\Rightarrow ",
-        copula_equivalence_predictive: r"/\!\!\!\!\Leftrightarrow ",
-        copula_equivalence_concurrent: r"|\!\!\!\!\Leftrightarrow ",
-        copula_equivalence_retrospective: r"\backslash\!\!\!\!\Leftrightarrow ",
+        copula_implication_predictive: r"/\!\!\!\Rightarrow ",
+        copula_implication_concurrent: r"|\!\!\!\Rightarrow ",
+        copula_implication_retrospective: r"\backslash\!\!\!\Rightarrow ",
+        copula_equivalence_predictive: r"/\!\!\!\Leftrightarrow ",
+        copula_equivalence_concurrent: r"|\!\!\!\Leftrightarrow ",
+        copula_equivalence_retrospective: r"\backslash\!\!\!\Leftrightarrow ",
     },
     sentence: NarseseFormatSentence {
         punctuation_judgement: ".",
@@ -133,9 +133,9 @@ pub const FORMAT_LATEX: NarseseFormat<&str> = NarseseFormat {
         punctuation_question: "?",
         punctuation_quest: "¿", // 【20230806 23:46:18】倒问号没有对应的LaTeX。。。
         stamp_brackets: ("", ""), // !【2024-02-25 16:31:38】此处时态没括号。。
-        stamp_past: r"\backslash\!\!\!\!\Rightarrow",
-        stamp_present: r"|\!\!\!\!\Rightarrow",
-        stamp_future: r"/\!\!\!\!\Rightarrow",
+        stamp_past: r"\backslash\!\!\!\Rightarrow",
+        stamp_present: r"|\!\!\!\Rightarrow",
+        stamp_future: r"/\!\!\!\Rightarrow",
         stamp_fixed: "t=", // ? LaTeX语法未知
         truth_brackets: (r"\langle", r"\rangle"),
         truth_separator: ",",
