@@ -129,7 +129,7 @@ mod tests {
     }
 
     #[test]
-    fn tests() {
+    fn tests_ascii() {
         test_matrix! {
             FORMAT_ASCII;
             _test_parse_and_format => [
@@ -140,6 +140,10 @@ mod tests {
                 _sample_task()
             ]
         }
+    }
+
+    #[test]
+    fn tests_latex() {
         test_matrix! {
             FORMAT_LATEX;
             _test_parse_and_format => [
@@ -149,10 +153,14 @@ mod tests {
                 _sample_task()
             ]
         }
+    }
+
+    #[test]
+    fn tests_han() {
         test_matrix! {
             FORMAT_HAN;
             _test_parse_and_format => [
-                "预0.5、0.75、0.4算「（顺序，「『ball』是【left】」，「（积，『SELF』，任一any，其一some ）是操作do」）得「『SELF』是【good】」」。 发生在-1 真1、0.9值"
+                "预0.5、0.75、0.4算「（接连，「『ball』是【left】」，「（积，『SELF』，任一any，其一some ）是操作do」）得「『SELF』是【good】」」。 发生在-1 真1、0.9值"
                 "「我是谁」" // ! 先前的failed case
             ]
             _test_format_and_parse => [
