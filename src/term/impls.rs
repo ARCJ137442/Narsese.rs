@@ -896,9 +896,57 @@ impl PartialEq for Term {
 impl Eq for Term {}
 
 /// 实现/获取词项
-impl GetTerm for Term {
+impl GetTerm<Term> for Term {
     fn get_term(&self) -> &Term {
         &self
+    }
+}
+
+/// 实现/专用/像迭代器
+/// * 🎯初次用于统一「复合词项の迭代」与「像の迭代」：自动迭代出「占位符」
+/// * 🎯也用于迭代「像」词项（词法上迭代出「占位符」）
+/// * 📝此中使用泛型参数，将类型变得更通用更宽泛
+pub struct ImageIterator<'a, I: Iterator<Item = &'a Term>> {
+    raw_components: I,
+    now_index: usize,
+    placeholder_index: usize,
+}
+
+impl<'a, I> ImageIterator<'a, I>
+where
+    I: Iterator<Item = &'a Term>,
+{
+    pub fn new(raw_components: I, placeholder_index: usize) -> Self {
+        Self {
+            raw_components,
+            now_index: 0,
+            placeholder_index,
+        }
+    }
+}
+
+/// 实现：在「『当前索引』到达『占位符索引』」时返回占位符
+/// * 🚩细节：避免创建临时变量
+impl<'a, I> Iterator for ImageIterator<'a, I>
+where
+    I: Iterator<Item = &'a Term>,
+{
+    type Item = &'a Term;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // 检查是否到了「占位符位置」
+        match self.now_index == self.placeholder_index {
+            // 若至⇒返回占位符（引用）
+            true => {
+                self.now_index += 1;
+                Some(&Placeholder)
+            }
+            // 未至⇒继续使用迭代器
+            false => {
+                self.now_index += 1;
+                self.raw_components.next()
+            }
+        }
     }
 }
 

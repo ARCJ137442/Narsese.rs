@@ -7,7 +7,7 @@
 //! * 请求
 
 use super::*;
-use crate::{GetTerm, Term};
+use crate::{GetPunctuation, GetStamp, GetTerm, GetTruth, Term};
 
 /// 使用枚举定义的「语句」类型
 ///
@@ -68,29 +68,32 @@ impl Sentence {
     }
 }
 
-/// 实现/属性
-impl Sentence {
+// 实现/属性 //
+
+impl GetTerm<Term> for Sentence {
+    /// 获取内部词项
+    fn get_term(&self) -> &Term {
+        match self {
+            Judgement(term, _, _) | Goal(term, _, _) | Question(term, _) | Quest(term, _) => term,
+        }
+    }
+}
+
+impl GetPunctuation<Punctuation> for Sentence {
     /// 获取内部标点
-    pub fn get_punctuation(&self) -> Punctuation {
+    fn get_punctuation(&self) -> &Punctuation {
         match self {
-            Judgement(..) => Punctuation::Judgement,
-            Goal(..) => Punctuation::Goal,
-            Question(..) => Punctuation::Question,
-            Quest(..) => Punctuation::Quest,
+            Judgement(..) => &Punctuation::Judgement,
+            Goal(..) => &Punctuation::Goal,
+            Question(..) => &Punctuation::Question,
+            Quest(..) => &Punctuation::Quest,
         }
     }
+}
 
-    /// 获取内部时间戳
-    pub fn get_stamp(&self) -> &Stamp {
-        match self {
-            Judgement(_, _, stamp) | Goal(_, _, stamp) | Question(_, stamp) | Quest(_, stamp) => {
-                stamp
-            }
-        }
-    }
-
+impl GetTruth<Truth> for Sentence {
     /// 获取内部真值（不一定有）
-    pub fn get_truth(&self) -> Option<&Truth> {
+    fn get_truth(&self) -> Option<&Truth> {
         match self {
             // 判断 | 目标 ⇒ 有真值
             Judgement(_, truth, _) | Goal(_, truth, _) => Some(truth),
@@ -99,11 +102,14 @@ impl Sentence {
         }
     }
 }
-impl GetTerm for Sentence {
-    /// 获取内部词项
-    fn get_term(&self) -> &Term {
+
+impl GetStamp<Stamp> for Sentence {
+    /// 获取内部时间戳
+    fn get_stamp(&self) -> &Stamp {
         match self {
-            Judgement(term, _, _) | Goal(term, _, _) | Question(term, _) | Quest(term, _) => term,
+            Judgement(_, _, stamp) | Goal(_, _, stamp) | Question(_, stamp) | Quest(_, stamp) => {
+                stamp
+            }
         }
     }
 }

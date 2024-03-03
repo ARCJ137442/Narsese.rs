@@ -16,6 +16,7 @@ pub use format::*;
 
 // 实现/格式化
 pub mod impl_formatter;
+pub mod impl_formatter_lexical;
 
 // 实现/解析器
 pub mod impl_parser;

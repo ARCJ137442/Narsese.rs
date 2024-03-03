@@ -234,3 +234,60 @@ macro_rules! fail_tests {
         )*
     };
 }
+
+/// 用于简化「连续追加字符串」的宏
+/// * 🎯最初用于「字符串格式化」算法中
+/// * 🚩用法：`push_str!(要追加入的字符串; 待追加表达式1, 待追加表达式2, ...)`
+///
+/// ## 用例
+///
+/// ```rust
+/// use enum_narsese::push_str;
+/// let mut s = String::new();
+/// push_str!(
+///     &mut s;
+///     "这",
+///     "是",
+///     "可以被",
+///     &String::from("连续添加"),
+///     "\u{7684}",
+/// );
+/// assert_eq!(s, "这是可以被连续添加的");
+/// ```
+#[macro_export]
+macro_rules! push_str {
+    {$out:expr; $($ex:expr),* $(,)?} => {
+        {
+            $(
+                $out.push_str($ex)
+            );*
+        }
+    };
+}
+
+/// 用于将「流式追加」捕捉转换成「固定返回值」
+/// * 🎯首次应用于「基于[`String::push_str`]动态追加产生字符串」与「直接返回字符串」的转换中
+/// 
+/// # Example
+///
+/// ```rust
+/// use enum_narsese::catch_flow;
+///
+/// fn append(out: &mut String) {
+///     out.push_str("hello, ");
+///     out.push_str("world!");
+/// }
+/// 
+/// let caught = catch_flow!(append;);
+/// assert_eq!(caught, "hello, world!");
+/// ```
+#[macro_export]
+macro_rules! catch_flow {
+    ( $($path:ident).+ ; $($arg:tt)* ) => {
+        {
+            let mut s = String::new();
+            $($path).+(&mut s, $($arg)*);
+            s
+        }
+    };
+}

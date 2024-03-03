@@ -1,29 +1,128 @@
 //! 实现/格式化器
 
 use super::format::*;
-use crate::{sentence::*, task::*, term::*, util::*};
+use crate::{catch_flow, push_str, sentence::*, task::*, term::*, traits::*, util::*};
 
 /// 实现：转换
 ///
 /// ! ℹ️单元测试在[`super::formats`]模块中定义
 impl NarseseFormat<&str> {
-    /// 工具函数/原子词项
-    fn format_atom(&self, out: &mut String, atom: &Term, prefix: &str) {
-        out.push_str(prefix);
-        out.push_str(&atom.get_atom_name_unchecked());
+    // 模板函数 //
+    // * 📌核心：具体数据结构无关
+    // * 🎯用于进行纯字符串的处理
+
+    /// 模板/原子词项：前缀+名称
+    /// * 🎯所有Narsese原子词项类型
+    /// * 📝仅使用`pub(super)`即可在mod内共用，但为后续复用扩展，仍然使用`pub`对crate外开放
+    pub fn template_atom(out: &mut String, prefix: &str, name: &str) {
+        push_str!(out; prefix, name);
     }
 
-    /// 工具函数/系列词项
-    fn format_components(&self, out: &mut String, components: Vec<&Term>) {
-        for (i, term) in components.iter().enumerate() {
+    /// 模板/系列词项
+    /// * 🎯一般复合词项，词项集（外延集/内涵集）
+    /// * 📝对于「字符串自面量数组」，`Vec<&str>`的引用类型对应`&[str]`而非`&[&str]`
+    ///   * ❓亦或两者皆可
+    pub fn template_components(
+        out: &mut String,
+        components: impl Iterator<Item = String>,
+        separator: &str,
+        space: &str,
+    ) {
+        for (i, term_str) in components.enumerate() {
             // 逗号
             if i != 0 {
-                out.push_str(self.compound.separator);
-                out.push_str(self.space.format_terms);
+                push_str!(out; separator, space);
             }
             // 词项
-            out.push_str(&self.format_term(term));
+            out.push_str(&term_str);
         }
+    }
+
+    /// 模板/一般复合词项
+    /// * 🎯使用「连接符」区分「复合类型」的词项
+    /// * 📝对于「字符串自面量数组」，`Vec<&str>`的引用类型对应`&[&str]`而非`&[str]`
+    ///   * ⚠️后者的`str`是大小不定的：the size for values of type `str` cannot be known at compilation time
+    pub fn template_compound(
+        out: &mut String,
+        left_bracket: &str,
+        connecter: &str,
+        components: impl Iterator<Item = String>,
+        separator: &str,
+        space: &str,
+        right_bracket: &str,
+    ) {
+        // 左括号&连接符
+        push_str!(out;
+            // 左括号 `(`
+            left_bracket,
+            // 连接符 | `&&, `
+            connecter, separator, space,
+        );
+        // 组分 | `A, B, C`
+        Self::template_components(out, components, separator, space);
+        // 右括号 | `)`
+        out.push_str(right_bracket);
+    }
+
+    /// 模板/集合复合词项
+    /// * 🎯「外延集/内涵集」这样【无需特定连接符，只需特殊括弧区分】的词项
+    pub fn template_compound_set(
+        out: &mut String,
+        left_bracket: &str,
+        components: impl Iterator<Item = String>,
+        separator: &str,
+        space: &str,
+        right_bracket: &str,
+    ) {
+        // 左括号 | `{`
+        out.push_str(left_bracket);
+        // 组分 | `A, B, C`
+        Self::template_components(out, components, separator, space);
+        // 右括号 | `}`
+        out.push_str(right_bracket);
+    }
+
+    /// 模板/陈述
+    /// * 🎯各类作为陈述的词项
+    pub fn template_statement(
+        out: &mut String,
+        left_bracket: &str,
+        subject: &str,
+        copula: &str,
+        predicate: &str,
+        space: &str,
+        right_bracket: &str,
+    ) {
+        push_str!(out;
+            left_bracket, // `<`
+            subject, // `S`
+            space, copula, space, // ` --> `
+            predicate, // `P`
+            right_bracket, // `>`
+        );
+    }
+
+    /// 模板/语句
+    /// * 🎯词项+标点+时间戳+真值
+    pub fn template_sentence(
+        out: &mut String,
+        term: &str,
+        punctuation: &str,
+        stamp: &str,
+        truth: &str,
+        separator: &str,
+    ) {
+        // 词项直接输入，后续紧跟标点
+        out.push_str(term);
+        // 后续顺序拼接，并避免多余分隔符
+        join_lest_multiple_separators(out, [punctuation, stamp, truth].into_iter(), separator)
+    }
+
+    // 针对EnumNarsese的格式 //
+
+    /// 工具函数/原子词项
+    fn format_atom(&self, out: &mut String, atom: &Term, prefix: &str) {
+        Self::template_atom(out, prefix, &atom.get_atom_name_unchecked());
     }
 
     /// 工具函数/词项集
@@ -34,26 +133,28 @@ impl NarseseFormat<&str> {
         bracket_left: &str,
         bracket_right: &str,
     ) {
-        // 括号开始
-        out.push_str(bracket_left);
-        // 逐个词项加入
-        self.format_components(out, components);
-        // 括号结束
-        out.push_str(bracket_right);
+        Self::template_compound_set(
+            out,
+            bracket_left,
+            // 批量将内部词项转换成字符串
+            components.iter().map(|term| self.format_term(term)),
+            self.compound.separator,
+            self.space.format_terms,
+            bracket_right,
+        );
     }
 
     /// 工具函数/复合词项
     fn format_compound(&self, out: &mut String, components: Vec<&Term>, connecter: &str) {
-        // 括号开始
-        out.push_str(self.compound.brackets.0);
-        // 连接符
-        out.push_str(connecter);
-        out.push_str(self.compound.separator);
-        out.push_str(self.space.format_terms);
-        // 逐个词项加入
-        self.format_components(out, components);
-        // 括号结束
-        out.push_str(self.compound.brackets.1);
+        Self::template_compound(
+            out,
+            self.compound.brackets.0,
+            connecter,
+            components.iter().map(|term| self.format_term(term)),
+            self.compound.separator,
+            self.space.format_terms,
+            self.compound.brackets.1,
+        );
     }
 
     /// 工具函数/像
@@ -64,48 +165,45 @@ impl NarseseFormat<&str> {
         components: Vec<&Term>,
         connecter: &str,
     ) {
-        // 左括号
-        out.push_str(self.compound.brackets.0);
-        // 连接符
-        out.push_str(connecter);
-        out.push_str(self.compound.separator);
-        out.push_str(self.space.format_terms);
-        //各个元素
-        for (i, term) in components.iter().enumerate() {
-            // 插入占位符
-            if i == index {
-                out.push_str(self.atom.prefix_placeholder);
-                out.push_str(self.compound.separator);
-                out.push_str(self.space.format_terms);
-            }
-            // 逗号
-            if i != 0 {
-                out.push_str(self.compound.separator);
-                out.push_str(self.space.format_terms);
-            }
-            // 词项
-            self._format_term(out, term);
-        }
-        // 右括号
-        out.push_str(self.compound.brackets.1);
+        Self::template_compound(
+            out,
+            self.compound.brackets.0,
+            connecter,
+            // 通过特殊的迭代器，连同占位符一起迭代
+            ImageIterator::new(components.iter().map(|&term| term), index)
+                .map(|term| self.format_term(term)),
+            self.compound.separator,
+            self.space.format_terms,
+            self.compound.brackets.1,
+        )
     }
 
     /// 工具函数/陈述
     fn format_statement(&self, out: &mut String, left: &Term, right: &Term, copula: &str) {
-        out.push_str(self.statement.brackets.0);
-        self._format_term(out, left);
-        out.push_str(self.space.format_terms);
-        out.push_str(copula);
-        out.push_str(self.space.format_terms);
-        self._format_term(out, right);
-        out.push_str(self.statement.brackets.1);
+        Self::template_statement(
+            out,
+            self.statement.brackets.0,
+            // 左边
+            &self.format_term(left),
+            // 连接符
+            copula,
+            // 右边
+            &self.format_term(right),
+            // 空格
+            self.space.format_terms,
+            // 右边
+            self.statement.brackets.1,
+        )
     }
 
     /// 格式化函数/词项
     /// * 返回一个新字符串
     pub fn format_term(&self, term: &Term) -> String {
+        // 创建一个新字符串
         let mut s = String::new();
+        // 对字符串注入格式化文本
         self._format_term(&mut s, term);
+        // 返回注入后的字符串
         s
     }
 
@@ -334,21 +432,6 @@ impl NarseseFormat<&str> {
         out.push_str(self.sentence.stamp_brackets.1);
     }
 
-    /// 工具函数/有内容时前缀分隔符
-    /// * 关键在「避免无用分隔符」
-    fn add_space_if_necessary_and_flush_buffer(&self, out: &mut String, buffer: &mut String) {
-        match buffer.is_empty() {
-            // 空⇒不做动作
-            true => {}
-            // 非空⇒预置分隔符，推送并清空
-            false => {
-                out.push_str(self.space.format_items);
-                out.push_str(buffer);
-                buffer.clear();
-            }
-        }
-    }
-
     /// 格式化函数/标点
     fn format_punctuation(&self, out: &mut String, sentence: &Sentence) {
         out.push_str(match sentence {
@@ -363,32 +446,29 @@ impl NarseseFormat<&str> {
     ///
     /// ! ⚠️注意：没有独立的「标点」一说
     pub fn format_sentence(&self, sentence: &Sentence) -> String {
-        let mut out = String::new();
-        self._format_sentence(&mut out, sentence);
-        out
+        catch_flow!(self._format_sentence; sentence)
     }
 
     /// 总格式化函数/语句
     fn _format_sentence(&self, out: &mut String, sentence: &Sentence) {
-        // 临时缓冲区 | 用于「有内容⇒添加空格」的逻辑
-        let mut buffer = String::new();
-        // 词项 | 第一个直接输入
-        self._format_term(out, sentence.get_term());
-        // 标点 | 紧跟词项，无需分离
-        self.format_punctuation(out, &sentence);
-        // 时间戳
-        self._format_stamp(&mut buffer, &sentence.get_stamp());
-        self.add_space_if_necessary_and_flush_buffer(out, &mut buffer);
-        // 真值 | 若无⇒当空真值对待
-        self._format_truth(&mut buffer, sentence.get_truth().unwrap_or(&Truth::Empty));
-        self.add_space_if_necessary_and_flush_buffer(out, &mut buffer);
+        Self::template_sentence(
+            out,
+            // 词项
+            &catch_flow!(self._format_term; &sentence.get_term()),
+            // 标点
+            &catch_flow!(self.format_punctuation; &sentence),
+            // 时间戳
+            &catch_flow!(self._format_stamp; &sentence.get_stamp()),
+            // 真值 | 默认空真值（对「问题」「请求」而言）
+            &catch_flow!(self._format_truth; &sentence.get_truth().unwrap_or(&Truth::Empty)),
+            // 分隔用空格
+            self.space.format_terms,
+        );
     }
 
     /// 格式化函数/预算值
     pub fn format_budget(&self, budget: &Budget) -> String {
-        let mut out = String::new();
-        self._format_budget(&mut out, budget);
-        out
+        catch_flow!(self._format_budget; budget)
     }
 
     /// 总格式化函数/预算值
@@ -420,6 +500,22 @@ impl NarseseFormat<&str> {
         self._format_budget(out, task.get_budget());
         // 语句
         self._format_sentence(&mut buffer, &task.get_sentence());
-        self.add_space_if_necessary_and_flush_buffer(out, &mut buffer);
+        // 添加空格
+        add_space_if_necessary_and_flush_buffer(out, &mut buffer, self.space.format_items);
+    }
+}
+
+/// 单元测试
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn _test(format: NarseseFormat<&str>) {
+        // TODO: 完善测试
+    }
+
+    #[test]
+    fn test() {
+        // TODO: 完善测试
     }
 }

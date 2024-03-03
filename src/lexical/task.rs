@@ -1,3 +1,5 @@
+use crate::{GetBudget, GetPunctuation, GetStamp, GetTerm, GetTruth};
+
 use super::{LexicalSentence, LexicalTerm};
 
 /// 词法上的「任务」：预算值+语句
@@ -7,7 +9,7 @@ pub struct LexicalTask {
     sentence: LexicalSentence,
 }
 
-/// 实现
+/// 自身方法
 impl LexicalTask {
     /// 从位置参数构造语句 | 对语句[`LexicalSentence`]部分进行展开
     pub fn new(
@@ -22,6 +24,11 @@ impl LexicalTask {
             sentence: LexicalSentence::new(term, punctuation, stamp, truth),
         }
     }
+
+    // 获取内部语句
+    pub fn get_sentence(&self) -> &LexicalSentence {
+        &self.sentence
+    }
 }
 
 /// 快捷构造宏
@@ -30,6 +37,42 @@ macro_rules! lexical_task {
     [$($arg:expr)*] => {
         LexicalTask::new($($arg),*)
     };
+}
+
+// 实现
+impl GetTerm<LexicalTerm> for LexicalTask {
+    /// 获取内部词项
+    fn get_term(&self) -> &LexicalTerm {
+        self.sentence.get_term()
+    }
+}
+
+impl GetBudget<String> for LexicalTask {
+    /// 获取内部预算值
+    fn get_budget(&self) -> &String {
+        &self.budget
+    }
+}
+
+impl GetPunctuation<String> for LexicalTask {
+    /// 获取内部标点
+    fn get_punctuation(&self) -> &String {
+        self.sentence.get_punctuation()
+    }
+}
+
+impl GetStamp<String> for LexicalTask {
+    /// 获取内部时间戳
+    fn get_stamp(&self) -> &String {
+        self.sentence.get_stamp()
+    }
+}
+
+impl GetTruth<String> for LexicalTask {
+    /// 获取内部真值（不一定有）
+    fn get_truth(&self) -> Option<&String> {
+        self.sentence.get_truth()
+    }
 }
 
 /// 单元测试

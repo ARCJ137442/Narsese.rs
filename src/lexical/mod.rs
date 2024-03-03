@@ -22,11 +22,25 @@ pub use sentence::*;
 mod task;
 pub use task::*;
 
+// 统合部分
+
+/// 用于归并表示「词法上的Narsese」
+pub enum LexicalNarsese {
+    /// 词法性词项
+    Term(LexicalTerm),
+    /// 词法性语句
+    Sentence(LexicalSentence),
+    /// 词法性任务
+    Task(LexicalTask),
+}
+
 /// 单元测试：词项+语句+任务
 #[cfg(test)]
 #[allow(unused)]
 mod tests {
-    use crate::{lexical_atom, lexical_compound, lexical_set, lexical_statement, lexical_task, show};
+    use crate::{
+        lexical_atom, lexical_compound, lexical_set, lexical_statement, lexical_task, show,
+    };
 
     use super::*;
 

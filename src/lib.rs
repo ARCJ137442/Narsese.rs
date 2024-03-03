@@ -10,6 +10,10 @@
 pub mod macros;
 pub mod util;
 
+// 共用特征
+pub mod traits;
+pub use traits::*;
+
 // 词法
 mod lexical;
 
