@@ -235,6 +235,17 @@ macro_rules! fail_tests {
     };
 }
 
+#[macro_export]
+macro_rules! assert_eqs {
+    {
+        $($left:expr => $right:expr $(,)?)*
+    } => {
+        $(
+            assert_eq!($left, $right);
+        )*
+    };
+}
+
 /// 用于简化「连续追加字符串」的宏
 /// * 🎯最初用于「字符串格式化」算法中
 /// * 🚩用法：`push_str!(要追加入的字符串; 待追加表达式1, 待追加表达式2, ...)`
