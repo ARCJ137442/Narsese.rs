@@ -10,6 +10,9 @@
 pub mod macros;
 pub mod util;
 
+// 词法
+mod lexical;
+
 // 词项
 pub mod term;
 pub use term::*;

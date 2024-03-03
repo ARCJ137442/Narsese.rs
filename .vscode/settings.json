@@ -9,6 +9,7 @@
         "Uparrow"
     ],
     "conventionalCommits.scopes": [
-        "解析器&格式化"
+        "解析器&格式化",
+        "词法"
     ]
 }
