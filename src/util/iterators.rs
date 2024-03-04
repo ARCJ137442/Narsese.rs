@@ -412,7 +412,7 @@ where
 /// 单元测试
 #[cfg(test)]
 mod tests {
-    use crate::{assert_eqs, show};
+    use crate::assert_eqs;
 
     use super::*;
 
