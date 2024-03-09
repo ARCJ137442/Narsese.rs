@@ -96,3 +96,37 @@ impl NarseseFormat<&str> {
         add_space_if_necessary_and_flush_buffer(out, &mut buffer, self.space.format_items);
     }
 }
+
+/// 单元测试
+#[cfg(test)]
+mod tests {
+    use super::super::tests_lexical::_sample_task;
+    use super::*;
+    use crate::conversion::string::{FORMAT_ASCII, FORMAT_HAN, FORMAT_LATEX};
+    use crate::{f_parallel, show};
+
+    /// 测试其中一个格式
+    fn _test(format: NarseseFormat<&str>, name: &str, expected: &str) {
+        // 声明
+        println!("Test of {name}");
+        // 构造样本任务
+        let task = _sample_task(&format);
+        // 格式化
+        let formatted = format.format_lexical_task(&task);
+        // 展示
+        show!(&formatted);
+        // 断言
+        assert_eq!(formatted, expected);
+    }
+
+    #[test]
+    fn test() {
+        // 平行测试
+        f_parallel![
+            _test;
+            FORMAT_ASCII "ascii" "$0.5;0.75;0.4$ <(&/, <ball {-] left>, <(*, {SELF}, $any, #some) --> ^do>) ==> <SELF {-] good>>. :!-1: %1.0;0.9%";
+            FORMAT_LATEX "latex" r#"\$0.5;0.75;0.4\$ \left<\left(,  \left<ball \circ\!\!\!\rightarrow\!\!\!\circ   left\right>  \left<\left(\times   \left\{SELF\right\}  \$any  \#some\right) \rightarrow  \Uparrow do\right>\right) \Rightarrow  \left<SELF \circ\!\!\!\rightarrow\!\!\!\circ   good\right>\right>. t=-1 \langle1.0,0.9\rangle"#;
+            FORMAT_HAN "漢" "预0.5、0.75、0.4算 「（接连，「ball具有left」，「（积，『SELF』，任一any，其一some）是操作do」）得「SELF具有good」」. 发生在-1 真1.0、0.9值";
+        ];
+    }
+}

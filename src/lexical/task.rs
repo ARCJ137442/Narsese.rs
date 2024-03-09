@@ -39,6 +39,21 @@ macro_rules! lexical_task {
     };
 }
 
+/// 快捷构造预算
+/// * 🎯兼容「Narsese格式」
+/// * ⚠️实际上还是字符串
+#[macro_export]
+macro_rules! lexical_budget {
+    [
+        $left:expr;
+        $separator:expr;
+        $($value:expr)+;
+        $right:expr $(;)?
+    ] => {
+        $left.to_string() + &[$($value),+].join($separator) + $right
+    };
+}
+
 // 实现
 impl GetTerm<LexicalTerm> for LexicalTask {
     /// 获取内部词项

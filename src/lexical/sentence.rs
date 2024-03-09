@@ -33,6 +33,55 @@ macro_rules! lexical_sentence {
     };
 }
 
+/// 快捷构造时间戳
+/// * 🎯兼容「Narsese格式」
+/// * ⚠️实际上还是字符串
+#[macro_export]
+macro_rules! lexical_stamp {
+    // 有内部值的
+    // * 🎯用于「固定」时间戳
+    [
+        $left:expr;
+        $head:expr;
+        $value:expr;
+        $right:expr $(;)?
+    ] => {
+        $left.to_string() + $head + $value + $right
+    };
+    // 没内部值的
+    [
+        $left:expr;
+        $head:expr;
+        $right:expr $(;)?
+    ] => {
+        $left.to_string() + $head + $right
+    };
+}
+
+/// 快捷构造真值
+/// * 🎯兼容「Narsese格式」
+/// * ⚠️实际上还是字符串
+#[macro_export]
+macro_rules! lexical_truth {
+    // 内部有值的
+    [
+        $left:expr;
+        $separator:expr;
+        $($value:expr)*;
+        $right:expr $(;)?
+    ] => {
+        $left.to_string() + &[$($value),*].join($separator) + $right
+    };
+    // 空真值
+    [
+        $left:expr;
+        $separator:expr;
+        $right:expr $(;)?
+    ] => {
+        $left.to_string() + $right
+    };
+}
+
 // 实现
 impl GetTerm<LexicalTerm> for LexicalSentence {
     fn get_term(&self) -> &LexicalTerm {

@@ -519,22 +519,34 @@ impl NarseseFormat<&str> {
 /// 单元测试
 #[cfg(test)]
 mod test {
-    use crate::show;
 
     use super::super::tests_enum::_sample_task;
     use super::*;
+    use crate::conversion::string::{FORMAT_ASCII, FORMAT_HAN, FORMAT_LATEX};
+    use crate::{f_parallel, show};
 
-    fn _test(format: NarseseFormat<&str>) {
+    /// 测试其中一个格式
+    fn _test(format: NarseseFormat<&str>, name: &str, expected: &str) {
+        // 声明
+        println!("Test of {name}");
         // 构造样本任务
         let task = _sample_task();
         // 格式化
         let formatted = format.format_task(&task);
         // 展示
-        show!(formatted);
+        show!(&formatted);
+        // 断言
+        assert_eq!(formatted, expected);
     }
 
     #[test]
     fn test() {
-        // TODO: 完善测试
+        // 平行测试
+        f_parallel![
+            _test;
+            FORMAT_ASCII "ascii" "$0.5;0.75;0.4$ <(&/, <{ball} --> [left]>, <(*, {SELF}, $any, #some) --> ^do>) ==> <{SELF} --> [good]>>. :!-1: %1;0.9%";
+            FORMAT_LATEX "latex" r#"\$0.5;0.75;0.4\$ \left<\left(,  \left<\left\{ball\right\} \rightarrow  \left[left\right]\right>  \left<\left(\times   \left\{SELF\right\}  \$any  \#some\right) \rightarrow  \Uparrow do\right>\right) \Rightarrow  \left<\left\{SELF\right\} \rightarrow  \left[good\right]\right>\right>. t=-1 \langle1,0.9\rangle"#;
+            FORMAT_HAN "漢" "预0.5、0.75、0.4算 「（接连，「『ball』是【left】」，「（积，『SELF』，任一any，其一some）是操作do」）得「『SELF』是【good】」」。发生在-1真1、0.9值";
+        ];
     }
 }

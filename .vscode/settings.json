@@ -13,5 +13,6 @@
     "conventionalCommits.scopes": [
         "解析器&格式化",
         "词法"
-    ]
+    ],
+    "editor.formatOnSave": true
 }
