@@ -17,12 +17,22 @@ pub use format::*;
 // 实现/格式化
 #[cfg(feature = "enum_narsese")]
 pub mod impl_formatter;
+// #[cfg(feature = "enum_narsese")]
+// pub use impl_formatter::*; // !【2024-03-09 17:54:14】实际上没有新导出任何东西
 #[cfg(feature = "lexical_narsese")]
 pub mod impl_formatter_lexical;
+// #[cfg(feature = "lexical_narsese")]
+// pub use impl_formatter_lexical::*; // !【2024-03-09 17:54:14】实际上没有新导出任何东西
 
 // 实现/解析器
 #[cfg(feature = "enum_narsese")]
 pub mod impl_parser;
+// #[cfg(feature = "enum_narsese")]
+// pub use impl_parser::*; // !🚩【2024-03-09 18:01:35】暂且禁用：有歧义的导出
+#[cfg(feature = "lexical_narsese")]
+pub mod impl_parser_lexical;
+// #[cfg(feature = "lexical_narsese")]
+// pub use impl_parser_lexical::*; // !🚩【2024-03-09 18:01:35】暂且禁用：有歧义的导出
 
 // 具体的格式 //
 pub mod instances;
