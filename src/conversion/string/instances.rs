@@ -5,8 +5,8 @@ use super::format::*;
 /// * 另可参考：<https://github.com/opennars/opennars/wiki/Narsese-Grammar-(Input-Output-Format)>
 /// * 可用于打印Narsese的默认形式
 pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
-    space : NarseseFormatSpace {
-        parse: " ", // ! 解析时忽略空格
+    space: NarseseFormatSpace {
+        parse: " ",        // ! 解析时忽略空格
         format_terms: " ", // 格式化时，词项间需要空格（英文如此）
         format_items: " ", // 格式化时，条目间需要空格（英文如此）
     },
@@ -152,8 +152,8 @@ pub const FORMAT_LATEX: NarseseFormat<&str> = NarseseFormat {
 /// * 📌原创
 pub const FORMAT_HAN: NarseseFormat<&str> = NarseseFormat {
     space: NarseseFormatSpace {
-        parse: " ",       // ! 解析时忽略空格
-        format_terms: "", // 格式化时，词项间无需分隔（避免太过松散）
+        parse: " ",        // ! 解析时忽略空格
+        format_terms: "",  // 格式化时，词项间无需分隔（避免太过松散）
         format_items: " ", // 格式化时，条目间需要分隔（避免太过密集）
     },
     atom: NarseseFormatAtom {
@@ -203,12 +203,12 @@ pub const FORMAT_HAN: NarseseFormat<&str> = NarseseFormat {
         punctuation_judgement: "。",
         punctuation_goal: "！",
         punctuation_question: "？",
-        punctuation_quest: "；", // 暂且没有更合适、更方便输入的全角标点
+        punctuation_quest: "；",  // 暂且没有更合适、更方便输入的全角标点
         stamp_brackets: ("", ""), // !【2024-02-25 16:31:38】此处时态没括号。。
         stamp_past: "过去",
         stamp_present: "现在",
         stamp_future: "将来",
-        stamp_fixed: "发生在", // 另一个候选是「时为」，但欠缺可读性
+        stamp_fixed: "发生在",        // 另一个候选是「时为」，但欠缺可读性
         truth_brackets: ("真", "值"), // 大改：兼容单真值、空真值
         truth_separator: "、",
     },
@@ -222,7 +222,7 @@ pub const FORMAT_HAN: NarseseFormat<&str> = NarseseFormat {
 
 /// 单元测试
 #[cfg(test)]
-#[cfg(feature="enum_narsese")]
+#[cfg(feature = "enum_narsese")]
 mod tests_enum_narsese {
 
     use super::*;

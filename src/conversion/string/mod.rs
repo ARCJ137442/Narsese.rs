@@ -15,13 +15,13 @@ pub mod format;
 pub use format::*;
 
 // 实现/格式化
-#[cfg(feature="enum_narsese")]
+#[cfg(feature = "enum_narsese")]
 pub mod impl_formatter;
-#[cfg(feature="lexical_narsese")]
+#[cfg(feature = "lexical_narsese")]
 pub mod impl_formatter_lexical;
 
 // 实现/解析器
-#[cfg(feature="enum_narsese")]
+#[cfg(feature = "enum_narsese")]
 pub mod impl_parser;
 
 // 具体的格式 //
@@ -30,7 +30,7 @@ pub use instances::*;
 
 /// 集成测试@字符串解析&格式化
 #[cfg(test)]
-#[cfg(feature="enum_narsese")]
+#[cfg(feature = "enum_narsese")]
 mod tests_enum {
 
     use self::impl_parser::NarseseResult;
@@ -53,7 +53,10 @@ mod tests_enum {
         }
     }
 
-    use crate::{show, enum_narsese::{Budget, Sentence, Stamp, Task, Term, Truth}};
+    use crate::{
+        enum_narsese::{Budget, Sentence, Stamp, Task, Term, Truth},
+        f_tensor, show,
+    };
 
     /// 先解析然后格式化
     fn _test_parse_and_format(format: &NarseseFormat<&str>, input: &str) -> String {
@@ -93,14 +96,14 @@ mod tests_enum {
                 $({
                     // 告知测试
                     println!("Test in `{}`", stringify!($f));
-                    // 生成行列
-                    let inputs = [$($input),+];
-                    // 新建一个列
-                    let mut col = vec![];
-                    // 生成列元素
-                    for input in inputs {
-                        col.push($f(&$format, input))
-                    }
+
+                    // 生成矩阵 | 执行测试
+                    let matrix = f_tensor![
+                        $f [&$format] [ $($input)+ ]
+                    ];
+
+                    // 展示矩阵
+                    show!(&matrix);
                 })+;
             }
         };
@@ -123,7 +126,7 @@ mod tests_enum {
         ]);
         let self_good = Term::new_instance_property(Term::new_word("SELF"), Term::new_word("good"));
         let term = Term::new_implication(conditional_operation.clone(), self_good.clone());
-        
+
         // 构造语句
         let truth = Truth::Double(1.0, 0.9);
         let stamp = Stamp::Fixed(-1);

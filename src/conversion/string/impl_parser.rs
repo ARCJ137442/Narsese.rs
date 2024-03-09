@@ -1494,73 +1494,7 @@ impl NarseseFormat<&str> {
 mod tests_parse {
     use super::*;
     use crate::conversion::string::*;
-    use crate::{fail_tests, show};
-
-    /// 生成「矩阵」
-    /// 
-    /// # 用例
-    /// 
-    /// ```rust,no-test
-    /// f_matrix! [
-    ///     // 应用的函数
-    ///     _test_parse_term;
-    ///     // 格式×输入
-    ///     &format_ascii;
-    ///     "word", "_", "$i_var", "#d_var", "?q_var", "+137", "^op",
-    ///     // "^go-to" // * ←该操作符OpenNARS可解析，而ONA、PyNARS不能
-    ///     // ! ↑【2024-02-22 14:46:16】现因需兼顾`<主词-->谓词>`的结构（防止系词中的`-`被消耗），故不再兼容
-    /// ]
-    /// ```
-    /// 
-    /// =>
-    /// 
-    /// ```rust,no-test
-    /// {
-    ///     let mut matrix = vec![];
-    ///     let formats = [(&format_ascii)];
-    ///     let inputs = ["word","_","$i_var","#d_var","?q_var","+137","^op"];
-    ///     for format in formats {
-    ///         let mut col = vec![];
-    ///         for input in inputs {
-    ///             col.push(_test_parse_term(format,input))
-    ///         }matrix.push((format,col));
-    ///     }
-    ///     matrix
-    /// }
-    /// ```
-    /// 
-    /// # 结果
-    /// `Vec<(format, Vec<result>)>`
-    /// 
-    macro_rules! f_matrix {
-        [
-            $f:ident;
-            $($format:expr $(,)?)+ ;
-            $($input:expr $(,)?)+ $(;)?
-            // *【2024-02-22 15:32:02】↑现在所有逗号都可选了
-        ] => {
-            {
-                // 新建一个矩阵
-                let mut matrix = vec![];
-                // 生成行列
-                let formats = [$($format),+];
-                let inputs = [$($input),+];
-                // 给矩阵添加元素
-                for format in formats {
-                    // 新建一个列
-                    let mut col = vec![];
-                    // 生成列元素
-                    for input in inputs {
-                        col.push($f(format, input))
-                    }
-                    // 添加列
-                    matrix.push((format, col));
-                }
-                // 返回矩阵
-                matrix
-            }
-        };
-    }
+    use crate::{f_tensor, fail_tests, show};
 
     /// 通通用测试/尝试解析并返回错误
     fn __test_parse(format: &NarseseFormat<&str>, input: &str) -> NarseseResult {
@@ -1601,39 +1535,39 @@ mod tests_parse {
     }
 
     /// 通用测试/词项
-    fn _test_parse_term(format: &NarseseFormat<&str>, input: &str) {
+    fn _test_parse_term(format: &NarseseFormat<&str>, input: &str) -> Term {
         // 尝试解析并检验
         let term: Term = __test_parse(format, input).try_into().unwrap();
         // 展示
-        show!(term);
+        show!(term)
     }
 
     /// 通用测试/语句
-    fn _test_parse_sentence(format: &NarseseFormat<&str>, input: &str) {
+    fn _test_parse_sentence(format: &NarseseFormat<&str>, input: &str) -> Sentence {
         // 尝试解析并检验
         let sentence: Sentence = __test_parse(format, input).try_into().unwrap();
         // 展示
-        show!(sentence);
+        show!(sentence)
     }
 
     /// 通用测试/任务
-    fn _test_parse_task(format: &NarseseFormat<&str>, input: &str) {
+    fn _test_parse_task(format: &NarseseFormat<&str>, input: &str) -> Task {
         // 尝试解析并检验
         let task: Task = __test_parse(format, input).try_into().unwrap();
         // 展示
-        show!(task);
+        show!(task)
     }
 
     /// 测试/原子词项
     #[test]
     fn test_parse_atom() {
         let format_ascii = FORMAT_ASCII;
-        let matrix = f_matrix! [
+        let matrix = f_tensor! [
             // 应用的函数
             _test_parse_term;
             // 格式×输入
             &format_ascii;
-            "word", "_", "$i_var", "#d_var", "?q_var", "+137", "^op",
+            "word" "_" "$i_var" "#d_var" "?q_var" "+137" "^op"
             // "^go-to" // * ←该操作符OpenNARS可解析，而ONA、PyNARS不能
             // ! ↑【2024-02-22 14:46:16】现因需兼顾`<主词-->谓词>`的结构（防止系词中的`-`被消耗），故不再兼容
         ];
@@ -1682,31 +1616,31 @@ mod tests_parse {
     #[test]
     fn test_parse_compound() {
         let format_ascii = FORMAT_ASCII;
-        let matrix = f_matrix! [
-            // 应用的函数
-            _test_parse_term;
-            // 格式×输入
-            &format_ascii;
-            "{word, w2}",
-            "{{word}, {w2}}",
-            "{{{{{{嵌套狂魔}}}}}}",
-            "[1 , 2 , 3  , 4 ,   5 ]",
-            "[_ , _ , _  , _ ,   _ ]", // ! 看起来是五个，实际上因为是「集合」只有一个
-            "(&, word, $i_var, #d_var, ?q_var, _, +137, ^op)",
-            "(|, word, $i_var, #d_var, ?q_var, _, +137, ^op)",
-            "(-, {被减的}, [减去的])",
-            "(~, {[被减的]}, [{减去的}])",
-            "(~, (-, 被减的被减的, {[被减的减去的]}), [{减去的}])",
-            "(*, word, $i_var, #d_var, ?q_var, _, +137, ^op)",
-            "(/, word, _, $i_var, #d_var, ?q_var, +137, ^op)",
-            "(\\,word,$i_var,#d_var,?q_var,_,+137,^op)",
-            "(/, _, 0)",
-            "(\\, 0, _)",
-            "( &&  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )",
-            "( ||  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )",
-            "( --  , 我是被否定的)",
-            "( &/  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )",
-            "( &|  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )",
+        let matrix = f_tensor! [
+        // 应用的函数
+        _test_parse_term;
+        // 格式×输入
+        &format_ascii;
+        "{word, w2}"
+        "{{word}, {w2}}"
+        "{{{{{{嵌套狂魔}}}}}}"
+        "[1 , 2 , 3  , 4 ,   5 ]"
+        "[_ , _ , _  , _ ,   _ ]" // ! 看起来是五个，实际上因为是「集合」只有一个
+        "(&, word, $i_var, #d_var, ?q_var, _, +137, ^op)"
+        "(|, word, $i_var, #d_var, ?q_var, _, +137, ^op)"
+        "(-, {被减的}, [减去的])"
+        "(~, {[被减的]}, [{减去的}])"
+        "(~, (-, 被减的被减的, {[被减的减去的]}), [{减去的}])"
+        "(*, word, $i_var, #d_var, ?q_var, _, +137, ^op)"
+        "(/, word, _, $i_var, #d_var, ?q_var, +137, ^op)"
+        "(\\,word,$i_var,#d_var,?q_var,_,+137,^op)"
+        "(/, _, 0)"
+        "(\\, 0, _)"
+        "( &&  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )"
+        "( ||  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )"
+        "( --  , 我是被否定的)"
+        "( &/  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )"
+        "( &|  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )"
         ];
         show!(matrix);
     }
@@ -1739,33 +1673,33 @@ mod tests_parse {
     #[test]
     fn test_parse_statement() {
         let format_ascii = FORMAT_ASCII;
-        let matrix = f_matrix! [
+        let matrix = f_tensor! [
             // 应用的函数
             _test_parse_term;
             // 格式×输入
             &format_ascii;
             // 普通情况
-            "<外延-->内涵>",
-            "<我是右边的外延 --> 我是左边的内涵>",
-            "<前提 ==> 结论>",
-            "<等价物 <=> 等價物>",
+            "<外延-->内涵>"
+            "<我是右边的外延 --> 我是左边的内涵>"
+            "<前提 ==> 结论>"
+            "<等价物 <=> 等價物>"
             // 派生系词
-            "<实例 {-- 类型>",
-            "<类型 --] 属性>",
-            "<实例 {-] 属性>",
-            r#"<当下行动 =/> 未来预期>"#,
-            r#"<当下条件 =|> 当下结论>"#,
-            r#"<当下结果 =\> 过往原因>"#,
-            r#"<统一前提 </> 未来等价>"#,
-            r#"<统一前提 <|> 当下等价>"#,
-            r#"<统一前提 <\> 过往等价>"#, // ! ⚠️允许出现，但会被自动转换为「未来等价」
+            "<实例 {-- 类型>"
+            "<类型 --] 属性>"
+            "<实例 {-] 属性>"
+            r#"<当下行动 =/> 未来预期>"#
+            r#"<当下条件 =|> 当下结论>"#
+            r#"<当下结果 =\> 过往原因>"#
+            r#"<统一前提 </> 未来等价>"#
+            r#"<统一前提 <|> 当下等价>"#
+            r#"<统一前提 <\> 过往等价>"# // ! ⚠️允许出现，但会被自动转换为「未来等价」
 
             // 集成测试：原子&复合
-            "<[蕴含]==>{怪论}>",
-            "<$我很相似 <-> #我也是>",
-            "<^咱俩相同<->^咱俩相同>",
-            "<+123<->加一二三>",
-            "<(*, {SELF}) --> ^left>",
+            "<[蕴含]==>{怪论}>"
+            "<$我很相似 <-> #我也是>"
+            "<^咱俩相同<->^咱俩相同>"
+            "<+123<->加一二三>"
+            "<(*, {SELF}) --> ^left>"
         ];
         show!(matrix);
     }
@@ -1776,12 +1710,12 @@ mod tests_parse {
     /// 测试/标点（语句）
     #[test]
     fn test_parse_punctuation() {
-        let matrix = f_matrix! [
+        let matrix = f_tensor! [
         // 应用的函数
         _test_parse_sentence;
         // 格式×输入
         &FORMAT_ASCII;
-        "判断.", "目标!", "问题?", "请求@", "?查询变量vs问题?"
+        "判断." "目标!" "问题?" "请求@" "?查询变量vs问题?"
         ];
         show!(matrix);
     }
@@ -1812,19 +1746,19 @@ mod tests_parse {
     /// 测试/真值（语句）
     #[test]
     fn test_parse_truth() {
-        let matrix = f_matrix! [
+        let matrix = f_tensor! [
             // 应用的函数
             _test_parse_sentence;
             // 格式×输入
             &FORMAT_ASCII;
-            "判断. %1.0;0.9%", "目标! %.0;.9%", "问题?", "请求@",
-            "单真值. %1.0%",
-            "单真值. %00%",
-            "单真值. %00.00%",
-            "单真值2. %.0%",
-            "空真值. %%", // * 视作空真值
-            "空真值2. %", // * 这个会预先退出
-            "空真值3.",
+            "判断. %1.0;0.9%" "目标! %.0;.9%" "问题?" "请求@"
+            "单真值. %1.0%"
+            "单真值. %00%"
+            "单真值. %00.00%"
+            "单真值2. %.0%"
+            "空真值. %%" // * 视作空真值
+            "空真值2. %" // * 这个会预先退出
+            "空真值3."
         ];
         show!(matrix);
     }
@@ -1845,19 +1779,19 @@ mod tests_parse {
     /// 测试/预算值（任务）
     #[test]
     fn test_parse_budget() {
-        let matrix = f_matrix! [
+        let matrix = f_tensor! [
             // 应用的函数
             _test_parse_task;
             // 格式×输入
             &FORMAT_ASCII;
-            "$0.5;0.5;0.5$ 判断. %1.0%",
-            "$.7;.75;0.555$目标! %.0;.9%",
-            "$1;1;1$ 问题?",
-            "$0;0;0$请求@",
-            "$0;0$双预算?",
-            "$0$单预算@",
-            "$$空预算?",
-            "$$$独立变量vs空运算?",
+            "$0.5;0.5;0.5$ 判断. %1.0%"
+            "$.7;.75;0.555$目标! %.0;.9%"
+            "$1;1;1$ 问题?"
+            "$0;0;0$请求@"
+            "$0;0$双预算?"
+            "$0$单预算@"
+            "$$空预算?"
+            "$$$独立变量vs空运算?"
         ];
         show!(matrix);
     }
@@ -1880,18 +1814,18 @@ mod tests_parse {
     /// 测试/时间戳（语句）
     #[test]
     fn test_parse_stamp() {
-        let matrix = f_matrix! [
+        let matrix = f_tensor! [
             // 应用的函数
             _test_parse_sentence;
             // 格式×输入
             &FORMAT_ASCII;
-            "固定.:!114514:",
-            "固定正.:!+137:",
-            "固定负.:!-442:",
-            "过去.:\\:",
-            "现在? :|:",
-            "未来! :/:",
-            "永恒.",
+            "固定.:!114514:"
+            "固定正.:!+137:"
+            "固定负.:!-442:"
+            "过去.:\\:"
+            "现在? :|:"
+            "未来! :/:"
+            "永恒."
         ];
         show!(matrix);
     }
@@ -1940,7 +1874,7 @@ mod tests_parse {
     /// * 🎯用于检验是否可能panic
     #[test]
     fn test_parse_stability_cases() {
-        f_matrix! [
+        f_tensor! [
             // 应用的函数
             _test_parse_stability;
             // 格式×输入
@@ -1984,7 +1918,7 @@ mod tests_parse {
     /// 集成测试/解析器
     #[test]
     fn test_parse_integrated() {
-        let matrix = f_matrix! [
+        let matrix = f_tensor! [
             // 应用的函数
             _test_parse_common;
             // 格式×输入

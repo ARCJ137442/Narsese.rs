@@ -33,7 +33,8 @@ impl ZeroOneFloat for FloatPrecision {
         *self >= 0.0 && *self <= 1.0
     }
     fn validate_01(self) -> Self {
-        if self < 0.0 || self > 1.0 {
+        // * 📝Clippy：可以使用「区间包含」而非「条件组合」
+        if !(0.0..=1.0).contains(&self) {
             panic!("「0-1」区间外的值（建议：`0<x<1`）");
         }
         self

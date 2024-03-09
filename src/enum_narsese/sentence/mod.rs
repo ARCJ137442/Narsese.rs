@@ -21,5 +21,6 @@ pub mod punctuation;
 pub use punctuation::*;
 
 // 语句 //
-pub mod sentence;
+#[allow(clippy::module_inception)] // * 告知Clippy忽略（私有模块）
+mod sentence;
 pub use sentence::*;

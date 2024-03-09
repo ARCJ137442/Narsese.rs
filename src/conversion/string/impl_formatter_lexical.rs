@@ -92,7 +92,7 @@ impl NarseseFormat<&str> {
         // 预算值
         out.push_str(task.get_budget());
         // 语句
-        self._format_lexical_sentence(&mut buffer, &task.get_sentence());
+        self._format_lexical_sentence(&mut buffer, task.get_sentence());
         add_space_if_necessary_and_flush_buffer(out, &mut buffer, self.space.format_items);
     }
 }

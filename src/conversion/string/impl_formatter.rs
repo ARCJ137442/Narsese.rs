@@ -521,8 +521,8 @@ impl NarseseFormat<&str> {
 mod test {
     use crate::show;
 
-    use super::*;
     use super::super::tests_enum::_sample_task;
+    use super::*;
 
     fn _test(format: NarseseFormat<&str>) {
         // 构造样本任务
