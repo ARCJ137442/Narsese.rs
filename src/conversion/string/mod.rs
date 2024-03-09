@@ -15,10 +15,13 @@ pub mod format;
 pub use format::*;
 
 // 实现/格式化
+#[cfg(feature="enum_narsese")]
 pub mod impl_formatter;
+#[cfg(feature="lexical_narsese")]
 pub mod impl_formatter_lexical;
 
 // 实现/解析器
+#[cfg(feature="enum_narsese")]
 pub mod impl_parser;
 
 // 具体的格式 //
@@ -27,13 +30,15 @@ pub use instances::*;
 
 /// 集成测试@字符串解析&格式化
 #[cfg(test)]
-mod tests {
+#[cfg(feature="enum_narsese")]
+mod tests_enum {
 
     use self::impl_parser::NarseseResult;
 
     use super::*;
     use format::NarseseFormat;
 
+    /// 用于给格式加上「自动解包并格式化内容」功能
     trait FormatResult {
         fn format_result(&self, result: &NarseseResult) -> String;
     }
@@ -41,14 +46,14 @@ mod tests {
     impl FormatResult for NarseseFormat<&str> {
         fn format_result(&self, result: &NarseseResult) -> String {
             match result {
-                NarseseResult::Term(term) => self.format_term(&term),
-                NarseseResult::Sentence(sentence) => self.format_sentence(&sentence),
-                NarseseResult::Task(task) => self.format_task(&task),
+                NarseseResult::Term(term) => self.format_term(term),
+                NarseseResult::Sentence(sentence) => self.format_sentence(sentence),
+                NarseseResult::Task(task) => self.format_task(task),
             }
         }
     }
 
-    use crate::{show, Budget, Sentence, Stamp, Task, Term, Truth};
+    use crate::{show, enum_narsese::{Budget, Sentence, Stamp, Task, Term, Truth}};
 
     /// 先解析然后格式化
     fn _test_parse_and_format(format: &NarseseFormat<&str>, input: &str) -> String {
@@ -101,8 +106,8 @@ mod tests {
         };
     }
 
-    /// 构造一个格式化样本
-    fn _sample_task() -> Task {
+    /// （通用）构造一个格式化样本
+    pub fn _sample_task() -> Task {
         // 构造词项
         let ball_left = Term::new_instance_property(Term::new_word("ball"), Term::new_word("left"));
         let conditional_operation = Term::new_conjunction_sequential(vec![
@@ -118,15 +123,15 @@ mod tests {
         ]);
         let self_good = Term::new_instance_property(Term::new_word("SELF"), Term::new_word("good"));
         let term = Term::new_implication(conditional_operation.clone(), self_good.clone());
+        
         // 构造语句
         let truth = Truth::Double(1.0, 0.9);
         let stamp = Stamp::Fixed(-1);
         let sentence = Sentence::new_judgement(term.clone(), truth, stamp);
-        // 构造任务
+
+        // 构造任务并返回
         let budget = Budget::Triple(0.5, 0.75, 0.4);
-        let task = Task::new(sentence.clone(), budget);
-        // 返回
-        task
+        Task::new(sentence.clone(), budget) // * 📝【2024-03-09 10:48:31】Clippy推荐直接返回构造之后的值
     }
 
     #[test]

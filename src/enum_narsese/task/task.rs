@@ -1,8 +1,7 @@
 //! 统一定义「任务」
-
-use crate::{
-    term::Term, GetBudget, GetPunctuation, GetStamp, GetTerm, GetTruth, Punctuation, Stamp, Truth,
-};
+use crate::common_api::{GetBudget, GetPunctuation, GetStamp, GetTerm, GetTruth};
+use crate::enum_narsese::sentence::{Punctuation, Sentence, Stamp, Truth};
+use crate::enum_narsese::term::Term;
 
 use super::*;
 

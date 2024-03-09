@@ -140,6 +140,7 @@ macro_rules! show {
     };
 }
 
+#[allow(clippy::test_attr_in_doctest)] // * 📝告诉Clippy「这只是用来生成单元测试的示例，并非要运行测试」
 /// # 辅助用测试宏/批量添加失败测试
 ///
 /// * 可极大减轻添加`should_panic`的代码量
@@ -278,7 +279,7 @@ macro_rules! push_str {
 
 /// 用于将「流式追加」捕捉转换成「固定返回值」
 /// * 🎯首次应用于「基于[`String::push_str`]动态追加产生字符串」与「直接返回字符串」的转换中
-/// 
+///
 /// # Example
 ///
 /// ```rust
@@ -288,7 +289,7 @@ macro_rules! push_str {
 ///     out.push_str("hello, ");
 ///     out.push_str("world!");
 /// }
-/// 
+///
 /// let caught = catch_flow!(append;);
 /// assert_eq!(caught, "hello, world!");
 /// ```
@@ -300,5 +301,90 @@ macro_rules! catch_flow {
             $($path).+(&mut s, $($arg)*);
             s
         }
+    };
+}
+
+/// 构建通用的「函数参数矩阵展开」宏
+/// * 🎯用于简化一系列「笛卡尔积式组合调用」
+/// 
+/// # Example
+///
+/// ```rust
+/// use enum_narsese::f_matrix;
+///
+/// fn add(a: i32, b: i32) -> i32 {a + b}
+///
+/// let matrix =
+///     f_matrix![add; 1 2 3; 4 5];
+/// let expanded =
+///     [[add(1,4), add(1,5)], [add(2,4), add(2,5)], [add(3,4), add(3,5)]];
+///
+/// assert_eq!(matrix, expanded);
+/// ```
+/// 
+/// # Experiences
+/// 
+/// * 📝使用「前缀特殊标识符」控制宏匹配时的分派路径
+///   * 💭此举特别像Julia的多分派系统
+/// * 📝涉及「嵌套笛卡尔积展开」时，把其它变量都变成一个维度，在一次调用中只展开一个维度
+///   * 🚩源自GitHub Issue的方法
+///     * 1 先使用「数组」之类的包装成一个令牌树（tt）
+///     * 2 展开另一个维度
+///     * 3 再将原先包装的维度解包
+///
+/// # References
+/// 
+/// * 🔗宏小册「使用`@`标识子分派」<https://www.bookstack.cn/read/DaseinPhaos-tlborm-chinese/aeg-ook.md>
+/// * 🔗开发者论坛：<https://users.rust-lang.org/t/why-is-the-innermost-meta-variable-expansion-impacted-by-the-outmost-one/99099/4>
+/// * 🔗GitHub Issue：<https://github.com/rust-lang/rust/issues/96184>
+#[macro_export]
+macro_rules! f_matrix {
+    // 入口
+    [
+        // 要被调用的函数（标识符）
+        $f:ident;
+        // 第一个参数的表达式序列
+        $($arg1:expr)+;
+        // 第二个参数的表达式序列
+        $($arg2:expr)+ $(;)?
+    ] => {
+        // * 1 先使用「数组」之类的包装成一个令牌树（tt）
+        f_matrix!(@wrapped $f; $($arg1)+; [$($arg2),+])
+    };
+    // 已经打包，先展开第一个参数
+    [
+        // 内部标识符
+        @wrapped
+        // 要被调用的函数（标识符）
+        $f:ident;
+        // 第一个参数的表达式序列
+        $($arg1:expr)+;
+        // 第二个参数的表达式序列（被打包）
+        $arg2:tt $(;)? ] => {
+        [
+            // * 2 展开另一个维度
+            $(
+                f_matrix![@wrapped_fixed_1 $f; $arg1; $arg2 ]
+            ),+
+        ]
+    };
+    // 已解包第一个参数，现在展开第二个参数
+    [ 
+        // 内部标识符
+        @wrapped_fixed_1
+        // 要被调用的函数（标识符）
+        $f:ident;
+        // 第一个参数的表达式（已展开）
+        $arg1:expr;
+        // 第二个参数的表达式序列（正解包）
+        [$($arg2:expr),*] $(;)?
+     ] => {
+        [
+            // * 3 再将原先包装的维度解包
+            $(
+                // ↓这里解包的是arg2
+                $f($arg1, $arg2)
+            ),+
+        ]
     };
 }

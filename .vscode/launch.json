@@ -7,8 +7,57 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug",
-            "program": "${workspaceFolder}/<executable file>",
+            "name": "Debug级单元测试（所有特性）",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--all-features",
+                    "--package=enum_narsese"
+                ],
+                "filter": {
+                    "name": "enum_narsese",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "测试可执行文件「结构展示器」",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=structure_illustrator",
+                    "--package=enum_narsese"
+                ],
+                "filter": {
+                    "name": "structure_illustrator",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug单元测试@结构展示器",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=structure_illustrator",
+                    "--package=enum_narsese"
+                ],
+                "filter": {
+                    "name": "structure_illustrator",
+                    "kind": "bin"
+                }
+            },
             "args": [],
             "cwd": "${workspaceFolder}"
         }

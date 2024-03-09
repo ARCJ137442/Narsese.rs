@@ -3,6 +3,7 @@
         ".\\Cargo.toml"
     ],
     "cSpell.words": [
+        "doctest",
         "EVCXR",
         "Rightarrow",
         "tomllib",

@@ -1,33 +1,18 @@
-//! 使用枚举简单实现一个Narsese数据结构库
-//! 三种数据结构
-//! * 词项（首要）
-//! * 语句（封装）
-//! * 任务（封装）
-//!
-//! ⚠️【2024-02-19 10:58:46】暂不考虑通用性，仅考虑「MWE」
+//! 库的主模块
 
 // 实用
 pub mod macros;
 pub mod util;
 
-// 共用特征
-pub mod traits;
-pub use traits::*;
+// 共用GPI
+pub mod common_api;
 
 // 词法
-mod lexical;
+#[cfg(feature = "lexical_narsese")]
+pub mod lexical;
 
-// 词项
-pub mod term;
-pub use term::*;
-
-// 语句
-pub mod sentence;
-pub use sentence::*;
-
-// 任务
-pub mod task;
-pub use task::*;
+#[cfg(feature = "enum_narsese")]
+pub mod enum_narsese;
 
 // 转换
 pub mod conversion;

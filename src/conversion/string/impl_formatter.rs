@@ -1,7 +1,13 @@
 //! 实现/格式化器
 
 use super::format::*;
-use crate::{catch_flow, push_str, sentence::*, task::*, term::*, traits::*, util::*};
+use crate::{
+    catch_flow,
+    common_api::{GetBudget, GetStamp, GetTerm, GetTruth},
+    enum_narsese::*,
+    push_str,
+    util::*,
+};
 
 /// 实现：转换
 ///
@@ -170,8 +176,13 @@ impl NarseseFormat<&str> {
             self.compound.brackets.0,
             connecter,
             // 通过特殊的迭代器，连同占位符一起迭代
-            ImageIterator::new(components.iter().map(|&term| term), index)
-                .map(|term| self.format_term(term)),
+            ImageIterator::new(
+                // * 建立迭代器并复制其中的引用（`&&Term => &Term`）
+                // * 📝Clippy：可简化`.map(|&term| term)`为`.copied()`
+                components.iter().copied(),
+                index,
+            )
+            .map(|term| self.format_term(term)),
             self.compound.separator,
             self.space.format_terms,
             self.compound.brackets.1,
@@ -499,7 +510,7 @@ impl NarseseFormat<&str> {
         // 预算值
         self._format_budget(out, task.get_budget());
         // 语句
-        self._format_sentence(&mut buffer, &task.get_sentence());
+        self._format_sentence(&mut buffer, task.get_sentence());
         // 添加空格
         add_space_if_necessary_and_flush_buffer(out, &mut buffer, self.space.format_items);
     }
@@ -508,10 +519,18 @@ impl NarseseFormat<&str> {
 /// 单元测试
 #[cfg(test)]
 mod test {
+    use crate::show;
+
     use super::*;
+    use super::super::tests_enum::_sample_task;
 
     fn _test(format: NarseseFormat<&str>) {
-        // TODO: 完善测试
+        // 构造样本任务
+        let task = _sample_task();
+        // 格式化
+        let formatted = format.format_task(&task);
+        // 展示
+        show!(formatted);
     }
 
     #[test]

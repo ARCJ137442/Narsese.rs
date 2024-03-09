@@ -1,7 +1,12 @@
 //! 实现/格式化器
 
-use super::format::*;
-use crate::{catch_flow, lexical::*, traits::*, util::*};
+use super::format::NarseseFormat;
+use crate::{
+    catch_flow,
+    common_api::{GetBudget, GetTerm},
+    lexical::{LexicalSentence, LexicalTask, LexicalTerm},
+    util::add_space_if_necessary_and_flush_buffer,
+};
 
 /// 实现：转换
 ///

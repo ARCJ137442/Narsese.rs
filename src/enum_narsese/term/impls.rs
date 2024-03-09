@@ -1,6 +1,6 @@
 //! 统一定义词项实现
 
-use crate::GetTerm;
+use crate::common_api::GetTerm;
 
 use super::structs::*;
 use std::any::type_name;
@@ -299,11 +299,9 @@ impl Term {
                 _ => target.push(term),
             }
         }
-        // 根据「是否有占位符位置」产生结果
-        match placeholder_index {
-            Some(index) => Some(index),
-            None => None,
-        }
+        // 根据「是否有占位符位置」产生结果（实际上直接返回）
+        // * 📝Rust可以直接对[`Option`]进行map，其中[`None`]会保留原样
+        placeholder_index
     }
 
     /// 从「带有占位符的词项迭代器」中直接构建「外延像」
@@ -898,7 +896,7 @@ impl Eq for Term {}
 /// 实现/获取词项
 impl GetTerm<Term> for Term {
     fn get_term(&self) -> &Term {
-        &self
+        self
     }
 }
 

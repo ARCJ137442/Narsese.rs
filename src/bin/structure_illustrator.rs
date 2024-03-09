@@ -1,6 +1,8 @@
 //! 构建一个简单的REPL
 //! 🎯用于格式化展示一个Narsese对象
 
+#![cfg(feature="enum_narsese")]
+
 use std::io::{stdin, stdout, Stdin, Write};
 
 use enum_narsese::conversion::string::{impl_parser::NarseseResult, NarseseFormat, FORMAT_ASCII};

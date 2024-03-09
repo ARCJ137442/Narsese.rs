@@ -6,14 +6,12 @@
 //! * 预算值
 //! * 任务
 
-use crate::{sentence::Sentence, util::*};
-
 // 预算值 //
 
 mod budget;
 pub use budget::*;
 
 // 任务 //
-
+#[allow(clippy::module_inception)] // * 允许私有模块与父模块同名
 mod task;
 pub use task::*;

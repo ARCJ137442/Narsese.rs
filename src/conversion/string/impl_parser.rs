@@ -26,9 +26,9 @@
 //!     * ✨有相应的「结果索引」类型
 
 use crate::{
+    enum_narsese::*,
     first,
     util::{FloatPrecision, IntPrecision, ZeroOneFloat},
-    Budget, Punctuation, Sentence, Stamp, Task, Term, Truth,
 };
 use std::{error::Error, fmt::Display, io::ErrorKind};
 
@@ -645,7 +645,10 @@ impl<'a> ParseState<'a, &str> {
             errs;
 
             // 空格⇒跳过 //
-            self.starts_with(self.format.space.parse) => Ok(self.head_skip(self.format.space.parse)),
+            self.starts_with(self.format.space.parse) => {
+                self.head_skip(self.format.space.parse);
+                Ok(()) // * 📌Clippy：明确返回单元值，而非（可能后续会变的）「索引头跳过」的结果
+            },
             // 1 预算值 //
             (
                 self.starts_with(self.format.task.budget_brackets.0) &&
@@ -808,19 +811,15 @@ impl<'a> ParseState<'a, &str> {
                 }
                 // 尾括弧⇒解析并存入数值&跳出循环 | 「跳出尾括弧」在循环外操作
                 _ if self.starts_with(right_bracket) => {
-                    // 解析并存入数值
-                    match value_buffer.parse::<FloatPrecision>() {
-                        // 有效数值
-                        Ok(value) => {
-                            // 填充数组
-                            result[i] = value;
-                            // 清空缓冲区
-                            value_buffer.clear();
-                            // 增加计数
-                            i += 1;
-                        }
-                        // 无效数值⇒不做任何事
-                        Err(_) => {}
+                    // 只在数值有效时做事
+                    // * 📝Clippy：没必要使用`Err(..) => {}`这样的分支
+                    if let Ok(value) = value_buffer.parse::<FloatPrecision>() {
+                        // 填充数组
+                        result[i] = value;
+                        // 清空缓冲区
+                        value_buffer.clear();
+                        // 增加计数
+                        i += 1;
                     }
                     // 跳出循环
                     break;
@@ -1493,15 +1492,46 @@ impl NarseseFormat<&str> {
 /// 单元测试
 #[cfg(test)]
 mod tests_parse {
-    use crate::{
-        conversion::string::{NarseseFormat, FORMAT_ASCII},
-        fail_tests, show, Sentence, Task, Term,
-    };
-
-    use super::NarseseResult;
+    use super::*;
+    use crate::conversion::string::*;
+    use crate::{fail_tests, show};
 
     /// 生成「矩阵」
-    /// * 结果：`Vec<(format, Vec<result>)>`
+    /// 
+    /// # 用例
+    /// 
+    /// ```rust,no-test
+    /// f_matrix! [
+    ///     // 应用的函数
+    ///     _test_parse_term;
+    ///     // 格式×输入
+    ///     &format_ascii;
+    ///     "word", "_", "$i_var", "#d_var", "?q_var", "+137", "^op",
+    ///     // "^go-to" // * ←该操作符OpenNARS可解析，而ONA、PyNARS不能
+    ///     // ! ↑【2024-02-22 14:46:16】现因需兼顾`<主词-->谓词>`的结构（防止系词中的`-`被消耗），故不再兼容
+    /// ]
+    /// ```
+    /// 
+    /// =>
+    /// 
+    /// ```rust,no-test
+    /// {
+    ///     let mut matrix = vec![];
+    ///     let formats = [(&format_ascii)];
+    ///     let inputs = ["word","_","$i_var","#d_var","?q_var","+137","^op"];
+    ///     for format in formats {
+    ///         let mut col = vec![];
+    ///         for input in inputs {
+    ///             col.push(_test_parse_term(format,input))
+    ///         }matrix.push((format,col));
+    ///     }
+    ///     matrix
+    /// }
+    /// ```
+    /// 
+    /// # 结果
+    /// `Vec<(format, Vec<result>)>`
+    /// 
     macro_rules! f_matrix {
         [
             $f:ident;

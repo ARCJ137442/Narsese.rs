@@ -222,10 +222,11 @@ pub const FORMAT_HAN: NarseseFormat<&str> = NarseseFormat {
 
 /// 单元测试
 #[cfg(test)]
-mod tests {
+#[cfg(feature="enum_narsese")]
+mod tests_enum_narsese {
 
     use super::*;
-    use crate::*;
+    use crate::enum_narsese::*;
 
     fn test_format(label: &str, format: NarseseFormat<&str>) {
         // 展示格式
