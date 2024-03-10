@@ -6,6 +6,11 @@ use std::collections::VecDeque;
 ///   * 📌调用时的「可变元素」基本依赖闭包捕获的外部变量
 /// * ❌无法用于从「缓冲区迭代器」生成「头迭代器」：无法返回指向可变闭包[`FnMut`]的内部变量的引用
 ///   * 📌弃用原因：闭包的所有权问题
+/// * ❗标准库中已经有集成了：参见[`std::iter::from_fn`]
+///   * 📝一些细节实现差异
+///     * 📌标准库直接使用单元组struct，而本struct使用普通结构体
+///     * 📌标准库把「函数类型限制」从「定义时」留到了「实现时」
+///   * 🚩【2024-03-10 11:15:11】代码计划封存，以和标准库作对比
 pub struct FnIterator<F, T>
 where
     F: FnMut() -> Option<T>,
@@ -261,7 +266,17 @@ where
         }
         // 尝试从缓冲区头部取出元素
         self.buffer.pop_front()
-        // ! 此处无需处理「缓冲区索引」：会自动计算
+        // ! 此处无需处理「缓冲区头索引」：会自动计算
+    }
+
+    /// 头迭代（多次）
+    /// * 🚩执行多次头迭代（后续可优化）
+    ///   * 返回「是否完全迭代」，即是否`n`次都迭代出了元素
+    pub fn head_next_n(&mut self, n: usize) -> bool {
+        // 重复n次「头迭代」
+        (0..n)
+            // 只有所有「头索引步进」都成功时返回true
+            .all(|_| self.head_next().is_some())
     }
 
     // ! ❌【2024-03-04 20:58:35】实践：因为「打包后需要从中借用值」的借用问题，再次弃用「独立使用『头迭代器』管理迭代过程」的想法
@@ -283,6 +298,24 @@ where
     //         false => None,
     //     })
     // }
+
+    /// 缓冲区获取
+    /// * 📌自缓冲区以**相对位置**索引元素
+    ///   * 📌以「缓冲区头索引」为起点（缓冲区头索引=>0）
+    /// * 🚩直接获取缓冲区相应位置的元素
+    /// * ⚠️越界⇒尝试从「内部迭代器」中取出元素
+    ///   * 实在取不到⇒[`None`]
+    pub fn buffer_get(&mut self, index: usize) -> Option<&T> {
+        match index < self.len_buffer() {
+            // * 已经判断了「是否越界」，所以直接进行数组索引
+            true => Some(&self.buffer[index]),
+            // * 越界⇒尝试扩展缓冲区，并获取头部（缓冲区末尾）元素
+            false => match self.head_next_n(index - self.len_buffer() + 1) {
+                true => self.head_item(),
+                false => None,
+            },
+        }
+    }
 
     /// 缓冲区迭代器（不可变引用）
     pub fn buffer_iter(&self) -> impl Iterator<Item = &T> {
@@ -409,6 +442,41 @@ where
     }
 }
 
+/// 为字符串实现`into_chars`方法
+/// * 📄参考：https://internals.rust-lang.org/t/is-there-a-good-reason-why-string-has-no-into-chars/19496/7
+pub trait IntoChars {
+    /// 将自身转换为字符迭代器，获取自身所有权
+    fn into_chars(self) -> impl Iterator<Item = char>;
+}
+
+/// 对静态字串实现`into_chars`方法
+impl IntoChars for &str {
+    fn into_chars(self) -> impl Iterator<Item = char> {
+        self.to_owned().into_chars()
+    }
+}
+
+/// 对动态字串实现`into_chars`方法
+impl IntoChars for String {
+    /// 迁移自<https://github.com/rust-lang/libs-team/issues/268>
+    /// * ⚠️少量修改
+    ///   * 🚩使用自己的「函数式迭代器」
+    ///   * 📌使用闭包捕获自身作为变量，以避免「临时引用」问题
+    fn into_chars(self) -> impl Iterator<Item = char> {
+        let mut i = 0;
+        // 创建函数式迭代器，捕获变量`i`与自身
+        FnIterator::new(move || {
+            if i < self.len() {
+                let c = self[i..].chars().next().unwrap();
+                i += c.len_utf8();
+                Some(c)
+            } else {
+                None
+            }
+        })
+    }
+}
+
 /// 单元测试
 #[cfg(test)]
 mod tests {
@@ -532,6 +600,7 @@ mod tests {
 
         assert_eqs! {
             cached_a => Some(&'a') // 迭代出的字符是'a'
+            iter.buffer_get(0) => Some(&'a') // 缓冲区第一个元素为
             iter.head() => 0 // 此时头索引在`0`
             iter.is_began() => true // 此时已开始迭代
             iter.is_ended() => false // 此时未迭代终止
@@ -550,7 +619,7 @@ mod tests {
             iter.is_ended() => false // 此时仍未结束
             iter.is_buffer_empty() => true // 此时缓冲区为空
             iter.len_buffer() => 0 // 此时缓冲区长度为`0`
-            iter.buffer_head() => 1 // 此时「缓冲区索引」变为`1`
+            iter.buffer_head() => 1 // 此时「缓冲区头索引」变为`1`
         }
 
         // 迭代器再次【缓冲区迭代】 // ! 此时因为缓冲区【为空】，所以「内部迭代器」迭代出元素，头索引和缓冲区索引同时移动
@@ -563,7 +632,20 @@ mod tests {
             iter.is_ended() => false // 此时仍未结束
             iter.is_buffer_empty() => true // 此时缓冲区为空（本来为空，此时还是空）
             iter.len_buffer() => 0 // 此时缓冲区长度为`0`
-            iter.buffer_head() => 2 // 此时「缓冲区索引」步进到`2`
+            iter.buffer_head() => 2 // 此时「缓冲区头索引」步进到`2`
+        }
+
+        // 迭代器通过「缓冲区获取」扩展元素 // ! 此时因为缓冲区【为空】，所以「内部迭代器」迭代出元素，头索引和缓冲区索引同时移动
+        let c = iter.buffer_get(0);
+
+        assert_eqs! {
+            c => Some(&'c') // 此时没有缓存了，所以迭代出了新字符
+            iter.head() => 2 // 此时头索引步进到`1`
+            iter.is_began() => true // 此时已开始迭代
+            iter.is_ended() => false // 此时仍未结束
+            iter.is_buffer_empty() => false // 此时缓冲区非空（因为头索引步进，缓冲区收到了新字符）
+            iter.len_buffer() => 1 // 此时缓冲区长度为`1`
+            iter.buffer_head() => 2 // 此时「缓冲区头索引」不变
         }
 
         // 迭代器测试后续是否以"c" "cd" "不会比对成功"开头，在此中将'c'、'd'加入缓冲区
@@ -580,7 +662,7 @@ mod tests {
             iter.is_ended() => false // 此时仍未结束 | 临界状态：还未继续调用`next`方法
             iter.is_buffer_empty() => false // 此时缓冲区非空
             iter.len_buffer() => 2 // 此时缓冲区长度为`2`
-            iter.buffer_head() => 2 // 此时「缓冲区索引」不变
+            iter.buffer_head() => 2 // 此时「缓冲区头索引」不变
         }
 
         // 测试"c"开头，并（在缓冲区里）跳过它
@@ -593,7 +675,7 @@ mod tests {
             iter.is_ended() => false // 此时仍未结束 | 临界状态：还未继续调用`next`方法
             iter.is_buffer_empty() => false // 此时缓冲区非空
             iter.len_buffer() => 1 // 此时缓冲区长度减少到`1`（跳过了"c"）
-            iter.buffer_head() => 3 // 此时「缓冲区索引」增加到`3`（跳过了"c"）
+            iter.buffer_head() => 3 // 此时「缓冲区头索引」增加到`3`（跳过了"c"）
         }
 
         // 迭代器走到尽头
@@ -606,7 +688,7 @@ mod tests {
             iter.is_ended() => true // 此时已经结束 | 刚好超过
             iter.is_buffer_empty() => false // 此时缓冲区非空
             iter.len_buffer() => 1 // 此时缓冲区长度不变
-            iter.buffer_head() => 3 // 此时「缓冲区索引」不变
+            iter.buffer_head() => 3 // 此时「缓冲区头索引」不变
         }
 
         // 最后的缓冲区转交
@@ -620,7 +702,7 @@ mod tests {
             iter.is_ended() => true // 此时已经结束
             iter.is_buffer_empty() => true // 此时缓冲区为空
             iter.len_buffer() => 0 // 此时缓冲区长度清零
-            iter.buffer_head() => 4 // 此时「缓冲区索引」增加到`4`（为空之后比「头索引」大）
+            iter.buffer_head() => 4 // 此时「缓冲区头索引」增加到`4`（为空之后比「头索引」大）
         }
     }
 }

@@ -4,7 +4,7 @@
 use super::NarseseFormat;
 use crate::{
     lexical::{LexicalSentence, LexicalTask, LexicalTerm},
-    util::BufferIterator,
+    util::{BufferIterator, IntoChars},
 };
 use std::{error::Error, fmt::Display, io::ErrorKind};
 
@@ -148,12 +148,6 @@ impl<'a, Item, Text> ParseState<'a, Item, Text> {
 /// 字符实现
 /// * 🚩解析逻辑正式开始
 impl<'a> ParseState<'a, char, &str> {
-    /// 使用自身（从迭代器中）解析出一个结果
-    pub fn parse(&mut self) -> ParseResult {
-        // 用状态进行解析
-        self.err("开发中！")
-    }
-
     /// 快速构造解析结果/Err
     pub fn err(&self, message: &str) -> ParseResult {
         Err(ParseError::new(
@@ -165,17 +159,12 @@ impl<'a> ParseState<'a, char, &str> {
             self.iter.buffer_head(),
         ))
     }
-}
 
-trait CanLexicalParse {
-    fn to_buffer_iter(&self) -> BufferIterator<char, Box<dyn Iterator<Item = char>>>;
-}
-
-impl CanLexicalParse for &str {
-    fn to_buffer_iter(&self) -> BufferIterator<char, Box<dyn Iterator<Item = char>>> {
-        let dyn_iter = Box::new(self.to_string().chars().into_iter());
-        // BufferIterator::new(dyn_iter)
-        todo!() // TODO: 为了让解析函数能接收`&str`输入
+    /// 🔦入口
+    /// * 🚩使用自身（从迭代器中）解析出一个结果
+    pub fn parse(&mut self) -> ParseResult {
+        // 用状态进行解析
+        todo!("开发中！") // TODO: 前缀匹配+缓冲区捕获 思路
     }
 }
 
@@ -190,10 +179,23 @@ impl NarseseFormat<&str> {
         ParseState::new(self, input.into_iter())
     }
 
-    /// 主解析函数
-    pub fn parse_lexical(&self, input: impl IntoIterator<Item = char>) -> ParseResult {
+    /// 主解析函数@字符串
+    pub fn parse_lexical(&self, input: &str) -> ParseResult {
+        // 转发到（有所有权的）迭代器
+        self.parse_lexical_from_iter(input.into_chars())
+    }
+
+    /// 主解析函数@迭代器
+    /// * 🚩从一个字符迭代器开始解析
+    /// * 📝放弃使用类似`trait CanLexicalParse`的「方法重载」架构
+    ///   * ❌无法解决的冲突：trait无法同时对「所有实现了某特征的类型」和「特别指定的类型」实现
+    ///     * 📄case：字符串🆚字符迭代器
+    ///     * 📌原因：有可能「某特征」会在其它地方对「特别指定的类型」进行实现，这时候分派方法就会出歧义（走「通用」还是「专用」？）
+    ///     * 💭Julia的多分派借「层级类型系统」选择了「偏袒特定类型」的方案，但Rust不同
+    pub fn parse_lexical_from_iter(&self, input: impl Iterator<Item = char>) -> ParseResult {
         // 构造解析状态
-        let mut state = self.build_parse_state_lexical(input);
+        let iter_char: Box<dyn Iterator<Item = char>> = Box::new(input);
+        let mut state = self.build_parse_state_lexical(iter_char);
         // 用状态进行解析
         state.parse()
         // ! 随后丢弃状态
