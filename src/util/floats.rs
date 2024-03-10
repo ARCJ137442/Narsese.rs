@@ -74,9 +74,7 @@ mod tests_01_float {
             // 直接用`fail_tests!`生成失败测试
             fail_tests!{
                 $(
-                    $name {
-                        $num.validate_01();
-                    }
+                    $name ($num.validate_01());
                 )*
             }
         };

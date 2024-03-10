@@ -92,11 +92,16 @@ macro_rules! first {
 }
 
 /// # `show!`：复现Julia的`@show`
-/// * 🎯模拟Julia中常用的宏`@show 表达式`
-///   * 与Julia`@show(表达式)`等价 | Julia的还更宽松，不强制括号
-/// * 📌核心：打印`表达式 = 值`，并返回表达式的值
-/// * 📝使用`#[cfg(not(test))]`标注「非测试」
-///   * 🎯防止「定义之前测试宏」导致的「文档测试（doc test）失败」
+/// * 🎯复刻Julia中常用的宏`@show 表达式`
+///   * 相当于Julia`@show(表达式)`，但功能更强大
+/// * 📌核心：打印`表达式 = 值`，并（可选地）返回表达式的值
+///   * 🚩只有一个表达式⇒计算、打印并返回表达式的值
+///   * 🚩多个表达式⇒计算、打印并返回表达式值的元组 | Julia则是返回最后一个值
+///   * 🚩一个表达式+尾缀分号⇒计算并打印，**不返回**值
+///   * 🚩多个表达式+尾缀分号⇒批量计算并打印，不返回任何值（并且无运行时损耗）
+/// * ✅允许尾缀逗号
+/// * 📝对于文档测试，必须自包名导入相应的宏以便进行测试
+/// * 🔗亦可参考其它实现如[show](https://crates.io/crates/show)
 ///
 /// ## 用例
 ///
@@ -233,51 +238,109 @@ macro_rules! show {
 ///     panic!("这是另一个测试")
 /// }
 /// ```
+///
+/// * 📝暂时还没法在文档字符串（不管是注释还是#[doc = "..."]）中插值
 #[macro_export]
 macro_rules! fail_tests {
+    // 匹配空块
+    {} => {
+        // 无操作
+    };
     // 匹配代码块
-    ($($name:ident $code:block)* $(,)?) => {
-        $(
-            /// 失败测试_$name
-            #[test]
-            #[should_panic]
-            fn $name() {
-                $code
-            }
-        )*
+    {$name:ident $code:block $($tail:tt)*} => {
+        /// 失败测试 | 代码块
+        #[test]
+        #[should_panic]
+        fn $name() {
+            $code
+        }
+        // 尾递归
+        fail_tests!($($tail)*);
     };
     // 匹配表达式
-    ($($name:ident $code:expr;)* $(,)?) => {
-        $(
-            /// 失败测试_$name
-            #[test]
-            #[should_panic]
-            fn $name() {
-                $code; // ← 用分号分隔
-            }
-        )*
+    {$name:ident $code:expr; $($tail:tt)*} => {
+        /// 失败测试 | 表达式
+        #[test]
+        #[should_panic]
+        fn $name() {
+            $code; // ← 用分号分隔
+        }
+        // 尾递归
+        fail_tests!($($tail)*);
     };
     // 匹配语句
-    ($($name:ident $code:stmt;)* $(,)?) => {
-        $(
-            /// 失败测试_$name
-            #[test]
-            #[should_panic]
-            fn $name() {
-                $code
-            }
-        )*
+    {$name:ident $code:stmt; $($tail:tt)*} => {
+        /// 失败测试 | 语句
+        #[test]
+        #[should_panic]
+        fn $name() {
+            $code
+        }
+        fail_tests!($($tail)*);
     };
 }
 
+/// 用于简化「连续判断相等」的宏
+/// * 🎯用于统一
+///   * ⚠️缺点：不易定位断言出错的位置（需要靠断言的表达式定位）
+/// * 🚩模型：标记树撕咬机
+///   * ⚠️缺点：无法一次性展开
+///   * 🔗参考：<https://www.bookstack.cn/read/DaseinPhaos-tlborm-chinese/pat-incremental-tt-munchers.md>
+///
+/// # 用例
+///
+/// ```rust
+/// use enum_narsese::asserts;
+/// asserts! {
+///     1 + 1 > 1, // 判真
+///     1 + 1 => 2, // 判等
+///     1 + 1 < 3 // 连续
+///     1 + 2 < 4, // 判真（与「判等」表达式之间，需要逗号分隔）
+///     1 + 2 => 3 // 连续
+///     2 + 2 => 4 // 判等（其间无需逗号分隔）
+/// }
+/// ```
 #[macro_export]
-macro_rules! assert_eqs {
+macro_rules! asserts {
+    // 连续判等逻辑（无需逗号分隔）
     {
         $($left:expr => $right:expr $(,)?)*
     } => {
         $(
-            assert_eq!($left, $right);
+            assert_eq!($left, $right, "{} != {}", stringify!($left), stringify!($right));
         )*
+    };
+    // 连续判真逻辑（无需逗号分隔）
+    {
+        $($assertion:expr $(,)?)*
+    } => {
+        $(
+            assert!($assertion, "{} != true", stringify!($assertion));
+        )*
+    };
+    // 新形式/空
+    {} => {
+        // 无操作
+    };
+    // 新形式/判真
+    {
+        $($assertion:expr)*,
+        $($tail:tt)*
+    } => {
+        // 分派到先前情形
+        asserts!($($assertion)*);
+        // 尾递归
+        asserts!($($tail)*)
+    };
+    // 新形式/判等
+    {
+        $($left:expr => $right:expr)*,
+        $($tail:tt)*
+    } => {
+        // 分派到先前情形
+        asserts!($($left => $right)*);
+        // 尾递归
+        asserts!($($tail)*)
     };
 }
 

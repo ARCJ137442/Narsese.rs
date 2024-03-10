@@ -480,7 +480,7 @@ impl IntoChars for String {
 /// 单元测试
 #[cfg(test)]
 mod tests {
-    use crate::assert_eqs;
+    use crate::asserts;
 
     use super::*;
 
@@ -534,14 +534,14 @@ mod tests {
         let mut iter = BufferIterator::new(s.chars());
 
         // ! ⚠️注意：不能使用`collect`，其会获取迭代器的所有权（导致无法知晓「迭代后的状态」）
-        assert_eqs! {
+        asserts! {
             // 迭代之前
-            iter.head() => 0 // 此时头索引为`0`（但实际上是「未开始迭代」的状态）
-            iter.is_began() => false // 还没开始迭代
-            iter.is_ended() => false // 还没终止迭代
-            iter.len_buffer() => 0 // 此时缓冲区长度为`0`
-            iter.is_buffer_empty() => true // 此时缓冲区为空
-            iter.buffer_head() => 1 // 此时缓冲区头索引为`1`
+            iter.head() => 0, // 此时头索引为`0`（但实际上是「未开始迭代」的状态）
+            iter.is_began() => false, // 还没开始迭代
+            iter.is_ended() => false, // 还没终止迭代
+            iter.len_buffer() => 0, // 此时缓冲区长度为`0`
+            iter.is_buffer_empty(), // 此时缓冲区为空
+            iter.buffer_head() => 1, // 此时缓冲区头索引为`1`
         }
 
         // 一次性迭代完元素
@@ -556,26 +556,26 @@ mod tests {
         let len_chars_to = to.chars().count();
 
         // 迭代之后
-        assert_eqs! {
-            to => s // 迭代到字符串中，仍然保持原样
-            iter.head() => len_chars_to - 1 // 此时头索引为「字符长度-1」（终态）
-            iter.is_began() => true // 已经开始迭代
-            iter.is_ended() => true // 已经终止迭代
-            iter.len_buffer() => len_chars_to // 此时缓冲区长度为「字符长度」
-            iter.is_buffer_empty() => false // 此时缓冲区非空
-            iter.buffer_head() => 0 // 此时缓冲区头索引为`0`（因为没消耗缓冲区）
+        asserts! {
+            to => s, // 迭代到字符串中，仍然保持原样
+            iter.head() => len_chars_to - 1, // 此时头索引为「字符长度-1」（终态）
+            iter.is_began(), // 已经开始迭代
+            iter.is_ended(), // 已经终止迭代
+            iter.len_buffer() => len_chars_to, // 此时缓冲区长度为「字符长度」
+            iter.is_buffer_empty() => false, // 此时缓冲区非空
+            iter.buffer_head() => 0, // 此时缓冲区头索引为`0`（因为没消耗缓冲区）
         }
 
         // 再清空缓冲区
         iter.buffer_clear();
 
-        assert_eqs! {
-            iter.head() => len_chars_to - 1 // 此时头索引不变（终态）
-            iter.is_began() => true // 已经开始迭代
-            iter.is_ended() => true // 已经终止迭代
-            iter.len_buffer() => 0 // 此时缓冲区长度清零
-            iter.is_buffer_empty() => true // 此时缓冲区为空
-            iter.buffer_head() => len_chars_to // 此时缓冲区头索引为「字符长度」，为空⇔比「头索引」大`1`
+        asserts! {
+            iter.head() => len_chars_to - 1, // 此时头索引不变（终态）
+            iter.is_began(), // 已经开始迭代
+            iter.is_ended(), // 已经终止迭代
+            iter.len_buffer() => 0, // 此时缓冲区长度清零
+            iter.is_buffer_empty(), // 此时缓冲区为空
+            iter.buffer_head() => len_chars_to, // 此时缓冲区头索引为「字符长度」，为空⇔比「头索引」大`1`
         }
     }
 
@@ -586,19 +586,19 @@ mod tests {
         let mut iter = BufferIterator::new("abcd".chars());
 
         // ! 尽可能不要尝试在「开始迭代前」获取「头索引」
-        assert_eqs! {
+        asserts! {
             iter.head() => 0 // 此时头索引为`0`（但实际上是「未开始迭代」的状态）
             iter.is_began() => false // 还没开始迭代
             iter.is_ended() => false // 还没终止迭代
-            iter.len_buffer() => 0 // 此时缓冲区长度为`0`
-            iter.is_buffer_empty() => true // 此时缓冲区为空
+            iter.len_buffer() => 0, // 此时缓冲区长度为`0`
+            iter.is_buffer_empty(), // 此时缓冲区为空
             iter.buffer_head() => 1 // 此时缓冲区头索引为`1`
         }
 
         // 迭代器【头迭代】一次 // ! 迭代出的字符【存进缓冲区】，头也【不移动】
         let cached_a = iter.head_next();
 
-        assert_eqs! {
+        asserts! {
             cached_a => Some(&'a') // 迭代出的字符是'a'
             iter.buffer_get(0) => Some(&'a') // 缓冲区第一个元素为
             iter.head() => 0 // 此时头索引在`0`
@@ -612,25 +612,25 @@ mod tests {
         // 迭代器【缓冲区迭代】一次 // ! 此时因为缓冲区已缓存，所以缓冲区消耗并返回最前一个字符`'a'`
         let a2 = iter.buffer_next();
 
-        assert_eqs! {
-            a2 => Some('a') // 应该把缓存的第一个字符弹出
-            iter.head() => 0 // 此时头索引不变
-            iter.is_began() => true // 此时已开始迭代
-            iter.is_ended() => false // 此时仍未结束
-            iter.is_buffer_empty() => true // 此时缓冲区为空
-            iter.len_buffer() => 0 // 此时缓冲区长度为`0`
-            iter.buffer_head() => 1 // 此时「缓冲区头索引」变为`1`
+        asserts! {
+            a2 => Some('a'), // 应该把缓存的第一个字符弹出
+            iter.head() => 0, // 此时头索引不变
+            iter.is_began() => true, // 此时已开始迭代
+            iter.is_ended() => false, // 此时仍未结束
+            iter.is_buffer_empty(), // 此时缓冲区为空
+            iter.len_buffer() => 0, // 此时缓冲区长度为`0`
+            iter.buffer_head() => 1, // 此时「缓冲区头索引」变为`1`
         }
 
         // 迭代器再次【缓冲区迭代】 // ! 此时因为缓冲区【为空】，所以「内部迭代器」迭代出元素，头索引和缓冲区索引同时移动
         let b = iter.buffer_next();
 
-        assert_eqs! {
+        asserts! {
             b => Some('b') // 此时没有缓存了，所以迭代出了新字符
             iter.head() => 1 // 此时头索引步进到`1`
             iter.is_began() => true // 此时已开始迭代
-            iter.is_ended() => false // 此时仍未结束
-            iter.is_buffer_empty() => true // 此时缓冲区为空（本来为空，此时还是空）
+            iter.is_ended() => false, // 此时仍未结束
+            iter.is_buffer_empty(), // 此时缓冲区为空（本来为空，此时还是空）
             iter.len_buffer() => 0 // 此时缓冲区长度为`0`
             iter.buffer_head() => 2 // 此时「缓冲区头索引」步进到`2`
         }
@@ -638,7 +638,7 @@ mod tests {
         // 迭代器通过「缓冲区获取」扩展元素 // ! 此时因为缓冲区【为空】，所以「内部迭代器」迭代出元素，头索引和缓冲区索引同时移动
         let c = iter.buffer_get(0);
 
-        assert_eqs! {
+        asserts! {
             c => Some(&'c') // 此时没有缓存了，所以迭代出了新字符
             iter.head() => 2 // 此时头索引步进到`1`
             iter.is_began() => true // 此时已开始迭代
@@ -653,9 +653,9 @@ mod tests {
         let starts_with_c = iter.starts_with("c".chars());
         let starts_with_不会比对成功 = iter.starts_with("不会比对成功".chars());
 
-        assert_eqs! {
-            starts_with_cd => true // 的确是以"cd"开头 | 比对者比缓冲区长
-            starts_with_c => true // 的确是以"c"开头 | 比对者在缓冲区内
+        asserts! {
+            starts_with_cd // 的确是以"cd"开头 | 比对者比缓冲区长
+            starts_with_c, // 的确是以"c"开头 | 比对者在缓冲区内
             starts_with_不会比对成功 => false // 的确不以"不会比对成功"开头 | 比对者超出自身界限
             iter.head() => 3 // 此时头索引更新到了`3`——为了「前缀匹配」一直在增加索引
             iter.is_began() => true // 此时已开始迭代
@@ -668,7 +668,7 @@ mod tests {
         // 测试"c"开头，并（在缓冲区里）跳过它
         let skipped = iter.skip_when_starts_with("c".chars());
 
-        assert_eqs! {
+        asserts! {
             skipped => true // 的确是以"c"开头并跳过了
             iter.head() => 3 // 此时头索引不变——比对没有超出缓冲区
             iter.is_began() => true // 此时已开始迭代
@@ -681,11 +681,11 @@ mod tests {
         // 迭代器走到尽头
         let none = iter.head_next();
 
-        assert_eqs! {
+        asserts! {
             none => None // 已经没有可迭代的了
-            iter.head() => 3 // 此时头索引不变
-            iter.is_began() => true // 此时已开始迭代
-            iter.is_ended() => true // 此时已经结束 | 刚好超过
+            iter.head() => 3, // 此时头索引不变
+            iter.is_began() // 此时已开始迭代
+            iter.is_ended(), // 此时已经结束 | 刚好超过
             iter.is_buffer_empty() => false // 此时缓冲区非空
             iter.len_buffer() => 1 // 此时缓冲区长度不变
             iter.buffer_head() => 3 // 此时「缓冲区头索引」不变
@@ -695,12 +695,12 @@ mod tests {
         let mut d = String::new();
         iter.buffer_transfer_mut(|c| d.push(c));
 
-        assert_eqs! {
+        asserts! {
             d => "d" // 转交出来的字符串是"d"
-            iter.head() => 3 // 此时头索引不变
-            iter.is_began() => true // 此时已开始迭代
-            iter.is_ended() => true // 此时已经结束
-            iter.is_buffer_empty() => true // 此时缓冲区为空
+            iter.head() => 3, // 此时头索引不变
+            iter.is_began() // 此时已开始迭代
+            iter.is_ended() // 此时已经结束
+            iter.is_buffer_empty(), // 此时缓冲区为空
             iter.len_buffer() => 0 // 此时缓冲区长度清零
             iter.buffer_head() => 4 // 此时「缓冲区头索引」增加到`4`（为空之后比「头索引」大）
         }
