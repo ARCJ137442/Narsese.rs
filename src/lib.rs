@@ -1,11 +1,10 @@
 //! 库的主模块
 
-// 实用
-pub mod macros;
+// 实用 | 包括工具宏
 pub mod util;
 
-// 共用GPI
-pub mod common_api;
+// 共用API
+pub mod api;
 
 // 词法
 #[cfg(feature = "lexical_narsese")]

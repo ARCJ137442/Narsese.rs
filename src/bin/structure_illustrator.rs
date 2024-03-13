@@ -1,11 +1,13 @@
 //! 构建一个简单的REPL
 //! 🎯用于格式化展示一个Narsese对象
-
-#![cfg(feature="enum_narsese")]
+//! * 基于「枚举Narsese」实现
+#![cfg(feature = "enum_narsese")]
 
 use std::io::{stdin, stdout, Stdin, Write};
 
-use enum_narsese::conversion::string::{impl_parser::NarseseResult, NarseseFormat, FORMAT_ASCII};
+use enum_narsese::conversion::string::{
+    format_instances::FORMAT_ASCII, impl_enum::NarseseResult, NarseseFormat,
+};
 
 /// REPL主函数
 fn main() {

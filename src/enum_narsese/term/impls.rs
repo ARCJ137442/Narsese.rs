@@ -1,6 +1,6 @@
 //! 统一定义词项实现
 
-use crate::common_api::GetTerm;
+use crate::api::GetTerm;
 
 use super::structs::*;
 use std::any::type_name;

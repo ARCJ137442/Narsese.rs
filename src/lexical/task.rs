@@ -1,4 +1,4 @@
-use crate::common_api::{GetBudget, GetPunctuation, GetStamp, GetTerm, GetTruth};
+use crate::api::{GetBudget, GetPunctuation, GetStamp, GetTerm, GetTruth};
 
 use super::{LexicalSentence, LexicalTerm};
 

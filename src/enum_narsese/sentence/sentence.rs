@@ -7,7 +7,7 @@
 //! * 请求
 
 use super::*;
-use crate::common_api::{GetPunctuation, GetStamp, GetTerm, GetTruth};
+use crate::api::{GetPunctuation, GetStamp, GetTerm, GetTruth};
 use crate::enum_narsese::term::Term;
 
 /// 使用枚举定义的「语句」类型

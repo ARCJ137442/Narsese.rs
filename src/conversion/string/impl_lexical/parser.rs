@@ -1,8 +1,8 @@
 //! 实现/词法解析器
 //! * 🎯字符串→词法Narsese
 
-use super::NarseseFormat;
 use crate::{
+    conversion::string::common::NarseseFormat,
     lexical::{LexicalSentence, LexicalTask, LexicalTerm},
     util::{BufferIterator, IntoChars},
 };

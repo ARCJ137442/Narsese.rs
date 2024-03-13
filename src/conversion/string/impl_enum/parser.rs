@@ -26,13 +26,12 @@
 //!     * ✨有相应的「结果索引」类型
 
 use crate::{
+    conversion::string::common::*,
     enum_narsese::*,
     first,
     util::{FloatPrecision, IntPrecision, ZeroOneFloat},
 };
 use std::{error::Error, fmt::Display, io::ErrorKind};
-
-use super::NarseseFormat;
 
 /// 定义一个「CommonNarsese结果」类型
 /// * 🎯用于存储「最终被解析出来的CommonNarsese对象」
@@ -1493,6 +1492,7 @@ impl NarseseFormat<&str> {
 #[cfg(test)]
 mod tests_parse {
     use super::*;
+    use crate::conversion::string::format_instances::*;
     use crate::conversion::string::*;
     use crate::{f_tensor, fail_tests, show};
 

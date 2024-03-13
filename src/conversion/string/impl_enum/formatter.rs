@@ -1,9 +1,9 @@
 //! 实现/格式化器
 
-use super::format::*;
 use crate::{
+    api::{GetBudget, GetStamp, GetTerm, GetTruth},
     catch_flow,
-    common_api::{GetBudget, GetStamp, GetTerm, GetTruth},
+    conversion::string::common::*,
     enum_narsese::*,
     push_str,
     util::*,
@@ -522,7 +522,7 @@ mod test {
 
     use super::super::tests_enum::_sample_task;
     use super::*;
-    use crate::conversion::string::{FORMAT_ASCII, FORMAT_HAN, FORMAT_LATEX};
+    use crate::conversion::string::format_instances::{FORMAT_ASCII, FORMAT_HAN, FORMAT_LATEX};
     use crate::{f_parallel, show};
 
     /// 测试其中一个格式

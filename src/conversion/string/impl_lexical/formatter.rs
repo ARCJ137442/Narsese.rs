@@ -1,9 +1,9 @@
 //! 实现/格式化器
 
-use super::format::NarseseFormat;
 use crate::{
+    api::{GetBudget, GetTerm},
     catch_flow,
-    common_api::{GetBudget, GetTerm},
+    conversion::string::common::*,
     lexical::{LexicalSentence, LexicalTask, LexicalTerm},
     util::add_space_if_necessary_and_flush_buffer,
 };
@@ -100,9 +100,10 @@ impl NarseseFormat<&str> {
 /// 单元测试
 #[cfg(test)]
 mod tests {
+
+    use super::super::super::common::format_instances::*;
     use super::super::tests_lexical::_sample_task;
     use super::*;
-    use crate::conversion::string::{FORMAT_ASCII, FORMAT_HAN, FORMAT_LATEX};
     use crate::{f_parallel, show};
 
     /// 测试其中一个格式
