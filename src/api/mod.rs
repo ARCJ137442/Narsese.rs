@@ -9,3 +9,7 @@
 // API「获取内部元素」
 pub mod get_inner;
 pub use get_inner::*;
+
+// API「抽象Narsese值」
+pub mod narsese_value;
+pub use narsese_value::*;

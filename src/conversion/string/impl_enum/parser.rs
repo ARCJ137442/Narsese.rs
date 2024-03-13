@@ -26,7 +26,7 @@
 //!     * ✨有相应的「结果索引」类型
 
 use super::format::*;
-use crate::{conversion::string::common::*, enum_narsese::*};
+use crate::enum_narsese::*;
 use std::{error::Error, fmt::Display, io::ErrorKind};
 use util::{first, FloatPrecision, IntPrecision, ZeroOneFloat};
 
@@ -35,7 +35,7 @@ use util::{first, FloatPrecision, IntPrecision, ZeroOneFloat};
 ///   * 词项
 ///   * 语句
 ///   * 任务
-pub type NarseseResult = parser_structs::NarseseResult<Term, Sentence, Task>;
+pub type NarseseResult = EnumNarsese;
 
 // 实现`(try_)From/To`转换方法
 impl TryFrom<NarseseResult> for Term {

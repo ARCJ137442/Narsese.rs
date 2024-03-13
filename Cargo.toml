@@ -1,11 +1,13 @@
 [package]
 name = "enum_narsese"
-version = "0.4.2"
+version = "0.4.3"
 edition = "2021"
 
-[dependencies]
+[dependencies.nar_dev_utils]
 # 【2024-03-13 21:17:55】实用库现在独立为`nar_dev_utils`
-nar_dev_utils = { version = "0.1.0", path = "../NAR-dev-util", features=["floats", "iterators", "str_process"] }
+# version = "0.1.0" # ! 本地依赖可以不添加版本
+path = "../NAR-dev-util"
+features = []
 
 [features]
 default = ["bundled"]

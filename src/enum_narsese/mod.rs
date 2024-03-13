@@ -4,6 +4,8 @@
 //! * 语句（封装）
 //! * 任务（封装）
 
+use crate::api::NarseseValue;
+
 // 词项
 pub mod term;
 pub use term::*;
@@ -15,3 +17,8 @@ pub use sentence::*;
 // 任务
 pub mod task;
 pub use task::*;
+
+// 统合结构体
+
+/// 集「词项/语句/任务」于一身的「枚举Narsese」（Narsese值）
+pub type EnumNarsese = NarseseValue<Term, Sentence, Task>;

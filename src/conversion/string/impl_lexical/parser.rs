@@ -1,60 +1,15 @@
 //! 实现/词法解析器
 //! * 🎯字符串→词法Narsese
 
+use super::NarseseFormat;
 use crate::{
-    conversion::string::common::*,
-    lexical::{LexicalSentence, LexicalTask, LexicalTerm},
+    lexical::LexicalNarsese,
     util::{BufferIterator, IntoChars},
 };
-use std::{error::Error, fmt::Display, io::ErrorKind};
+use std::{error::Error, fmt::Display};
 
-use super::NarseseFormat;
-
-/// 特化「CommonNarsese结果」到「词法Narsese」版本
-/// * 🎯用于存储「最终被解析出来的CommonNarsese对象」
-///   * 词项
-///   * 语句
-///   * 任务
-pub type NarseseResult = parser_structs::NarseseResult<LexicalTerm, LexicalSentence, LexicalTask>;
-
-// 实现`(try_)From/To`转换方法
-// * 📌目前只需要「词法解析结果→词项/语句/任务」而无需其它做法
-impl TryFrom<NarseseResult> for LexicalTerm {
-    type Error = std::io::Error;
-    fn try_from(value: NarseseResult) -> Result<Self, Self::Error> {
-        match value {
-            NarseseResult::Term(term) => Ok(term),
-            _ => Err(Self::Error::new(
-                ErrorKind::InvalidData,
-                format!("类型不匹配，无法转换为词项：{value:?}"),
-            )),
-        }
-    }
-}
-impl TryFrom<NarseseResult> for LexicalSentence {
-    type Error = std::io::Error;
-    fn try_from(value: NarseseResult) -> Result<Self, Self::Error> {
-        match value {
-            NarseseResult::Sentence(sentence) => Ok(sentence),
-            _ => Err(Self::Error::new(
-                ErrorKind::InvalidData,
-                format!("类型不匹配，无法转换为语句：{value:?}"),
-            )),
-        }
-    }
-}
-impl TryFrom<NarseseResult> for LexicalTask {
-    type Error = std::io::Error;
-    fn try_from(value: NarseseResult) -> Result<Self, Self::Error> {
-        match value {
-            NarseseResult::Task(task) => Ok(task),
-            _ => Err(Self::Error::new(
-                ErrorKind::InvalidData,
-                format!("类型不匹配，无法转换为任务：{value:?}"),
-            )),
-        }
-    }
-}
+// * 📌现在不再使用类似「NarseseResult」的「解析结果」类型
+//   * 直接使用[`LexicalNarsese`]作为「词项/语句/任务」的枚举
 
 /// 用于表征「解析结果」
 /// * 用于表示「解析对象」
@@ -63,7 +18,7 @@ impl TryFrom<NarseseResult> for LexicalTask {
 /// * 现在是基于「解析器状态」的「状态机模型」
 ///   * 📌关键差异：附带可设置的「中间解析结果」与「可变索引」
 ///   * 🚩子解析函数在解析之后，直接填充「中间解析结果」并修改「可变索引」
-type ParseResult<T = NarseseResult> = Result<T, ParseError>;
+type ParseResult<T = LexicalNarsese> = Result<T, ParseError>;
 /// 用于表征「令牌消耗结果」
 /// * 🎯用于在出错时传播错误
 type ConsumeResult = ParseResult<()>;
@@ -200,7 +155,7 @@ mod test {
     use super::*;
 
     /// 通通用测试/尝试解析并返回错误
-    fn __test_parse(format: &NarseseFormat, input: &str) -> NarseseResult {
+    fn __test_parse(format: &NarseseFormat, input: &str) -> LexicalNarsese {
         // 解析
         let result = format.parse_lexical(input);
         // 检验

@@ -10,8 +10,11 @@
 //! Statement("-->", Atom("+", "123"), Compound("\", Atom("_", ""), Atom("$", "1"), Set("{}", Atom("", "SELF"))))
 //! ```
 
+use crate::api::NarseseValue;
+
 // 词项部分
 mod term;
+
 pub use term::*;
 
 // 语句部分
@@ -25,14 +28,8 @@ pub use task::*;
 // 统合部分
 
 /// 用于归并表示「词法上的Narsese」
-pub enum LexicalNarsese {
-    /// 词法性词项
-    Term(LexicalTerm),
-    /// 词法性语句
-    Sentence(LexicalSentence),
-    /// 词法性任务
-    Task(LexicalTask),
-}
+/// * 🚩现在使用更抽象的「Narsese值」取代
+pub type LexicalNarsese = NarseseValue<LexicalTerm, LexicalSentence, LexicalTask>;
 
 /// 单元测试：词项+语句+任务
 #[cfg(test)]

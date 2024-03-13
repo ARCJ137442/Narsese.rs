@@ -4,7 +4,7 @@ version = 3
 
 [[package]]
 name = "enum_narsese"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "nar_dev_utils",
 ]
