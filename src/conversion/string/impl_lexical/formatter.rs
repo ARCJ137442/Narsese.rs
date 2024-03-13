@@ -3,41 +3,43 @@
 use crate::{
     api::{GetBudget, GetTerm},
     catch_flow,
-    conversion::string::common::*,
+    conversion::string::common_narsese_templates::*,
     lexical::{LexicalSentence, LexicalTask, LexicalTerm},
     util::add_space_if_necessary_and_flush_buffer,
 };
 
+use super::NarseseFormat;
+
 /// 实现：转换
 ///
 /// ! ℹ️单元测试在[`super::formats`]模块中定义
-impl NarseseFormat<&str> {
+impl NarseseFormat {
     /// 工具函数/词项
     fn _format_lexical_term(&self, out: &mut String, term: &LexicalTerm) {
         match term {
             // 原子词项
-            LexicalTerm::Atom { prefix, name } => Self::template_atom(out, prefix, name),
+            LexicalTerm::Atom { prefix, name } => template_atom(out, prefix, name),
             // 复合词项（包括「像」）
-            LexicalTerm::Compound { connecter, terms } => Self::template_compound(
+            LexicalTerm::Compound { connecter, terms } => template_compound(
                 out,
-                self.compound.brackets.0,
+                &self.compound.brackets.0,
                 connecter,
                 terms.iter().map(|term| self.format_lexical_term(term)),
-                self.compound.separator,
-                self.space.format_terms,
-                self.compound.brackets.1,
+                &self.compound.separator,
+                &self.space.format_terms,
+                &self.compound.brackets.1,
             ),
             // 复合词项集合
             LexicalTerm::Set {
                 left_bracket,
                 terms,
                 right_bracket,
-            } => Self::template_compound_set(
+            } => template_compound_set(
                 out,
                 left_bracket,
                 terms.iter().map(|term| self.format_lexical_term(term)),
-                self.compound.separator,
-                self.space.format_terms,
+                &self.compound.separator,
+                &self.space.format_terms,
                 right_bracket,
             ),
             // 陈述
@@ -45,14 +47,14 @@ impl NarseseFormat<&str> {
                 copula,
                 subject,
                 predicate,
-            } => Self::template_statement(
+            } => template_statement(
                 out,
-                self.statement.brackets.0,
+                &self.statement.brackets.0,
                 &self.format_lexical_term(subject),
                 copula,
                 &self.format_lexical_term(predicate),
-                self.space.format_terms,
-                self.statement.brackets.1,
+                &self.space.format_terms,
+                &self.statement.brackets.1,
             ),
         }
     }
@@ -70,13 +72,13 @@ impl NarseseFormat<&str> {
 
     /// 总格式化函数/语句
     fn _format_lexical_sentence(&self, out: &mut String, sentence: &LexicalSentence) {
-        Self::template_sentence(
+        template_sentence(
             out,
             &self.format_lexical_term(sentence.get_term()),
             &sentence.punctuation,
             &sentence.stamp,
             &sentence.truth,
-            self.space.format_items,
+            &self.space.format_items,
         )
     }
 
@@ -93,7 +95,7 @@ impl NarseseFormat<&str> {
         out.push_str(task.get_budget());
         // 语句
         self._format_lexical_sentence(&mut buffer, task.get_sentence());
-        add_space_if_necessary_and_flush_buffer(out, &mut buffer, self.space.format_items);
+        add_space_if_necessary_and_flush_buffer(out, &mut buffer, &self.space.format_items);
     }
 }
 
@@ -101,33 +103,75 @@ impl NarseseFormat<&str> {
 #[cfg(test)]
 mod tests {
 
-    use super::super::super::common::format_instances::*;
-    use super::super::tests_lexical::_sample_task;
+    #![allow(unused)]
+    use super::super::tests::_sample_task_ascii as _sample_task;
     use super::*;
     use crate::{f_parallel, show};
 
     /// 测试其中一个格式
-    fn _test(format: NarseseFormat<&str>, name: &str, expected: &str) {
+    fn _test(name: &str, expected: &str) {
         // 声明
         println!("Test of {name}");
-        // 构造样本任务
-        let task = _sample_task(&format);
-        // 格式化
-        let formatted = format.format_lexical_task(&task);
-        // 展示
-        show!(&formatted);
-        // 断言
-        assert_eq!(formatted, expected);
+        todo!("🚧先做好自己本地的Narsese格式");
+        // // 构造样本任务
+        // let task = _sample_task();
+        // // 格式化
+        // let formatted = format.format_lexical_task(&task);
+        // // 展示
+        // show!(&formatted);
+        // // 断言
+        // assert_eq!(formatted, expected);
     }
 
     #[test]
     fn test() {
         // 平行测试
-        f_parallel![
-            _test;
-            FORMAT_ASCII "ascii" "$0.5;0.75;0.4$ <(&/, <ball {-] left>, <(*, {SELF}, $any, #some) --> ^do>) ==> <SELF {-] good>>. :!-1: %1.0;0.9%";
-            FORMAT_LATEX "latex" r#"\$0.5;0.75;0.4\$ \left<\left(,  \left<ball \circ\!\!\!\rightarrow\!\!\!\circ   left\right>  \left<\left(\times   \left\{SELF\right\}  \$any  \#some\right) \rightarrow  \Uparrow do\right>\right) \Rightarrow  \left<SELF \circ\!\!\!\rightarrow\!\!\!\circ   good\right>\right>. t=-1 \langle1.0,0.9\rangle"#;
-            FORMAT_HAN "漢" "预0.5、0.75、0.4算 「（接连，「ball具有left」，「（积，『SELF』，任一any，其一some）是操作do」）得「SELF具有good」」. 发生在-1 真1.0、0.9值";
-        ];
+        todo!("🚧先做好自己本地的Narsese格式");
+        // f_parallel![
+        //     _test;
+        //     FORMAT_ASCII "ascii" "$0.5;0.75;0.4$ <(&/, <ball {-] left>, <(*, {SELF}, $any, #some) --> ^do>) ==> <SELF {-] good>>. :!-1: %1.0;0.9%";
+        //     FORMAT_LATEX "latex" r#"\$0.5;0.75;0.4\$ \left<\left(,  \left<ball \circ\!\!\!\rightarrow\!\!\!\circ   left\right>  \left<\left(\times   \left\{SELF\right\}  \$any  \#some\right) \rightarrow  \Uparrow do\right>\right) \Rightarrow  \left<SELF \circ\!\!\!\rightarrow\!\!\!\circ   good\right>\right>. t=-1 \langle1.0,0.9\rangle"#;
+        //     FORMAT_HAN "漢" "预0.5、0.75、0.4算 「（接连，「ball具有left」，「（积，『SELF』，任一any，其一some）是操作do」）得「SELF具有good」」. 发生在-1 真1.0、0.9值";
+        // ];
+    }
+}
+/// 单元测试 & 枚举Narsese
+/// * 🚩只用到了「使用枚举Narsese生成的测试用例」而不会用到其它东西
+///   * 🏗️仍需继续处理与「枚举Narsese」的关系
+#[cfg(feature = "enum_narsese")]
+#[cfg(test)]
+mod tests_with_enum_narsese {
+
+    #![allow(unused)]
+    use super::super::tests_with_enum_narsese::_sample_task;
+    use crate::{
+        conversion::string::impl_enum::NarseseFormat as EnumNarseseFormat, f_parallel, show,
+    };
+
+    /// 测试其中一个格式
+    fn _test(format: EnumNarseseFormat<&str>, name: &str, expected: &str) {
+        // 声明
+        println!("Test of {name}");
+        // 构造样本任务
+        let task = _sample_task(&format);
+        todo!("❓后续需要「从『枚举Narsese格式』中生成」，以便支持『自枚举Narsese转换』")
+        // // 格式化
+        // let formatted = format.format_lexical_task(&task);
+        // // 展示
+        // show!(&formatted);
+        // // 断言
+        // assert_eq!(formatted, expected);
+    }
+
+    #[test]
+    fn test() {
+        // 平行测试
+        todo!("❓后续需要「从『枚举Narsese格式』中生成」以便使用");
+        // f_parallel![
+        //     _test;
+        //     FORMAT_ASCII "ascii" "$0.5;0.75;0.4$ <(&/, <ball {-] left>, <(*, {SELF}, $any, #some) --> ^do>) ==> <SELF {-] good>>. :!-1: %1.0;0.9%";
+        //     FORMAT_LATEX "latex" r#"\$0.5;0.75;0.4\$ \left<\left(,  \left<ball \circ\!\!\!\rightarrow\!\!\!\circ   left\right>  \left<\left(\times   \left\{SELF\right\}  \$any  \#some\right) \rightarrow  \Uparrow do\right>\right) \Rightarrow  \left<SELF \circ\!\!\!\rightarrow\!\!\!\circ   good\right>\right>. t=-1 \langle1.0,0.9\rangle"#;
+        //     FORMAT_HAN "漢" "预0.5、0.75、0.4算 「（接连，「ball具有left」，「（积，『SELF』，任一any，其一some）是操作do」）得「SELF具有good」」. 发生在-1 真1.0、0.9值";
+        // ];
     }
 }

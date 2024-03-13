@@ -5,8 +5,8 @@
 
 use std::io::{stdin, stdout, Stdin, Write};
 
-use enum_narsese::conversion::string::{
-    format_instances::FORMAT_ASCII, impl_enum::NarseseResult, NarseseFormat,
+use enum_narsese::conversion::string::impl_enum::{
+    format_instances::*, NarseseFormat, NarseseResult,
 };
 
 /// REPL主函数

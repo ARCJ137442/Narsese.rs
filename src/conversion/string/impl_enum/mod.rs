@@ -1,7 +1,12 @@
 //! 枚举Narsese与「字符串转换」有关的模块
 
+// 格式
+// * 【2024-03-13 14:42:13】最初源自enum_narsese
+mod format;
+pub use format::*;
+
 // 格式化
-// * 🚩直接对「Narsese格式」实现「格式化」方法
+// * 🚩直接对「枚举Narsese格式」实现「格式化」方法
 //   * 所以没导出模块内容
 mod formatter;
 
@@ -9,13 +14,20 @@ mod formatter;
 mod parser;
 pub use parser::*;
 
+// 解析格式的实例
+// * 🚩目前仍作为单独的子模块导出，而**不导出其内元素**
+//  * 其内元素可能会造成名称混淆
+// * 📝导入并【以别名重新导出】模块，实际上不太实用
+//  * 🚩此处弃用
+pub mod format_instances;
+// pub use format_instances as instances;
+
 /// 集成测试@枚举Narsese/字符串解析&格式化
 #[cfg(test)]
-mod tests_enum {
+mod tests {
 
     use self::parser::NarseseResult;
-    use super::super::common::format_instances::*;
-    use super::super::common::*;
+    use super::format_instances::*;
     use super::*;
 
     /// 用于给格式加上「自动解包并格式化内容」功能

@@ -1,7 +1,11 @@
 //! 词法Narsese
 
+// 格式
+mod format;
+pub use format::*;
+
 // 格式化
-// * 🚩直接对「Narsese格式」实现「格式化」方法
+// * 🚩直接对「词法Narsese格式」实现「格式化」方法
 //   * 所以没导出模块内容
 mod formatter;
 
@@ -11,18 +15,15 @@ pub use parser::*;
 
 /// 集成测试@词法Narsese/字符串解析&格式化
 #[cfg(test)]
-#[cfg(feature = "lexical_narsese")]
-mod tests_lexical {
-    use super::super::common::NarseseFormat;
+mod tests {
     use crate::{
-        lexical::{LexicalTask, LexicalTerm},
-        lexical_atom, lexical_budget, lexical_compound, lexical_set, lexical_stamp,
-        lexical_statement, lexical_task, lexical_truth,
+        lexical::LexicalTask, lexical::LexicalTerm, lexical_atom, lexical_compound, lexical_set,
+        lexical_statement, lexical_task,
     };
 
     /// （通用）构造一个格式化样本（ASCII自面量版本）
     /// * 基本涵盖其所属模块的全部内容
-    fn _sample_task_ascii() -> LexicalTask {
+    pub(crate) fn _sample_task_ascii() -> LexicalTask {
         // 构造词项
         let ball_left = lexical_statement!(lexical_atom!("ball") "{-]" lexical_atom!("left"));
         let conditional_operation = lexical_compound!(
@@ -58,11 +59,24 @@ mod tests_lexical {
         let budget = "$0.5; 0.75; 0.4$";
         lexical_task!(budget term.clone() punctuation stamp truth) // * 📝【2024-03-09 10:48:31】Clippy推荐直接返回构造之后的值
     }
+}
+
+/// 集成测试 & 枚举Narsese
+/// * 🎯利用「枚举Narsese」的「预置Narsese格式」生成「词法Narsese对象」
+#[cfg(test)]
+#[cfg(feature = "enum_narsese")]
+mod tests_with_enum_narsese {
+    use super::super::impl_enum::NarseseFormat as EnumNarseseFormat;
+    use crate::{
+        lexical::{LexicalTask, LexicalTerm},
+        lexical_atom, lexical_budget, lexical_compound, lexical_set, lexical_stamp,
+        lexical_statement, lexical_task, lexical_truth,
+    };
 
     /// （通用）构造一个格式化样本
     /// * 基本涵盖其所属模块的全部内容
     /// * 📌其中还有一些「格式特有」的东西
-    pub fn _sample_task(format: &NarseseFormat<&str>) -> LexicalTask {
+    pub fn _sample_task(format: &EnumNarseseFormat<&str>) -> LexicalTask {
         // 构造词项
         let ball_left = lexical_statement!(
             lexical_atom!(format.atom.prefix_word, "ball")

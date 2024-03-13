@@ -3,132 +3,24 @@
 use crate::{
     api::{GetBudget, GetStamp, GetTerm, GetTruth},
     catch_flow,
-    conversion::string::common::*,
+    conversion::string::common_narsese_templates::*,
     enum_narsese::*,
-    push_str,
     util::*,
 };
+
+use super::NarseseFormat;
 
 /// 实现：转换
 ///
 /// ! ℹ️单元测试在[`super::formats`]模块中定义
 impl NarseseFormat<&str> {
-    // 模板函数 //
-    // * 📌核心：具体数据结构无关
-    // * 🎯用于进行纯字符串的处理
+    // ! 🚩现在「纯字符串模板」已被提取到`common`模块
 
-    /// 模板/原子词项：前缀+名称
-    /// * 🎯所有Narsese原子词项类型
-    /// * 📝仅使用`pub(super)`即可在mod内共用，但为后续复用扩展，仍然使用`pub`对crate外开放
-    pub fn template_atom(out: &mut String, prefix: &str, name: &str) {
-        push_str!(out; prefix, name);
-    }
-
-    /// 模板/系列词项
-    /// * 🎯一般复合词项，词项集（外延集/内涵集）
-    /// * 📝对于「字符串自面量数组」，`Vec<&str>`的引用类型对应`&[str]`而非`&[&str]`
-    ///   * ❓亦或两者皆可
-    pub fn template_components(
-        out: &mut String,
-        components: impl Iterator<Item = String>,
-        separator: &str,
-        space: &str,
-    ) {
-        for (i, term_str) in components.enumerate() {
-            // 逗号
-            if i != 0 {
-                push_str!(out; separator, space);
-            }
-            // 词项
-            out.push_str(&term_str);
-        }
-    }
-
-    /// 模板/一般复合词项
-    /// * 🎯使用「连接符」区分「复合类型」的词项
-    /// * 📝对于「字符串自面量数组」，`Vec<&str>`的引用类型对应`&[&str]`而非`&[str]`
-    ///   * ⚠️后者的`str`是大小不定的：the size for values of type `str` cannot be known at compilation time
-    pub fn template_compound(
-        out: &mut String,
-        left_bracket: &str,
-        connecter: &str,
-        components: impl Iterator<Item = String>,
-        separator: &str,
-        space: &str,
-        right_bracket: &str,
-    ) {
-        // 左括号&连接符
-        push_str!(out;
-            // 左括号 `(`
-            left_bracket,
-            // 连接符 | `&&, `
-            connecter, separator, space,
-        );
-        // 组分 | `A, B, C`
-        Self::template_components(out, components, separator, space);
-        // 右括号 | `)`
-        out.push_str(right_bracket);
-    }
-
-    /// 模板/集合复合词项
-    /// * 🎯「外延集/内涵集」这样【无需特定连接符，只需特殊括弧区分】的词项
-    pub fn template_compound_set(
-        out: &mut String,
-        left_bracket: &str,
-        components: impl Iterator<Item = String>,
-        separator: &str,
-        space: &str,
-        right_bracket: &str,
-    ) {
-        // 左括号 | `{`
-        out.push_str(left_bracket);
-        // 组分 | `A, B, C`
-        Self::template_components(out, components, separator, space);
-        // 右括号 | `}`
-        out.push_str(right_bracket);
-    }
-
-    /// 模板/陈述
-    /// * 🎯各类作为陈述的词项
-    pub fn template_statement(
-        out: &mut String,
-        left_bracket: &str,
-        subject: &str,
-        copula: &str,
-        predicate: &str,
-        space: &str,
-        right_bracket: &str,
-    ) {
-        push_str!(out;
-            left_bracket, // `<`
-            subject, // `S`
-            space, copula, space, // ` --> `
-            predicate, // `P`
-            right_bracket, // `>`
-        );
-    }
-
-    /// 模板/语句
-    /// * 🎯词项+标点+时间戳+真值
-    pub fn template_sentence(
-        out: &mut String,
-        term: &str,
-        punctuation: &str,
-        stamp: &str,
-        truth: &str,
-        separator: &str,
-    ) {
-        // 词项直接输入，后续紧跟标点
-        out.push_str(term);
-        // 后续顺序拼接，并避免多余分隔符
-        join_lest_multiple_separators(out, [punctuation, stamp, truth].into_iter(), separator)
-    }
-
-    // 针对EnumNarsese的格式 //
+    // 针对「枚举Narsese」的格式化 //
 
     /// 工具函数/原子词项
     fn format_atom(&self, out: &mut String, atom: &Term, prefix: &str) {
-        Self::template_atom(out, prefix, &atom.get_atom_name_unchecked());
+        template_atom(out, prefix, &atom.get_atom_name_unchecked());
     }
 
     /// 工具函数/词项集
@@ -139,7 +31,7 @@ impl NarseseFormat<&str> {
         bracket_left: &str,
         bracket_right: &str,
     ) {
-        Self::template_compound_set(
+        template_compound_set(
             out,
             bracket_left,
             // 批量将内部词项转换成字符串
@@ -152,7 +44,7 @@ impl NarseseFormat<&str> {
 
     /// 工具函数/复合词项
     fn format_compound(&self, out: &mut String, components: Vec<&Term>, connecter: &str) {
-        Self::template_compound(
+        template_compound(
             out,
             self.compound.brackets.0,
             connecter,
@@ -171,7 +63,7 @@ impl NarseseFormat<&str> {
         components: Vec<&Term>,
         connecter: &str,
     ) {
-        Self::template_compound(
+        template_compound(
             out,
             self.compound.brackets.0,
             connecter,
@@ -191,7 +83,7 @@ impl NarseseFormat<&str> {
 
     /// 工具函数/陈述
     fn format_statement(&self, out: &mut String, left: &Term, right: &Term, copula: &str) {
-        Self::template_statement(
+        template_statement(
             out,
             self.statement.brackets.0,
             // 左边
@@ -462,7 +354,7 @@ impl NarseseFormat<&str> {
 
     /// 总格式化函数/语句
     fn _format_sentence(&self, out: &mut String, sentence: &Sentence) {
-        Self::template_sentence(
+        template_sentence(
             out,
             // 词项
             &catch_flow!(self._format_term; &sentence.get_term()),
@@ -520,9 +412,10 @@ impl NarseseFormat<&str> {
 #[cfg(test)]
 mod test {
 
-    use super::super::tests_enum::_sample_task;
-    use super::*;
-    use crate::conversion::string::format_instances::{FORMAT_ASCII, FORMAT_HAN, FORMAT_LATEX};
+    use super::{
+        super::{format_instances::*, tests::_sample_task},
+        *,
+    };
     use crate::{f_parallel, show};
 
     /// 测试其中一个格式

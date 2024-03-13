@@ -25,6 +25,7 @@
 //!   * 📌解析函数总是从某个「起始位置」开始，通过系列解析过程，返回「解析结果」以及
 //!     * ✨有相应的「结果索引」类型
 
+use super::format::*;
 use crate::{
     conversion::string::common::*,
     enum_narsese::*,
@@ -33,20 +34,12 @@ use crate::{
 };
 use std::{error::Error, fmt::Display, io::ErrorKind};
 
-/// 定义一个「CommonNarsese结果」类型
+/// 特化「CommonNarsese结果」到「枚举Narsese」版本
 /// * 🎯用于存储「最终被解析出来的CommonNarsese对象」
 ///   * 词项
 ///   * 语句
 ///   * 任务
-#[derive(Debug, Clone)]
-pub enum NarseseResult {
-    /// 解析出来的词项
-    Term(Term),
-    /// 解析出来的语句
-    Sentence(Sentence),
-    /// 解析出来的任务
-    Task(Task),
-}
+pub type NarseseResult = parser_structs::NarseseResult<Term, Sentence, Task>;
 
 // 实现`(try_)From/To`转换方法
 impl TryFrom<NarseseResult> for Term {
@@ -1491,9 +1484,8 @@ impl NarseseFormat<&str> {
 /// 单元测试
 #[cfg(test)]
 mod tests_parse {
+    use super::super::format_instances::*;
     use super::*;
-    use crate::conversion::string::format_instances::*;
-    use crate::conversion::string::*;
     use crate::{f_tensor, fail_tests, show};
 
     /// 通通用测试/尝试解析并返回错误

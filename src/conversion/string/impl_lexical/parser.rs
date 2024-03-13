@@ -2,36 +2,28 @@
 //! * 🎯字符串→词法Narsese
 
 use crate::{
-    conversion::string::common::NarseseFormat,
+    conversion::string::common::*,
     lexical::{LexicalSentence, LexicalTask, LexicalTerm},
     util::{BufferIterator, IntoChars},
 };
 use std::{error::Error, fmt::Display, io::ErrorKind};
 
-/// 定义一个「词法CommonNarsese结果」类型
-/// * 🎯用于存储「最终被解析出来的词法CommonNarsese对象」
+use super::NarseseFormat;
+
+/// 特化「CommonNarsese结果」到「词法Narsese」版本
+/// * 🎯用于存储「最终被解析出来的CommonNarsese对象」
 ///   * 词项
 ///   * 语句
 ///   * 任务
-/// * 📌复制并修改自EnumNarsese相应版本
-///   * ❓后续是否集成统一
-#[derive(Debug, Clone)]
-pub enum LexicalNarseseResult {
-    /// 解析出来的词项
-    Term(LexicalTerm),
-    /// 解析出来的语句
-    Sentence(LexicalSentence),
-    /// 解析出来的任务
-    Task(LexicalTask),
-}
+pub type NarseseResult = parser_structs::NarseseResult<LexicalTerm, LexicalSentence, LexicalTask>;
 
 // 实现`(try_)From/To`转换方法
 // * 📌目前只需要「词法解析结果→词项/语句/任务」而无需其它做法
-impl TryFrom<LexicalNarseseResult> for LexicalTerm {
+impl TryFrom<NarseseResult> for LexicalTerm {
     type Error = std::io::Error;
-    fn try_from(value: LexicalNarseseResult) -> Result<Self, Self::Error> {
+    fn try_from(value: NarseseResult) -> Result<Self, Self::Error> {
         match value {
-            LexicalNarseseResult::Term(term) => Ok(term),
+            NarseseResult::Term(term) => Ok(term),
             _ => Err(Self::Error::new(
                 ErrorKind::InvalidData,
                 format!("类型不匹配，无法转换为词项：{value:?}"),
@@ -39,11 +31,11 @@ impl TryFrom<LexicalNarseseResult> for LexicalTerm {
         }
     }
 }
-impl TryFrom<LexicalNarseseResult> for LexicalSentence {
+impl TryFrom<NarseseResult> for LexicalSentence {
     type Error = std::io::Error;
-    fn try_from(value: LexicalNarseseResult) -> Result<Self, Self::Error> {
+    fn try_from(value: NarseseResult) -> Result<Self, Self::Error> {
         match value {
-            LexicalNarseseResult::Sentence(sentence) => Ok(sentence),
+            NarseseResult::Sentence(sentence) => Ok(sentence),
             _ => Err(Self::Error::new(
                 ErrorKind::InvalidData,
                 format!("类型不匹配，无法转换为语句：{value:?}"),
@@ -51,11 +43,11 @@ impl TryFrom<LexicalNarseseResult> for LexicalSentence {
         }
     }
 }
-impl TryFrom<LexicalNarseseResult> for LexicalTask {
+impl TryFrom<NarseseResult> for LexicalTask {
     type Error = std::io::Error;
-    fn try_from(value: LexicalNarseseResult) -> Result<Self, Self::Error> {
+    fn try_from(value: NarseseResult) -> Result<Self, Self::Error> {
         match value {
-            LexicalNarseseResult::Task(task) => Ok(task),
+            NarseseResult::Task(task) => Ok(task),
             _ => Err(Self::Error::new(
                 ErrorKind::InvalidData,
                 format!("类型不匹配，无法转换为任务：{value:?}"),
@@ -71,7 +63,7 @@ impl TryFrom<LexicalNarseseResult> for LexicalTask {
 /// * 现在是基于「解析器状态」的「状态机模型」
 ///   * 📌关键差异：附带可设置的「中间解析结果」与「可变索引」
 ///   * 🚩子解析函数在解析之后，直接填充「中间解析结果」并修改「可变索引」
-type ParseResult<T = LexicalNarseseResult> = Result<T, ParseError>;
+type ParseResult<T = NarseseResult> = Result<T, ParseError>;
 /// 用于表征「令牌消耗结果」
 /// * 🎯用于在出错时传播错误
 type ConsumeResult = ParseResult<()>;
@@ -120,19 +112,19 @@ impl Error for ParseError {}
 /// 词法Narsese的「解析状态」
 /// * 其中的`C`一般为「字符」
 /// * 其中的`T`一般为「文本」（字符串）
-pub struct ParseState<'a, C, T> {
+pub struct ParseState<'a, C> {
     /// 引用的「解析格式」
-    format: &'a NarseseFormat<T>,
+    format: &'a NarseseFormat,
     /// 内置的「缓冲迭代器」
     /// * 🚩使用[`Box`]封装原始迭代器
     iter: BufferIterator<C, Box<dyn Iterator<Item = C> + 'a>>,
 }
 
 /// 通用实现
-impl<'a, Item, Text> ParseState<'a, Item, Text> {
+impl<'a, Item> ParseState<'a, Item> {
     /// 构造函数
     /// * 🚩传入迭代器进行构造
-    pub fn new(format: &'a NarseseFormat<Text>, iter: impl Iterator<Item = Item> + 'a) -> Self {
+    pub fn new(format: &'a NarseseFormat, iter: impl Iterator<Item = Item> + 'a) -> Self {
         Self {
             format,
             iter: BufferIterator::new(Box::new(iter)),
@@ -147,7 +139,7 @@ impl<'a, Item, Text> ParseState<'a, Item, Text> {
 
 /// 字符实现
 /// * 🚩解析逻辑正式开始
-impl<'a> ParseState<'a, char, &str> {
+impl<'a> ParseState<'a, char> {
     /// 快速构造解析结果/Err
     pub fn err(&self, message: &str) -> ParseResult {
         Err(ParseError::new(
@@ -169,13 +161,13 @@ impl<'a> ParseState<'a, char, &str> {
 }
 
 /// 总定义
-impl NarseseFormat<&str> {
+impl NarseseFormat {
     /// 构造解析状态
     /// * 索引默认从开头开始
     pub fn build_parse_state_lexical<'a>(
         &'a self,
         input: impl IntoIterator<Item = char> + 'a,
-    ) -> ParseState<'a, char, &str> {
+    ) -> ParseState<'a, char> {
         ParseState::new(self, input.into_iter())
     }
 
@@ -208,7 +200,7 @@ mod test {
     use super::*;
 
     /// 通通用测试/尝试解析并返回错误
-    fn __test_parse(format: &NarseseFormat<&str>, input: &str) -> LexicalNarseseResult {
+    fn __test_parse(format: &NarseseFormat, input: &str) -> NarseseResult {
         // 解析
         let result = format.parse_lexical(input);
         // 检验
