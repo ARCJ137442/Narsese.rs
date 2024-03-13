@@ -29,6 +29,8 @@ mod tests {
     use self::parser::NarseseResult;
     use super::format_instances::*;
     use super::*;
+    use crate::enum_narsese::{Budget, Sentence, Stamp, Task, Term, Truth};
+    use util::{f_tensor, show};
 
     /// 用于给格式加上「自动解包并格式化内容」功能
     trait FormatResult {
@@ -44,11 +46,6 @@ mod tests {
             }
         }
     }
-
-    use crate::{
-        enum_narsese::{Budget, Sentence, Stamp, Task, Term, Truth},
-        f_tensor, show,
-    };
 
     /// 先解析然后格式化
     fn _test_parse_and_format(format: &NarseseFormat<&str>, input: &str) -> String {

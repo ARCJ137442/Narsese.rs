@@ -2,7 +2,7 @@
 //! * 📌重在**纯字符串**处理：与「具体实现的NarseseFormat」格式无关
 //! * 🎯统一提取出通用的「字符串格式化模板」模块
 
-use crate::{push_str, util::join_lest_multiple_separators};
+use util::{join_lest_multiple_separators, push_str};
 
 /// 模板/原子词项：前缀+名称
 /// * 🎯所有Narsese原子词项类型

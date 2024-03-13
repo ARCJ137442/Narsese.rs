@@ -14,5 +14,6 @@
         "解析器&格式化",
         "词法"
     ],
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "rust-analyzer.cargo.features": "all"
 }

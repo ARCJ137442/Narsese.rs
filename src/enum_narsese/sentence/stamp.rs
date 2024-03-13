@@ -7,7 +7,7 @@
 //! * 未来
 //! * 固定
 
-use crate::util::IntPrecision;
+use util::IntPrecision;
 
 /// 时间戳
 #[derive(Debug, Clone, PartialEq)]

@@ -2,10 +2,9 @@
 
 use crate::{
     api::{GetBudget, GetTerm},
-    catch_flow,
     conversion::string::common_narsese_templates::*,
     lexical::{LexicalSentence, LexicalTask, LexicalTerm},
-    util::add_space_if_necessary_and_flush_buffer,
+    util::{add_space_if_necessary_and_flush_buffer, catch_flow},
 };
 
 use super::NarseseFormat;
@@ -106,7 +105,7 @@ mod tests {
     #![allow(unused)]
     use super::super::tests::_sample_task_ascii as _sample_task;
     use super::*;
-    use crate::{f_parallel, show};
+    use util::{f_parallel, show};
 
     /// 测试其中一个格式
     fn _test(name: &str, expected: &str) {
@@ -144,9 +143,8 @@ mod tests_with_enum_narsese {
 
     #![allow(unused)]
     use super::super::tests_with_enum_narsese::_sample_task;
-    use crate::{
-        conversion::string::impl_enum::NarseseFormat as EnumNarseseFormat, f_parallel, show,
-    };
+    use crate::conversion::string::impl_enum::NarseseFormat as EnumNarseseFormat;
+    use util::{f_parallel, show};
 
     /// 测试其中一个格式
     fn _test(format: EnumNarseseFormat<&str>, name: &str, expected: &str) {

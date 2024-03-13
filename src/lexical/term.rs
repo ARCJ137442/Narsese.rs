@@ -141,9 +141,8 @@ macro_rules! lexical_statement {
 #[cfg(test)]
 #[allow(unused)]
 mod tests {
-    use crate::show;
-
     use super::*;
+    use util::show;
 
     #[test]
     fn main() {

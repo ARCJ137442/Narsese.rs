@@ -2,11 +2,10 @@
 
 use crate::{
     api::{GetBudget, GetStamp, GetTerm, GetTruth},
-    catch_flow,
     conversion::string::common_narsese_templates::*,
     enum_narsese::*,
-    util::*,
 };
+use util::*;
 
 use super::NarseseFormat;
 
@@ -416,7 +415,7 @@ mod test {
         super::{format_instances::*, tests::_sample_task},
         *,
     };
-    use crate::{f_parallel, show};
+    use util::{f_parallel, show};
 
     /// 测试其中一个格式
     fn _test(format: NarseseFormat<&str>, name: &str, expected: &str) {

@@ -5,7 +5,7 @@
 //! * 单真值
 //! * 双真值
 
-use crate::util::{FloatPrecision, ZeroOneFloat};
+use util::{FloatPrecision, ZeroOneFloat};
 
 /// 使用枚举表示真值
 /// * 📌与目标使用的「预算值」同一
@@ -73,7 +73,7 @@ impl Truth {
 /// 单元测试/真值
 #[cfg(test)]
 mod tests_truth {
-    use crate::fail_tests;
+    use util::fail_tests;
 
     use super::*;
 

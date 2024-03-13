@@ -1,5 +1,5 @@
 //! 统一定义「预算值」
-use crate::util::*;
+use util::*;
 
 /// 使用枚举表示预算值
 /// * 📌兼容不同的缺省形式
@@ -88,7 +88,7 @@ impl Budget {
 /// 单元测试/预算值
 #[cfg(test)]
 mod tests_budget {
-    use crate::fail_tests;
+    use util::fail_tests;
 
     use super::*;
 

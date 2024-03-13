@@ -111,9 +111,8 @@ impl GetTruth<String> for LexicalSentence {
 #[cfg(test)]
 #[allow(unused)]
 mod tests {
-    use crate::{lexical_atom, show};
-
     use super::*;
+    use crate::{lexical_atom, util::*};
 
     #[test]
     fn main() {

@@ -26,13 +26,9 @@
 //!     * ✨有相应的「结果索引」类型
 
 use super::format::*;
-use crate::{
-    conversion::string::common::*,
-    enum_narsese::*,
-    first,
-    util::{FloatPrecision, IntPrecision, ZeroOneFloat},
-};
+use crate::{conversion::string::common::*, enum_narsese::*};
 use std::{error::Error, fmt::Display, io::ErrorKind};
+use util::{first, FloatPrecision, IntPrecision, ZeroOneFloat};
 
 /// 特化「CommonNarsese结果」到「枚举Narsese」版本
 /// * 🎯用于存储「最终被解析出来的CommonNarsese对象」
@@ -1486,7 +1482,7 @@ impl NarseseFormat<&str> {
 mod tests_parse {
     use super::super::format_instances::*;
     use super::*;
-    use crate::{f_tensor, fail_tests, show};
+    use util::{f_tensor, fail_tests, show};
 
     /// 通通用测试/尝试解析并返回错误
     fn __test_parse(format: &NarseseFormat<&str>, input: &str) -> NarseseResult {

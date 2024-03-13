@@ -38,11 +38,10 @@ pub enum LexicalNarsese {
 #[cfg(test)]
 #[allow(unused)]
 mod tests {
-    use crate::{
-        lexical_atom, lexical_compound, lexical_set, lexical_statement, lexical_task, show,
-    };
-
     use super::*;
+    use crate::{
+        lexical_atom, lexical_compound, lexical_set, lexical_statement, lexical_task, util::*,
+    };
 
     #[test]
     fn main() {
