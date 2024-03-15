@@ -7,10 +7,10 @@ edition = "2021"
 # 【2024-03-13 21:17:55】实用库现在独立为`nar_dev_utils`
 # version = "0.1.0" # ! 本地依赖可以不添加版本
 path = "../NAR-dev-util"
-features = []
+features = ["bundled"]
 
 [features]
-default = ["bundled"]
+default = []
 bundled = [
     "enum_narsese",
     "lexical_narsese"

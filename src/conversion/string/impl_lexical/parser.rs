@@ -69,7 +69,7 @@ impl Error for ParseError {}
 /// * 其中的`T`一般为「文本」（字符串）
 pub struct ParseState<'a, C> {
     /// 引用的「解析格式」
-    format: &'a NarseseFormat,
+    format: &'a NarseseFormat<'a>,
     /// 内置的「缓冲迭代器」
     /// * 🚩使用[`Box`]封装原始迭代器
     iter: BufferIterator<C, Box<dyn Iterator<Item = C> + 'a>>,
@@ -109,17 +109,21 @@ impl<'a> ParseState<'a, char> {
 
     /// 🔦入口
     /// * 🚩使用自身（从迭代器中）解析出一个结果
+    ///   * 📌无需依赖其它外部数据
+    ///
+    /// TODO: 前缀匹配+缓冲区捕获 思路
     pub fn parse(&mut self) -> ParseResult {
         // 用状态进行解析
-        todo!("开发中！") // TODO: 前缀匹配+缓冲区捕获 思路
+        todo!("开发中！");
+        // 逐个开始解析各条目、跳过空白符等
     }
 }
 
 /// 总定义
-impl NarseseFormat {
+impl<'a> NarseseFormat<'a> {
     /// 构造解析状态
     /// * 索引默认从开头开始
-    pub fn build_parse_state_lexical<'a>(
+    pub fn build_parse_state_lexical(
         &'a self,
         input: impl IntoIterator<Item = char> + 'a,
     ) -> ParseState<'a, char> {

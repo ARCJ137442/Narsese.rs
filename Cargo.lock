@@ -11,4 +11,4 @@ dependencies = [
 
 [[package]]
 name = "nar_dev_utils"
-version = "0.1.0"
+version = "0.3.0"
