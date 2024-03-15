@@ -145,40 +145,40 @@ mod tests_budget {
     // invalid //
 
     fail_tests! {
-        // invalid - new | p | >1
+        /// invalid - new | p | >1
         test_new_invalid_p_up Budget::new_single(1.5);
 
-        // invalid - new | p | <0
+        /// invalid - new | p | <0
         test_new_invalid_p_down Budget::new_single(-0.5);
 
-        // invalid - new | d | >1
+        /// invalid - new | d | >1
         test_new_invalid_d_up Budget::new_double(0.5, 1.5);
 
-        // invalid - new | d | <0
+        /// invalid - new | d | <0
         test_new_invalid_d_down Budget::new_double(0.5, -0.5);
 
-        // invalid - new | q | >1
+        /// invalid - new | q | >1
         test_new_invalid_q_up Budget::new_triple(0.5, 0.5, 1.5);
 
-        // invalid - new | q | <0
+        /// invalid - new | q | <0
         test_new_invalid_q_down Budget::new_triple(0.5, 0.5, -0.5);
 
-        // invalid - get | p | empty
+        /// invalid - get | p | empty
         test_get_invalid_p_empty Budget::new_empty().p();
 
-        // invalid - get | d | empty
+        /// invalid - get | d | empty
         test_get_invalid_d_empty Budget::new_empty().d();
 
-        // invalid - get | q | empty
+        /// invalid - get | q | empty
         test_get_invalid_q_empty Budget::new_empty().q();
 
-        // invalid - get | d | single
+        /// invalid - get | d | single
         test_get_invalid_d_single Budget::new_single(0.5).d();
 
-        // invalid - get | q | single
+        /// invalid - get | q | single
         test_get_invalid_q_single Budget::new_single(0.5).q();
 
-        // invalid - get | q | double
+        /// invalid - get | q | double
         test_get_invalid_q_double Budget::new_double(0.5, 0.5).q();
     }
 }

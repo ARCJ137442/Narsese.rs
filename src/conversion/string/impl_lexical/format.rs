@@ -14,7 +14,15 @@ use util::{PrefixMatchDict, PrefixMatchDictPair};
 /// Narsese格式/空白符
 pub struct NarseseFormatSpace<'a> {
     /// 用于判断字符是否为空白符（解析用）
-    pub parse: Box<dyn Fn(char) -> bool>,
+    /// * 📝Rust中若需定义静态常量，需要对常量确保线程安全
+    ///   * 📄线程安全的类型⇔实现`Send + Sync`特征
+    ///   * ⚠️`Box`类型无法作为常量初始化⇒退而求其次，变为「静态变量」⇒不可变`static`仍然要求常量表达式
+    ///   * ⚠️任何闭包类型都不默认实现`Send + Sync`：直接`static`无法实现线程安全
+    ///   * 🚩最终方案
+    ///     * ✅常量表达式：使用[`lazy_statics`]实现「静态懒加载」绕开「`static`要求常量表达式」限制
+    ///     * ✅线程安全：限制下边闭包为`dyn Fn(char) -> bool + Send + Sync`
+    ///       * 📌其通常就是个纯函数
+    pub is_for_parse: Box<dyn Fn(char) -> bool + Send + Sync>,
     /// 空白符（格式化/分隔词项）
     /// * 🎯复合词项/陈述
     pub format_terms: &'a str,
@@ -35,7 +43,7 @@ pub struct NarseseFormatAtom {
     /// * 操作符
     pub prefixes: PrefixMatchDict,
     /// 用于判断字符是否为「合法原子标识符」的函数
-    pub is_identifier: Box<dyn Fn(char) -> bool>,
+    pub is_identifier: Box<dyn Fn(char) -> bool + Send + Sync>,
 }
 
 /// 复合词项格式

@@ -113,25 +113,25 @@ mod tests_truth {
 
     // invalid //
     fail_tests! {
-        // invalid - new | f | >1
+        /// invalid - new | f | >1
         test_new_invalid_f_up Truth::new_single(1.5);
 
-        // invalid - new | f | <0
+        /// invalid - new | f | <0
         test_new_invalid_f_down Truth::new_single(-0.5);
 
-        // invalid - new | c | >1
+        /// invalid - new | c | >1
         test_new_invalid_c_up Truth::new_double(0.5, 1.5);
 
-        // invalid - new | c | <0
+        /// invalid - new | c | <0
         test_new_invalid_c_down Truth::new_double(0.5, -0.5);
 
-        // invalid - get | f | empty
+        /// invalid - get | f | empty
         test_get_invalid_f_empty Truth::new_empty().f();
 
-        // invalid - get | c | empty
+        /// invalid - get | c | empty
         test_get_invalid_c_empty Truth::new_empty().c();
 
-        // invalid - get | c | single
+        /// invalid - get | c | single
         test_get_invalid_c_single Truth::new_single(0.5).c();
     }
 }
