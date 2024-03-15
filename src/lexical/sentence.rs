@@ -1,21 +1,27 @@
 use crate::api::{GetPunctuation, GetStamp, GetTerm, GetTruth};
 
-use super::LexicalTerm;
+use super::Term;
 
 /// 词法上的「语句」：词项+标点+时间戳+真值
 /// * 仅作为「最大并集」，不考虑「问题/请求 无真值」等情况
+/// * 🚩【2024-03-15 22:03:48】现在不再特别加上「Lexical」前缀，而是使用命名空间区分
+///   * 实际上就是`lexical::Sentence`或`use crate::lexical::Sentence as LexicalSentence`的事儿
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LexicalSentence {
-    term: LexicalTerm,
+pub struct Sentence {
+    /// 词法词项
+    pub term: Term,
+    /// 标点（字符串）
     pub punctuation: String,
+    /// 时间戳（字符串）
     pub stamp: String,
+    /// 真值（字符串）
     pub truth: String,
 }
 
 /// 自身方法
-impl LexicalSentence {
+impl Sentence {
     /// 从位置参数构造语句
-    pub fn new(term: LexicalTerm, punctuation: &str, stamp: &str, truth: &str) -> Self {
+    pub fn new(term: Term, punctuation: &str, stamp: &str, truth: &str) -> Self {
         Self {
             term,
             punctuation: punctuation.into(),
@@ -29,7 +35,8 @@ impl LexicalSentence {
 #[macro_export]
 macro_rules! lexical_sentence {
     [$($arg:expr)*] => {
-        LexicalSentence::new($($arg),*)
+        // * 📝引入`$crate::lexical`作为绝对路径
+        $crate::lexical::Sentence::new($($arg),*)
     };
 }
 
@@ -83,25 +90,25 @@ macro_rules! lexical_truth {
 }
 
 // 实现
-impl GetTerm<LexicalTerm> for LexicalSentence {
-    fn get_term(&self) -> &LexicalTerm {
+impl GetTerm<Term> for Sentence {
+    fn get_term(&self) -> &Term {
         &self.term
     }
 }
 
-impl GetPunctuation<String> for LexicalSentence {
+impl GetPunctuation<String> for Sentence {
     fn get_punctuation(&self) -> &String {
         &self.punctuation
     }
 }
 
-impl GetStamp<String> for LexicalSentence {
+impl GetStamp<String> for Sentence {
     fn get_stamp(&self) -> &String {
         &self.stamp
     }
 }
 
-impl GetTruth<String> for LexicalSentence {
+impl GetTruth<String> for Sentence {
     fn get_truth(&self) -> Option<&String> {
         Some(&self.truth)
     }

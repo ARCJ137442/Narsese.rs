@@ -3,7 +3,7 @@
 use crate::{
     api::{GetBudget, GetTerm},
     conversion::string::common_narsese_templates::*,
-    lexical::{LexicalSentence, LexicalTask, LexicalTerm},
+    lexical::{Sentence, Task, Term},
     util::{add_space_if_necessary_and_flush_buffer, catch_flow},
 };
 
@@ -14,12 +14,12 @@ use super::NarseseFormat;
 /// ! ℹ️单元测试在[`super::formats`]模块中定义
 impl<'a> NarseseFormat<'a> {
     /// 工具函数/词项
-    fn _format_term(&self, out: &mut String, term: &LexicalTerm) {
+    fn _format_term(&self, out: &mut String, term: &Term) {
         match term {
             // 原子词项
-            LexicalTerm::Atom { prefix, name } => template_atom(out, prefix, name),
+            Term::Atom { prefix, name } => template_atom(out, prefix, name),
             // 复合词项（包括「像」）
-            LexicalTerm::Compound { connecter, terms } => template_compound(
+            Term::Compound { connecter, terms } => template_compound(
                 out,
                 self.compound.brackets.0,
                 connecter,
@@ -29,7 +29,7 @@ impl<'a> NarseseFormat<'a> {
                 self.compound.brackets.1,
             ),
             // 复合词项集合
-            LexicalTerm::Set {
+            Term::Set {
                 left_bracket,
                 terms,
                 right_bracket,
@@ -42,7 +42,7 @@ impl<'a> NarseseFormat<'a> {
                 right_bracket,
             ),
             // 陈述
-            LexicalTerm::Statement {
+            Term::Statement {
                 copula,
                 subject,
                 predicate,
@@ -60,17 +60,17 @@ impl<'a> NarseseFormat<'a> {
 
     /// 格式化函数/词项
     /// * 返回一个新字符串
-    pub fn format_term(&self, term: &LexicalTerm) -> String {
+    pub fn format_term(&self, term: &Term) -> String {
         catch_flow!(self._format_term; term)
     }
 
     /// 格式化函数/语句
-    pub fn format_sentence(&self, sentence: &LexicalSentence) -> String {
+    pub fn format_sentence(&self, sentence: &Sentence) -> String {
         catch_flow!(self._format_sentence; sentence)
     }
 
     /// 总格式化函数/语句
-    fn _format_sentence(&self, out: &mut String, sentence: &LexicalSentence) {
+    fn _format_sentence(&self, out: &mut String, sentence: &Sentence) {
         template_sentence(
             out,
             &self.format_term(sentence.get_term()),
@@ -82,12 +82,12 @@ impl<'a> NarseseFormat<'a> {
     }
 
     /// 格式化函数/任务
-    pub fn format_task(&self, task: &LexicalTask) -> String {
+    pub fn format_task(&self, task: &Task) -> String {
         catch_flow!(self._format_task; task)
     }
 
     /// 总格式化函数/任务
-    fn _format_task(&self, out: &mut String, task: &LexicalTask) {
+    fn _format_task(&self, out: &mut String, task: &Task) {
         // 临时缓冲区 | 用于「有内容⇒添加空格」的逻辑
         let mut buffer = String::new();
         // 预算值

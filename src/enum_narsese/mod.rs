@@ -21,4 +21,4 @@ pub use task::*;
 // 统合结构体
 
 /// 集「词项/语句/任务」于一身的「枚举Narsese」（Narsese值）
-pub type EnumNarsese = NarseseValue<Term, Sentence, Task>;
+pub type Narsese = NarseseValue<Term, Sentence, Task>;

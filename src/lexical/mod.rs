@@ -29,7 +29,7 @@ pub use task::*;
 
 /// 用于归并表示「词法上的Narsese」
 /// * 🚩现在使用更抽象的「Narsese值」取代
-pub type LexicalNarsese = NarseseValue<LexicalTerm, LexicalSentence, LexicalTask>;
+pub type Narsese = NarseseValue<Term, Sentence, Task>;
 
 /// 单元测试：词项+语句+任务
 #[cfg(test)]

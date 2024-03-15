@@ -35,7 +35,7 @@ use util::{first, FloatPrecision, IntPrecision, ZeroOneFloat};
 ///   * 词项
 ///   * 语句
 ///   * 任务
-pub type NarseseResult = EnumNarsese;
+pub type NarseseResult = Narsese;
 
 // 实现`(try_)From/To`转换方法
 impl TryFrom<NarseseResult> for Term {
@@ -189,7 +189,7 @@ impl Error for ParseError {}
 /// 定义一个「解析器状态」类型
 /// * 🎯除了内置「格式」外，还可【缓存】解析状态
 /// * 📄学习参考：[tomllib/parser.rs](https://github.com/joelself/tomllib/blob/master/src/internals/parser.rs)
-pub struct ParseState<'a, Content> {
+pub struct ParseState<'a, Content = &'a str> {
     /// 引用的「解析格式」
     format: &'a NarseseFormat<Content>,
     /// 「解析环境」
@@ -254,26 +254,6 @@ impl<'a, C> ParseState<'a, C> {
     pub fn ok_consume() -> ConsumeResult {
         Ok(())
     }
-}
-
-/// 匹配并执行第一个匹配到的分支
-/// * 🎯用于快速识别开头
-/// 📝`self`是一个内容相关的关键字，必须向其中传递`self`作为参数
-macro_rules! first_method {
-    {
-        // * 传入「self.方法名」作为被调用的方法
-        $self_:ident.$method_name: ident;
-        // * 传入所有的分支
-        $( $pattern:expr => $branch:expr ),*,
-        // * 传入「else」分支
-        _ => $branch_else:expr $(,)?
-    } => {
-        // 插入`first!`宏中
-        first! {
-            $( $self_.$method_name($pattern) => $branch ),*,
-            _ => $branch_else
-        }
-    };
 }
 
 /// 匹配首个前缀匹配的分支，自动跳过前缀并执行代码
@@ -614,7 +594,7 @@ impl<'a> ParseState<'a, &str> {
     /// * 此处使用`first!`代表「截断条件表达式」
     /// * 📌该函数仅承担分支工作
     ///   * 「头部索引位移」在分支中进行
-    ///   * 当前一分支失败（返回Err）时，自动尝试匹配下一个分支
+    ///   * 当前一分支失败（返回Err）时，自动移回索引并尝试匹配下一个分支
     ///     * 🎯用于解决「『预算值』『独立变量』相互冲突」的问题
     /// * ⚠️【2024-02-21 17:17:58】此处引入「词项→标点」的固定顺序
     ///   * 🎯为了解决如 `?查询变量vs问题?` 的冲突
@@ -683,9 +663,9 @@ impl<'a> ParseState<'a, &str> {
 
     /// 消耗
     fn consume_punctuation(&mut self) -> ConsumeResult {
-        first_method! {
+        first! {
             // 匹配开头
-            self.starts_with;
+            (self.starts_with) => (_);
             // 标点 // ⚠️因开头不同且无法兜底，故直接内联至此
             // 判断
             self.format.sentence.punctuation_judgement => self.consume_punctuation_judgement(),
@@ -864,9 +844,9 @@ impl<'a> ParseState<'a, &str> {
         // 跳过左括弧
         self.head_skip_and_spaces(self.format.sentence.stamp_brackets.0);
         // 开始匹配时间戳类型标识符
-        let stamp = first_method! {
+        let stamp = first! {
             // 前缀匹配
-            self.starts_with;
+            (self.starts_with) => (_);
             // 固定
             self.format.sentence.stamp_fixed => {
                 // 跳过自身
@@ -986,8 +966,8 @@ impl<'a> ParseState<'a, &str> {
     /// * ⚠️解析的同时跳过词项
     ///   * 乃至无需`?`语法糖（错误直接传递，而无需提取值）
     fn parse_term(&mut self) -> ParseResult<Term> {
-        first_method! {
-            self.starts_with;
+        first! {
+            (self.starts_with) => (_);
             // 词项/外延集
             self.format.compound.brackets_set_extension.0 => self.parse_compound_set_extension(),
             // 词项/内涵集
@@ -1013,9 +993,9 @@ impl<'a> ParseState<'a, &str> {
         right_bracket: &str,
     ) -> ConsumeResult {
         while self.can_consume() {
-            first_method! {
+            first! {
                 // 检查开头
-                self.starts_with;
+                (self.starts_with) => (_);
                 // 空白⇒跳过
                 self.format.space.parse => self.head_skip(self.format.space.parse),
                 // 分隔符⇒跳过

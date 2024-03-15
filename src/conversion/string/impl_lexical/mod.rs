@@ -25,13 +25,12 @@ pub mod format_instances;
 #[cfg(test)]
 mod tests {
     use crate::{
-        lexical::LexicalTask, lexical::LexicalTerm, lexical_atom, lexical_compound, lexical_set,
-        lexical_statement, lexical_task,
+        lexical::Task, lexical_atom, lexical_compound, lexical_set, lexical_statement, lexical_task,
     };
 
     /// （通用）构造一个格式化样本（ASCII自面量版本）
     /// * 基本涵盖其所属模块的全部内容
-    pub(crate) fn _sample_task_ascii() -> LexicalTask {
+    pub(crate) fn _sample_task_ascii() -> Task {
         // 构造词项
         let ball_left = lexical_statement!(lexical_atom!("ball") "{-]" lexical_atom!("left"));
         let conditional_operation = lexical_compound!(
@@ -76,15 +75,14 @@ mod tests {
 mod tests_with_enum_narsese {
     use super::super::impl_enum::NarseseFormat as EnumNarseseFormat;
     use crate::{
-        lexical::{LexicalTask, LexicalTerm},
-        lexical_atom, lexical_budget, lexical_compound, lexical_set, lexical_stamp,
+        lexical::Task, lexical_atom, lexical_budget, lexical_compound, lexical_set, lexical_stamp,
         lexical_statement, lexical_task, lexical_truth,
     };
 
     /// （通用）构造一个格式化样本
     /// * 基本涵盖其所属模块的全部内容
     /// * 📌其中还有一些「格式特有」的东西
-    pub fn _sample_task(format: &EnumNarseseFormat<&str>) -> LexicalTask {
+    pub fn _sample_task(format: &EnumNarseseFormat<&str>) -> Task {
         // 构造词项
         let ball_left = lexical_statement!(
             lexical_atom!(format.atom.prefix_word, "ball")
