@@ -104,6 +104,7 @@ pub fn create_format_ascii<'a>() -> NarseseFormat<'a> {
             is_for_parse: Box::new(|c: char| c.is_whitespace()), // ! 解析时忽略空格
             format_terms: " ", // 格式化时，词项间需要空格（英文如此）
             format_items: " ", // 格式化时，条目间需要空格（英文如此）
+            remove_spaces_before_parse: true, // ASCII版本空格无关
         },
         atom: NarseseFormatAtom {
             // 所有原子词项的前缀
@@ -178,12 +179,14 @@ pub fn create_format_ascii<'a>() -> NarseseFormat<'a> {
             ),
             // 时间戳
             stamp_brackets: (":", ":"),
-            // 真值
+            // 真值 | 内容已不包含空格
             truth_brackets: ("%", "%"),
+            is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | ';')),
         },
         task: NarseseFormatTask {
-            // 预算
+            // 预算 | 内容已不包含空格
             budget_brackets: ("$", "$"),
+            is_budget_content: Box::new(|c: char| matches!(c, '0'..='9' | ';')),
         },
     }
 }
@@ -198,19 +201,20 @@ pub fn create_format_latex<'a>() -> NarseseFormat<'a> {
             is_for_parse: Box::new(|c| c.is_whitespace()), // ! 解析时可跳过空格
             format_terms: " ", // 格式化时，词项间需要分隔（避免代码粘连）
             format_items: " ", // 格式化时，条目间需要分隔（避免代码粘连）
+            remove_spaces_before_parse: true, // LaTeX版本亦可空格无关——通过「后缀空参数」省去空格
         },
         atom: NarseseFormatAtom {
             prefixes: prefix_match_dict!(
                 // 词语
                 ""
                 // 占位符
-                r"\diamond "
+                r"\diamond{}" // ! 此处即「后缀空参数」
                 // 变量
                 r"\$" r"\#" "?"
                 // 间隔
                 "+"
                 // 操作符
-                r"\Uparrow "
+                r"\Uparrow{}" // ! 此处即「后缀空参数」
             ),
             is_identifier: Box::new(|c| c.is_alphanumeric() || c == '_'),
         },
@@ -227,16 +231,16 @@ pub fn create_format_latex<'a>() -> NarseseFormat<'a> {
             ),
             // 复合词项连接符
             connecters: prefix_match_dict!(
-                r"\cap " // 外延交
-                r"\cup " // 内涵交
-                r"\minus " // 外延差
-                r"\sim " // 内涵差
-                r"\times " // 乘积
+                r"\cap{}" // 外延交
+                r"\cup{}" // 内涵交
+                r"\minus{}" // 外延差
+                r"\sim{}" // 内涵差
+                r"\times{}" // 乘积
                 "/" // 外延像
-                r"\backslash " // 内涵像
-                r"\wedge " // 合取
-                r"\vee " // 析取
-                r"\neg " // 否定
+                r"\backslash{}" // 内涵像
+                r"\wedge{}" // 合取
+                r"\vee{}" // 析取
+                r"\neg{}" // 否定
                 "," // 顺序合取
                 ";" // 平行合取
             ),
@@ -244,19 +248,19 @@ pub fn create_format_latex<'a>() -> NarseseFormat<'a> {
         statement: NarseseFormatStatement {
             brackets: (r"\left<", r"\right>"),
             copulas: prefix_match_dict!(
-                r"\rightarrow " // 继承
-                r"\leftrightarrow " // 相似
-                r"\Rightarrow " // 蕴含
-                r"\Leftrightarrow " // 等价
-                r"\circ\!\!\!\rightarrow  " // 实例
-                r"\rightarrow\!\!\!\circ  " // 属性
-                r"\circ\!\!\!\rightarrow\!\!\!\circ  " // 实例属性
-                r"/\!\!\!\Rightarrow " // 预测性蕴含
-                r"|\!\!\!\Rightarrow " // 并发性蕴含
-                r"\backslash\!\!\!\Rightarrow " // 回顾性蕴含
-                r"/\!\!\!\Leftrightarrow " // 预测性等价
-                r"|\!\!\!\Leftrightarrow " // 并发性等价
-                r"\backslash\!\!\!\Leftrightarrow " // 回顾性等价
+                r"\rightarrow{}" // 继承
+                r"\leftrightarrow{}" // 相似
+                r"\Rightarrow{}" // 蕴含
+                r"\Leftrightarrow{}" // 等价
+                r"\circ\!\!\!\rightarrow {}" // 实例
+                r"\rightarrow\!\!\!\circ {}" // 属性
+                r"\circ\!\!\!\rightarrow\!\!\!\circ {}" // 实例属性
+                r"/\!\!\!\Rightarrow{}" // 预测性蕴含
+                r"|\!\!\!\Rightarrow{}" // 并发性蕴含
+                r"\backslash\!\!\!\Rightarrow{}" // 回顾性蕴含
+                r"/\!\!\!\Leftrightarrow{}" // 预测性等价
+                r"|\!\!\!\Leftrightarrow{}" // 并发性等价
+                r"\backslash\!\!\!\Leftrightarrow{}" // 回顾性等价
             ),
         },
         sentence: NarseseFormatSentence {
@@ -272,10 +276,12 @@ pub fn create_format_latex<'a>() -> NarseseFormat<'a> {
             stamp_brackets: ("", ""), // !【2024-02-25 16:31:38】此处时态没括号。。
             // 真值
             truth_brackets: (r"\langle", r"\rangle"),
+            is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | ';')),
         },
         task: NarseseFormatTask {
             // 预算
             budget_brackets: (r"\$", r"\$"),
+            is_budget_content: Box::new(|c: char| matches!(c, '0'..='9' | ';')),
         },
     }
 }
@@ -288,6 +294,7 @@ pub fn create_format_han<'a>() -> NarseseFormat<'a> {
             is_for_parse: Box::new(|c| c.is_whitespace()), // ! 解析时忽略空格
             format_terms: "",  // 格式化时，词项间无需分隔（避免太过松散）
             format_items: " ", // 格式化时，条目间需要分隔（避免太过密集）
+            remove_spaces_before_parse: true, // 漢文亦空格无关
         },
         atom: NarseseFormatAtom {
             prefixes: prefix_match_dict!(
@@ -358,10 +365,12 @@ pub fn create_format_han<'a>() -> NarseseFormat<'a> {
             stamp_brackets: ("", ""), // !【2024-02-25 16:31:38】此处时态没括号。。
             // 真值
             truth_brackets: ("真", "值"), // 大改：兼容单真值、空真值
+            is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | '、')), // 此处有特别的分隔符「、」
         },
         task: NarseseFormatTask {
             // 预算
             budget_brackets: ("预", "算"),
+            is_budget_content: Box::new(|c: char| matches!(c, '0'..='9' | '、')), // 此处有特别的分隔符「、」
         },
     }
 }

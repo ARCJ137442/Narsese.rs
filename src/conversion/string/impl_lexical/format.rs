@@ -24,9 +24,9 @@ pub struct NarseseFormatSpace<'a> {
     ///       * 📌其通常就是个纯函数
     pub is_for_parse: Box<dyn Fn(char) -> bool + Send + Sync>,
 
-    /// 解析时是否忽略空白符
+    /// 解析前是否筛除空白符
     /// 🎯用于决定在「解析环境理想化」时是否要「预筛除空白符」
-    pub ignore_spaces_for_parse: bool,
+    pub remove_spaces_before_parse: bool,
 
     /// 空白符（格式化/分隔词项）
     /// * 🎯复合词项/陈述
@@ -50,6 +50,7 @@ pub struct NarseseFormatAtom {
     /// * 间隔
     /// * 操作符
     pub prefixes: PrefixMatchDict,
+
     /// 用于判断字符是否为「合法原子标识符」的函数
     pub is_identifier: Box<dyn Fn(char) -> bool + Send + Sync>,
 }
@@ -97,7 +98,6 @@ pub struct NarseseFormatStatement<'a> {
 }
 
 /// 语句格式（含标点、真值、时间戳）
-#[derive(Debug, Clone)]
 pub struct NarseseFormatSentence<'a> {
     /// 合法的「标点」
     pub punctuations: PrefixMatchDict,
@@ -106,17 +106,43 @@ pub struct NarseseFormatSentence<'a> {
     /// * 🚩仅通过括弧捕获整个「真值」字符串，而**不再细分内部结构**
     pub truth_brackets: (&'a str, &'a str),
 
+    /// 判断是否为「真值内部允许的字符」
+    /// * 🎯用于提供信息以更快分割边界（从预算值而来）
+    pub is_truth_content: Box<dyn Fn(char) -> bool + Send + Sync>,
+
     /// 时间戳括弧
     /// * 🚩仅通过括弧捕获整个「时间戳」字符串，而**不再细分内部结构**
     pub stamp_brackets: (&'a str, &'a str),
 }
 
 /// 任务格式（含预算值）
-#[derive(Debug, Clone)]
 pub struct NarseseFormatTask<'a> {
     /// 预算值括弧
     /// * 🚩仅通过括弧捕获整个「预算值」字符串，而**不再细分内部结构**
     pub budget_brackets: (&'a str, &'a str),
+
+    /// 判断是否为「预算值内部允许的字符」
+    /// * 🎯用于解决可能的「预算值🆚独立变量」「误报的预算值范围」的问题
+    /// * 📌在「总解析方法」中，以此为凭据分割「预算值」
+    ///   * ❓似乎实际上的case并不存在：预算只会在开头进行匹配
+    /// * 🚩若开头匹配了预算值左括弧，则
+    ///   * 前缀匹配右括弧（提早结束）
+    ///   * 收入前【通过此函数】**确认**将收入的字符是否合法
+    /// * 📄case@ASCII: `$$$independent.`⇒空预算、词项为`$independent`、判断、永恒、空真值
+    ///   * ✅解析过程：遇到第二个`$`视作闭括弧，提早结束
+    /// * 📄case@ASCII: `$$independent.`⇒空预算、词项为`independent`、判断、永恒、空真值
+    ///   * ✅解析过程：遇到第二个`$`视作闭括弧，提早结束
+    /// * 📄case@ASCII: `$independent.`⇒空预算、词项为`$independent`、判断、永恒、空真值
+    ///   * ✅解析过程：遇到非法内容`i`提前结束
+    ///   * ❗无此函数的版本：没遇到闭括弧，提前结束
+    /// * 📄case@漢文: `预算。`⇒解析错误：没有词项
+    ///   * ✅解析过程：遇到右括弧`算`视作闭括弧，提早结束
+    /// * 📄case@漢文: `预算预算。`⇒空预算、词项为`预算`、判断、永恒、空真值
+    ///   * ✅解析过程：遇到右括弧`算`视作闭括弧，提早结束
+    /// * 📄case@漢文: `预预算。`⇒空预算、词项为`预预算`、判断、永恒、空真值
+    ///   * ✅解析过程：遇到非法内容`预`提前结束
+    ///   * ⚠️无此函数的版本：截取到`预预算`，后边没词项⇒报错
+    pub is_budget_content: Box<dyn Fn(char) -> bool + Send + Sync>,
 }
 
 /// 总「词法Narsese格式」
