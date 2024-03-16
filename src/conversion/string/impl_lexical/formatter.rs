@@ -65,6 +65,7 @@ impl<'a> NarseseFormat<'a> {
     }
 
     /// 格式化函数/语句
+    /// * 返回一个新字符串
     pub fn format_sentence(&self, sentence: &Sentence) -> String {
         catch_flow!(self._format_sentence; sentence)
     }
@@ -82,6 +83,7 @@ impl<'a> NarseseFormat<'a> {
     }
 
     /// 格式化函数/任务
+    /// * 返回一个新字符串
     pub fn format_task(&self, task: &Task) -> String {
         catch_flow!(self._format_task; task)
     }
