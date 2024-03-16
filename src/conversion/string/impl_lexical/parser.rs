@@ -142,6 +142,82 @@ impl<'a> ParseState<'a, char> {
         ))
     }
 
+    // 实用工具函数 //
+
+    /// 工具/前缀匹配 & 偏移前移
+    /// * 🎯在「匹配前缀」的同时不消耗缓冲区
+    ///   * 📌没有解析出来时，都不要动缓冲区。。。
+    ///   * 💭也正是因此，这个「缓冲区迭代器」实际上用处不大
+    /// * 🚩匹配了返回「消耗成功」，否则返回「前缀不匹配」错误
+    #[inline(always)]
+    fn offset_skip_when_starts_with(&mut self, prefix: &str, offset: &mut usize) -> ConsumeResult {
+        if self.iter.starts_with(prefix.chars()) {
+            // 统一跳过
+            let len = prefix.chars().count();
+            *offset += len;
+            self.iter.buffer_consume_n(len);
+            // 返回「消耗成功」
+            Self::ok(())
+        } else {
+            // 返回「消耗失败」
+            self.err(&format!("前缀「{prefix}」不匹配，无法前移"))
+        }
+    }
+
+    /// 工具/字符匹配 & 偏移跳过连续空白符
+    /// * 🎯复合词项/陈述 跳过左右括弧
+    fn offset_skip_spaces(&mut self, offset: &mut usize) {
+        // 不断在偏移处获取字符
+        while let Some(c) = self.iter.buffer_get(*offset) {
+            match (self.format.space.is_for_parse)(*c) {
+                // 是空白符⇒偏移跳过
+                true => *offset += 1,
+                // 否则⇒跳出循环
+                false => break,
+            }
+        }
+    }
+
+    /// 工具/前缀匹配 & 跳过后续空白符
+    /// * 🎯复合词项/陈述 跳过左右括弧
+    fn offset_skip_when_starts_with_and_skip_spaces(
+        &mut self,
+        prefix: &str,
+        offset: &mut usize,
+    ) -> ConsumeResult {
+        // 尝试跳过前缀（若无，则不会继续跳过）
+        self.offset_skip_when_starts_with(prefix, offset)?;
+        // 然后跳过空白符
+        self.offset_skip_spaces(offset);
+        // 返回成功
+        Self::ok(())
+    }
+
+    /// 工具/前缀匹配 & 返回 & 跳过连续空白符
+    /// * 🎯词项连接符/陈述系词 多个选一个
+    ///
+    /// ! 📝生命周期问题：不要和原有的`'a`冲突
+    fn offset_skip_when_starts_with_one_and_skip_spaces<'b, T>(
+        &'b mut self,
+        prefixes: &'b (impl PrefixMatch<T> + std::fmt::Debug),
+        offset: &mut usize,
+    ) -> ParseResult<&'b T> {
+        for term in prefixes.prefixes_terms() {
+            if self
+                .offset_skip_when_starts_with_and_skip_spaces(
+                    prefixes.get_prefix_from_term(term),
+                    offset,
+                )
+                .is_ok()
+            {
+                return Self::ok(term);
+            }
+        }
+        self.err(&format!("未在「{prefixes:?}」中找到匹配的前缀"))
+    }
+
+    // 具体内容解析 //
+
     /// 🔦入口
     /// * 🚩使用自身（从迭代器中）解析出一个结果
     ///   * 📌无需依赖其它外部数据
@@ -419,7 +495,47 @@ impl<'a> ParseState<'a, char> {
     /// （尝试）消耗复合词项（递归）
     fn consume_compound(&mut self) -> ConsumeResult {
         // TODO: 左括弧⇒连接符⇒词项⇒右括弧
-        todo!("开发中")
+        // * ⚠️无法直接消耗左括弧：消耗了后续就没法回溯
+        // * ⚠️不能预先确定右边界：输入「字符迭代器」无右界 & 有可能有嵌套括弧
+        let mut char_len_offset = 0_usize;
+
+        // （尝试）匹配左括弧并前移offset（不更改缓冲区），顺带跳过空白符
+        self.offset_skip_when_starts_with_and_skip_spaces(
+            self.format.compound.brackets.0,
+            &mut char_len_offset,
+        )?;
+
+        // 匹配连接符
+        let connecter = self.offset_skip_when_starts_with_one_and_skip_spaces(
+            &self.format.compound.connecters,
+            &mut char_len_offset,
+        )?;
+
+        // 构造结果词项
+        let mut compound = Term::Compound {
+            connecter: connecter.to_owned(),
+            terms: vec![],
+        };
+
+        // 开始匹配并填充组分
+        // ? 💫【2024-03-16 20:39:39】这里应该装填词项
+        //   ? 所以应该先匹配并返回一个词项
+        //   ? ❗但返回词项需要独立出一个`parse_term`函数
+        //   ? 并且迭代器状态（缓冲区等）还没法共享（返回的时候还不能改变缓冲区）
+        //   ? 于是又要把目前这个「偏移量」传递过去
+        //   ? 💥这又回到了先前「枚举Narsese」所用的「字符数组+头索引指针」方案
+        //   ? 💢还不如按原来的方案——缓冲区迭代器的优势彻底丧尽
+        // * 💭弃用「缓冲区迭代器」，改用其它方案
+
+        // （尝试）匹配右括弧并前移offset（不更改缓冲区），顺带跳过空白符
+        self.offset_skip_when_starts_with_and_skip_spaces(
+            self.format.compound.brackets.1,
+            &mut char_len_offset,
+        )?;
+
+        // 最终成功⇒消耗字符串
+        self.iter.buffer_consume_n(char_len_offset);
+        Self::ok(())
     }
 
     /// （尝试）消耗陈述词项（递归）
