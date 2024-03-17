@@ -9,10 +9,15 @@
 //!   * 📌「词法Narsese」数据结构中已固定类型为[`&'a str`]/&[`str`]
 //!   * 因此整个「词法Narsese格式」已经和字符串绑定了
 
-use util::{PrefixMatchDict, PrefixMatchDictPair};
+use util::{
+    BiFixMatchDict, BiFixMatchDictPair, PrefixMatchDict, SuffixMatchDict, SuffixMatchDictPair,
+};
 
 /// Narsese格式/空白符
-pub struct NarseseFormatSpace<'a> {
+pub struct NarseseFormatSpace<'a, F = Box<dyn Fn(char) -> bool + Send + Sync>>
+where
+    F: Fn(char) -> bool + Send + Sync,
+{
     /// 用于判断字符是否为空白符（解析用）
     /// * 📝Rust中若需定义静态常量，需要对常量确保线程安全
     ///   * 📄线程安全的类型⇔实现`Send + Sync`特征
@@ -22,7 +27,7 @@ pub struct NarseseFormatSpace<'a> {
     ///     * ✅常量表达式：使用[`lazy_statics`]实现「静态懒加载」绕开「`static`要求常量表达式」限制
     ///     * ✅线程安全：限制下边闭包为`dyn Fn(char) -> bool + Send + Sync`
     ///       * 📌其通常就是个纯函数
-    pub is_for_parse: Box<dyn Fn(char) -> bool + Send + Sync>,
+    pub is_for_parse: F,
 
     /// 解析前是否筛除空白符
     /// 🎯用于决定在「解析环境理想化」时是否要「预筛除空白符」
@@ -41,7 +46,10 @@ pub struct NarseseFormatSpace<'a> {
 
 /// 原子词项格式
 /// * 📌格式：[前缀] + (标识符)
-pub struct NarseseFormatAtom {
+pub struct NarseseFormatAtom<F = Box<dyn Fn(char) -> bool + Send + Sync>>
+where
+    F: Fn(char) -> bool + Send + Sync,
+{
     /// 合法的「原子词项前缀」
     /// * 词语
     /// * 独立变量
@@ -52,7 +60,7 @@ pub struct NarseseFormatAtom {
     pub prefixes: PrefixMatchDict,
 
     /// 用于判断字符是否为「合法原子标识符」的函数
-    pub is_identifier: Box<dyn Fn(char) -> bool + Send + Sync>,
+    pub is_identifier: F,
 }
 
 /// 复合词项格式
@@ -61,7 +69,7 @@ pub struct NarseseFormatCompound<'a> {
     /// 合法的「集合复合词项括弧对」
     /// * 外延集
     /// * 内涵集
-    pub set_brackets: PrefixMatchDictPair<&'a str>,
+    pub set_brackets: BiFixMatchDictPair,
 
     /// 通用的「复合词项括弧对」
     pub brackets: (&'a str, &'a str),
@@ -94,31 +102,54 @@ pub struct NarseseFormatStatement<'a> {
     /// * 实例/属性/实例属性
     /// * 预测性/并发性/回顾性 蕴含
     /// * 预测性/并发性/回顾性 等价
-    pub copulas: PrefixMatchDict,
+    pub copulas: BiFixMatchDict,
 }
 
 /// 语句格式（含标点、真值、时间戳）
-pub struct NarseseFormatSentence<'a> {
+pub struct NarseseFormatSentence<'a, F = Box<dyn Fn(char) -> bool + Send + Sync>>
+where
+    F: Fn(char) -> bool + Send + Sync,
+{
     /// 合法的「标点」
-    pub punctuations: PrefixMatchDict,
+    pub punctuations: SuffixMatchDict,
 
     /// 真值括弧
-    /// * 🚩仅通过括弧捕获整个「真值」字符串，而**不再细分内部结构**
+    /// * 🚩通过括弧捕获整个「真值」字符串，而**不再细分内部结构**
     pub truth_brackets: (&'a str, &'a str),
 
     /// 判断是否为「真值内部允许的字符」
     /// * 🎯用于提供信息以更快分割边界（从预算值而来）
-    pub is_truth_content: Box<dyn Fn(char) -> bool + Send + Sync>,
+    pub is_truth_content: F,
 
-    /// 时间戳括弧
-    /// * 🚩仅通过括弧捕获整个「时间戳」字符串，而**不再细分内部结构**
-    pub stamp_brackets: (&'a str, &'a str),
+    /// 合法的时间戳「括弧」对
+    /// * 🎯适配LaTeX/漢文的「无固定括弧」情况
+    /// * 📝对于「时间戳」不能再再像ASCII版本那样假设「一定有固定括弧」了
+    ///   * 📄ASCIIの「过去」：`:\:` => `("", ":\:")`
+    ///   * 📄LaTeXの「过去」：`\backslash\!\!\!\Rightarrow` => `("", "\backslash\!\!\!\Rightarrow")`
+    ///   * 📌此处可统一使用「空前缀」兼容「枚举时间戳」：实际使用时进行后缀匹配，空前缀可实现与「特别开一个`enum_stamps`」基本一样的性能
+    /// * 🎯一并处理有关「固定时间戳」的问题：内部合法字符判定
+    ///   * 📄ASCIIの「固定」：`:!137:` => `(":!", ":")`
+    ///   * 📄LaTeXの「固定」：`t=[+-][0-9]+` => `("t=", "")`
+    /// * 🚩在「枚举时间戳」之后，以更细分的方式【正确】捕获「固定时间戳」类型
+    ///   * 实际上是一种「括弧匹配」
+    /// * ✨直接通过「不同类括弧」兼容各类「固定时间戳」类型
+    ///   * 📌而无需固定「时间戳括弧」
+    pub stamp_brackets: SuffixMatchDictPair<String>,
+
+    /// 合法的「固定时间戳」
+    /// * 🎯适配LaTeX/漢文的「无固定括弧」情况
+    /// * 📌通过「合法字符序列」兼容「前后缀不固定的『固定』时间戳类型」
+    ///   * 📄ASCIIの「固定」：`:!-123:`
+    pub is_stamp_content: F,
 }
 
 /// 任务格式（含预算值）
-pub struct NarseseFormatTask<'a> {
+pub struct NarseseFormatTask<'a, F = Box<dyn Fn(char) -> bool + Send + Sync>>
+where
+    F: Fn(char) -> bool + Send + Sync,
+{
     /// 预算值括弧
-    /// * 🚩仅通过括弧捕获整个「预算值」字符串，而**不再细分内部结构**
+    /// * 🚩通过括弧捕获整个「预算值」字符串，而**不再细分内部结构**
     pub budget_brackets: (&'a str, &'a str),
 
     /// 判断是否为「预算值内部允许的字符」
@@ -142,7 +173,7 @@ pub struct NarseseFormatTask<'a> {
     /// * 📄case@漢文: `预预算。`⇒空预算、词项为`预预算`、判断、永恒、空真值
     ///   * ✅解析过程：遇到非法内容`预`提前结束
     ///   * ⚠️无此函数的版本：截取到`预预算`，后边没词项⇒报错
-    pub is_budget_content: Box<dyn Fn(char) -> bool + Send + Sync>,
+    pub is_budget_content: F,
 }
 
 /// 总「词法Narsese格式」
@@ -154,12 +185,18 @@ pub struct NarseseFormatTask<'a> {
 ///   * 任务格式（含预算值）
 /// * 🚩不特化符号为`LexicalNarseseFormat`
 ///   * 📌这种「符号特化」交给调用方处理
-pub struct NarseseFormat<'a> {
+/// * 🚩现在将其中的「函数类型」提取为类型参数
+///   * 📜默认还是`Box<dyn Fn>`
+///   * ✅可兼容其它实现了`Fn`特征的对象（如函数指针）
+pub struct NarseseFormat<'a, F = Box<dyn Fn(char) -> bool + Send + Sync + 'a>>
+where
+    F: Fn(char) -> bool + Send + Sync + 'a,
+{
     /// 空白符格式
-    pub space: NarseseFormatSpace<'a>,
+    pub space: NarseseFormatSpace<'a, F>,
 
     /// 原子词项格式
-    pub atom: NarseseFormatAtom,
+    pub atom: NarseseFormatAtom<F>,
 
     /// 复合词项格式
     pub compound: NarseseFormatCompound<'a>,
@@ -168,7 +205,7 @@ pub struct NarseseFormat<'a> {
     pub statement: NarseseFormatStatement<'a>,
 
     /// 语句格式（含标点、真值、时间戳）
-    pub sentence: NarseseFormatSentence<'a>,
+    pub sentence: NarseseFormatSentence<'a, F>,
 
     /// 任务格式（含预算值）
     pub task: NarseseFormatTask<'a>,

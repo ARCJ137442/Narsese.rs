@@ -6,9 +6,7 @@
 
 use super::format::*;
 use lazy_static::lazy_static;
-use util::{
-    prefix_match_dict, prefix_match_dict_pair, PrefixMatch, PrefixMatchDict, PrefixMatchDictPair,
-};
+use util::{bi_fix_match_dict_pair, suffix_match_dict_pair, x_fix_match_dict, PrefixMatchDict};
 
 // * 📝有关「全局常量」定义，闭包↔死局？ * //
 // 这里不可以：`Box::new`并非常量函数
@@ -108,7 +106,7 @@ pub fn create_format_ascii<'a>() -> NarseseFormat<'a> {
         },
         atom: NarseseFormatAtom {
             // 所有原子词项的前缀
-            prefixes: prefix_match_dict!(
+            prefixes: x_fix_match_dict!(
                 // 词语
                 ""
                 // 占位符
@@ -121,11 +119,11 @@ pub fn create_format_ascii<'a>() -> NarseseFormat<'a> {
                 "^"
             ),
             // 一般文字、数字、连带`-`均算入在内
-            is_identifier: Box::new(|c: char| c.is_alphanumeric() || c == '_'),
+            is_identifier: Box::new(is_atom_identifier),
         },
         compound: NarseseFormatCompound {
             // 外延集/内涵集
-            set_brackets: prefix_match_dict_pair!(
+            set_brackets: bi_fix_match_dict_pair!(
                 "{" => "}" // 外延集
                 "[" => "]" // 内涵集
             ),
@@ -134,7 +132,7 @@ pub fn create_format_ascii<'a>() -> NarseseFormat<'a> {
             // 普通分隔符
             separator: ",",
             // 复合词项连接符
-            connecters: prefix_match_dict!(
+            connecters: x_fix_match_dict!(
                 "&"  // 外延交
                 "|"  // 内涵交
                 "-"  // 外延差
@@ -153,7 +151,7 @@ pub fn create_format_ascii<'a>() -> NarseseFormat<'a> {
             // 陈述括弧
             brackets: ("<", ">"),
             // 陈述系词
-            copulas: prefix_match_dict!(
+            copulas: x_fix_match_dict!(
                 "-->" // 继承
                 "<->" // 相似
                 "==>" // 蕴含
@@ -171,14 +169,22 @@ pub fn create_format_ascii<'a>() -> NarseseFormat<'a> {
         },
         sentence: NarseseFormatSentence {
             // 所有标点
-            punctuations: prefix_match_dict!(
+            punctuations: x_fix_match_dict!(
                 "." // 判断
                 "!" // 目标
                 "?" // 问题
                 "@" // 请求
             ),
             // 时间戳
-            stamp_brackets: (":", ":"),
+            stamp_brackets: suffix_match_dict_pair!(
+                // * 🚩空前缀匹配
+                "" => r":\:" // 过去
+                "" => r":|:" // 现在
+                "" => r":/:" // 将来
+                // * 📌ASCII版本经典使用双边括弧
+                ":!" => r":" // 固定
+            ),
+            is_stamp_content: Box::new(|c: char| matches!(c, '0'..='9' | '+' | '-')), // regex:`[0-9+\-]`
             // 真值 | 内容已不包含空格
             truth_brackets: ("%", "%"),
             is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | ';')),
@@ -191,10 +197,24 @@ pub fn create_format_ascii<'a>() -> NarseseFormat<'a> {
     }
 }
 
+fn is_atom_identifier(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
+}
+
+#[test]
+fn t() {
+    use util::show;
+    show!(is_atom_identifier('a'));
+    show!(&FORMAT_ASCII.sentence.stamp_brackets);
+}
+
 /// LaTeX扩展
 /// * 来源：文档 `NARS ASCII Input.pdf`
 /// * 【20230809 10:22:34】注：暂未找到官方格式模板，此仅基于个人观察
 /// * 【20230811 0:26:55】不能很好地兼容「二元运算」表达（需要更专业者优化）
+/// * 📌【2024-03-17 11:00:17】现在对「\【字母串】」形式的LaTeX文本**强制要求后缀**`{}`以便实现「空格无关」
+///   * ⚠️这可能会影响到「LaTeX→Narsese」的语法，但**LaTeX Narsese语法本身就是【面向输出】而非【面向解析】的**
+///   * ℹ️LaTeX扩展本身不会有多少「需要由此转换成Narsese」的场景
 pub fn create_format_latex<'a>() -> NarseseFormat<'a> {
     NarseseFormat {
         space: NarseseFormatSpace {
@@ -204,7 +224,7 @@ pub fn create_format_latex<'a>() -> NarseseFormat<'a> {
             remove_spaces_before_parse: true, // LaTeX版本亦可空格无关——通过「后缀空参数」省去空格
         },
         atom: NarseseFormatAtom {
-            prefixes: prefix_match_dict!(
+            prefixes: x_fix_match_dict!(
                 // 词语
                 ""
                 // 占位符
@@ -220,17 +240,18 @@ pub fn create_format_latex<'a>() -> NarseseFormat<'a> {
         },
         compound: NarseseFormatCompound {
             // 左右括弧
+            // * 📌【2024-03-17 14:07:31】目前暂且不对`\left` `\right`做【括号封装】
             brackets: (r"\left(", r"\right)"),
             // 以空格作分隔符
             separator: " ",
             // 词项集
-            set_brackets: prefix_match_dict_pair!(
+            set_brackets: bi_fix_match_dict_pair!(
                 // ! ↓此中`{` `}`需要转义
                 r"\left\{" => r"\right\}" // 外延集
                 r"\left[" => r"\right]" // 内涵集
             ),
             // 复合词项连接符
-            connecters: prefix_match_dict!(
+            connecters: x_fix_match_dict!(
                 r"\cap{}" // 外延交
                 r"\cup{}" // 内涵交
                 r"\minus{}" // 外延差
@@ -247,7 +268,7 @@ pub fn create_format_latex<'a>() -> NarseseFormat<'a> {
         },
         statement: NarseseFormatStatement {
             brackets: (r"\left<", r"\right>"),
-            copulas: prefix_match_dict!(
+            copulas: x_fix_match_dict!(
                 r"\rightarrow{}" // 继承
                 r"\leftrightarrow{}" // 相似
                 r"\Rightarrow{}" // 蕴含
@@ -265,7 +286,7 @@ pub fn create_format_latex<'a>() -> NarseseFormat<'a> {
         },
         sentence: NarseseFormatSentence {
             // 标点
-            punctuations: prefix_match_dict!(
+            punctuations: x_fix_match_dict!(
                 "." // 判断
                 "!" // 目标
                 "?" // 问题
@@ -273,9 +294,17 @@ pub fn create_format_latex<'a>() -> NarseseFormat<'a> {
                 // ! 💭【20230806 23:46:18】倒问号没有对应的LaTeX。。。
             ),
             // 时间戳
-            stamp_brackets: ("", ""), // !【2024-02-25 16:31:38】此处时态没括号。。
+            stamp_brackets: suffix_match_dict_pair!(
+                // * 🚩空前缀匹配
+                "" => r"\backslash\!\!\!\Rightarrow{}" // 过去
+                "" => r"|\!\!\!\Rightarrow{}" // 现在
+                "" => r"/\!\!\!\Rightarrow{}" // 将来
+                // !【2024-03-17 10:07:16】没有后缀，只以前缀区分
+                "t=" => "", // ? LaTeX语法未知
+            ),
+            is_stamp_content: Box::new(|c: char| matches!(c, '0'..='9' | '+' | '-')), // regex:`[0-9+\-]`
             // 真值
-            truth_brackets: (r"\langle", r"\rangle"),
+            truth_brackets: (r"\langle{}", r"\rangle{}"),
             is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | ';')),
         },
         task: NarseseFormatTask {
@@ -297,7 +326,7 @@ pub fn create_format_han<'a>() -> NarseseFormat<'a> {
             remove_spaces_before_parse: true, // 漢文亦空格无关
         },
         atom: NarseseFormatAtom {
-            prefixes: prefix_match_dict!(
+            prefixes: x_fix_match_dict!(
                 // 词语
                 ""
                 // 占位符
@@ -314,12 +343,12 @@ pub fn create_format_han<'a>() -> NarseseFormat<'a> {
         compound: NarseseFormatCompound {
             brackets: ("（", "）"),
             separator: "，",
-            set_brackets: prefix_match_dict_pair!(
+            set_brackets: bi_fix_match_dict_pair!(
                 "『" => "』" // 外延集
                 "【" => "】" // 内涵集
             ),
             // 复合词项连接符
-            connecters: prefix_match_dict!(
+            connecters: x_fix_match_dict!(
                 "外交" // 外延交
                 "内交" // 内涵交
                 "外差" // 外延差
@@ -336,7 +365,7 @@ pub fn create_format_han<'a>() -> NarseseFormat<'a> {
         },
         statement: NarseseFormatStatement {
             brackets: ("「", "」"),
-            copulas: prefix_match_dict!(
+            copulas: x_fix_match_dict!(
                 "是" // 继承
                 "似" // 相似
                 "得" // 蕴含
@@ -354,7 +383,7 @@ pub fn create_format_han<'a>() -> NarseseFormat<'a> {
         },
         sentence: NarseseFormatSentence {
             // 标点
-            punctuations: prefix_match_dict!(
+            punctuations: x_fix_match_dict!(
                 "。" // 判断
                 "！" // 目标
                 "？" // 问题
@@ -362,7 +391,15 @@ pub fn create_format_han<'a>() -> NarseseFormat<'a> {
                 // ! 暂且没有更合适、更方便输入的全角标点
             ),
             // 时间戳
-            stamp_brackets: ("", ""), // !【2024-02-25 16:31:38】此处时态没括号。。
+            stamp_brackets: suffix_match_dict_pair!(
+                // * 🚩空前缀匹配
+                "" => "过去" // 过去
+                "" => "现在" // 现在
+                "" => "将来" // 将来
+                // !【2024-03-17 10:07:16】没有后缀，只以前缀区分
+                "发生在" => "",
+            ),
+            is_stamp_content: Box::new(|c: char| matches!(c, '0'..='9' | '+' | '-')), // regex:`[0-9+\-]`
             // 真值
             truth_brackets: ("真", "值"), // 大改：兼容单真值、空真值
             is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | '、')), // 此处有特别的分隔符「、」
