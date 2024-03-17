@@ -187,12 +187,12 @@ pub fn create_format_ascii<'a>() -> NarseseFormat<'a> {
             is_stamp_content: Box::new(|c: char| matches!(c, '0'..='9' | '+' | '-')), // regex:`[0-9+\-]`
             // 真值 | 内容已不包含空格
             truth_brackets: ("%", "%"),
-            is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | ';')),
+            is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | ';')),
         },
         task: NarseseFormatTask {
             // 预算 | 内容已不包含空格
             budget_brackets: ("$", "$"),
-            is_budget_content: Box::new(|c: char| matches!(c, '0'..='9' | ';')),
+            is_budget_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | ';')),
         },
     }
 }
@@ -305,12 +305,12 @@ pub fn create_format_latex<'a>() -> NarseseFormat<'a> {
             is_stamp_content: Box::new(|c: char| matches!(c, '0'..='9' | '+' | '-')), // regex:`[0-9+\-]`
             // 真值
             truth_brackets: (r"\langle{}", r"\rangle{}"),
-            is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | ';')),
+            is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | ';')),
         },
         task: NarseseFormatTask {
             // 预算
             budget_brackets: (r"\$", r"\$"),
-            is_budget_content: Box::new(|c: char| matches!(c, '0'..='9' | ';')),
+            is_budget_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | ';')),
         },
     }
 }
@@ -402,12 +402,12 @@ pub fn create_format_han<'a>() -> NarseseFormat<'a> {
             is_stamp_content: Box::new(|c: char| matches!(c, '0'..='9' | '+' | '-')), // regex:`[0-9+\-]`
             // 真值
             truth_brackets: ("真", "值"), // 大改：兼容单真值、空真值
-            is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | '、')), // 此处有特别的分隔符「、」
+            is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | '、')), // 此处有特别的分隔符「、」
         },
         task: NarseseFormatTask {
             // 预算
             budget_brackets: ("预", "算"),
-            is_budget_content: Box::new(|c: char| matches!(c, '0'..='9' | '、')), // 此处有特别的分隔符「、」
+            is_budget_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | '、')), // 此处有特别的分隔符「、」
         },
     }
 }

@@ -33,7 +33,7 @@
 //!       * 💭只要别把括号改得「过于变态」，就可以通过
 //!     * ❌这基本否决了通过「括号树」进行匹配的方案——不然就要时刻提防「系词/连接符冒充括号」的情况
 
-use util::{first, PrefixMatch};
+use util::{first, PrefixMatch, SuffixMatch};
 
 use super::NarseseFormat;
 use crate::{
@@ -333,12 +333,47 @@ impl<'a> ParseState<'a> {
     /// * 🚩直接在整个环境中进行「前缀截取」
     /// * ⚙️返回一个可空值
     ///   * 📌要么「没匹配到合法的预算值（[`None`]）」
-    ///   * 📌要么返回「匹配到的完整预算值，以及其在『解析环境』中的末尾位置（用于切分词项）」
+    ///   * 📌要么返回「匹配到的完整预算值，以及其在『解析环境』中的**右边界**（用于切分词项）」
+    ///     * 🎯返回并直接使用「词项部分」的开头索引，同时也无需做「-1」偏移
     /// * 📄匹配的环境如：`$0.5;0.5;0.5$<A-->B>.%1.0;0.9%`
     /// * 📄匹配的结果如：`Some(("$0.5;0.5;0.5$", 12))` | `12` 对应第二个`$`
-    fn segment_budget(&mut self, env: ParseEnv<'a>) -> Option<(String, ParseIndex)> {
-        // TODO: 有待完成
-        todo!("有待完成")
+    fn segment_budget(&self, env: ParseEnv<'a>) -> Option<(String, ParseIndex)> {
+        // 尝试前缀匹配
+        let (left, right) = self
+            .format
+            .task
+            .budget_brackets
+            .match_suffix_char_slice(env)?;
+
+        // 匹配成功⇒将右括弧变成字符数组，并构建返回值 | 字符数组不能直接与「静态字串」比对
+        let right_chars = right.chars().collect::<Vec<_>>();
+        let right_len_chars = right_chars.len();
+        let mut budget_str = left.to_string(); // 💭实际上也可以「预先分割，然后一次返回」，后者更偏函数式写法
+
+        // 然后从左括弧尾部开始搜索
+        let mut i = left.chars().count();
+        while i < env.len() {
+            // 右括弧⇒预先返回
+            if env[i..].starts_with(&right_chars) {
+                // 计算边界与尾部索引
+                let right_border = i + right_len_chars;
+                // 加进右边界
+                budget_str.push_str(right);
+                // 返回截取的字符串
+                return Some((budget_str, right_border));
+            }
+            // 检测字符是否合法
+            match (self.format.task.is_budget_content)(env[i]) {
+                // 合法⇒推进解析结果
+                true => budget_str.push(env[i]),
+                // 非法⇒解析失败⇒返回`None`
+                false => return None,
+            }
+            // 索引步进
+            i += 1;
+        }
+        // 一直合法字符，但没找到右括弧⇒解析失败
+        None
     }
 
     /// 后缀截取真值
@@ -348,7 +383,7 @@ impl<'a> ParseState<'a> {
     ///   * 📌要么返回「匹配到的完整真值，以及其在『解析环境』中的开头位置（用于切分时间戳）」
     /// * 📄匹配的环境如：`$0.5;0.5;0.5$<A-->B>.%1.0;0.9%`
     /// * 📄匹配的结果如：`Some(("$0.5;0.5;0.5$", 21))` | `21` 对应第一个`%`
-    fn segment_truth(&mut self, env: ParseEnv<'a>) -> Option<(String, ParseIndex)> {
+    fn segment_truth(&self, env: ParseEnv<'a>) -> Option<(String, ParseIndex)> {
         // TODO: 有待完成
         todo!("有待完成")
     }
@@ -363,7 +398,7 @@ impl<'a> ParseState<'a> {
     ///   * 📌要么返回「匹配到的完整时间戳，以及其在『解析环境』中的开头位置（用于切分标点）」
     /// * 📄匹配的环境如：`G!:|:%1.0;0.9%`
     /// * 📄匹配的结果如：`Some((":|:", 2))` | `2` 对应第一个`:`
-    fn segment_stamp(&mut self, env: ParseEnv<'a>) -> Option<(String, ParseIndex)> {
+    fn segment_stamp(&self, env: ParseEnv<'a>) -> Option<(String, ParseIndex)> {
         // TODO: 有待完成
         todo!("有待完成")
     }
@@ -377,7 +412,7 @@ impl<'a> ParseState<'a> {
     ///   * 📌要么返回「匹配到的完整标点，以及其在『解析环境』中的开头位置（用于切分出词项）」
     /// * 📄匹配的环境如：`G!:|:%1.0;0.9%`
     /// * 📄匹配的结果如：`Some(("!", 1))` | `1` 对应`!`
-    fn segment_punctuation(&mut self, env: ParseEnv<'a>) -> Option<(String, ParseIndex)> {
+    fn segment_punctuation(&self, env: ParseEnv<'a>) -> Option<(String, ParseIndex)> {
         // TODO: 有待完成
         todo!("有待完成")
     }
@@ -391,7 +426,7 @@ impl<'a> ParseState<'a> {
     /// * 💭至于「返回位置标识」可能需要在专门的「分割词项」方法中
     ///   * 🎯复合词项/陈述中的「词项分割」
     ///   *
-    fn parse_term(&mut self, env: ParseEnv<'a>) -> ParseResult<Option<Term>> {
+    fn parse_term(&self, env: ParseEnv<'a>) -> ParseResult<Option<Term>> {
         // TODO: 有待完成
         todo!("有待完成")
     }
@@ -412,6 +447,10 @@ impl<'a> NarseseFormat<'a> {
 /// 单元测试
 #[cfg(test)]
 mod test {
+
+    use util::{asserts, show};
+
+    use super::super::format_instances::*;
     use super::*;
 
     /// 通通用测试/尝试解析并返回错误
@@ -426,6 +465,57 @@ mod test {
             Err(e) => {
                 panic!("{}", e);
             }
+        }
+    }
+
+    /// 测试/前缀截取预算
+    #[test]
+    fn test_segment_budget() {
+        let format = &FORMAT_ASCII;
+        let state = ParseState::new(format);
+
+        // 成功case
+        let env = "$0.5; 0.5; 0.5$";
+        let env = idealize_env(format, env);
+
+        let result = state.segment_budget(&env);
+        show!(&result);
+
+        let (budget, last_index) = result.expect("没正确解析出预算值！");
+        let expected_str = "$0.5;0.5;0.5$";
+        asserts! {
+            budget => expected_str, // 过滤掉了空格
+            last_index => expected_str.len() // 是「潜在的词项」的开头位置
+        }
+
+        // 失败case 1 | 没找到右括弧
+        let env = "$0.5; 0.5; 0.5";
+        let env = idealize_env(format, env);
+
+        let result = state.segment_budget(&env);
+
+        asserts! {
+            result => None // 解析失败
+        }
+
+        // 失败case 2 | 前缀不匹配
+        let env = "(0.5; 0.5; 0.5)";
+        let env = idealize_env(format, env);
+
+        let result = state.segment_budget(&env);
+
+        asserts! {
+            result => None // 解析失败
+        }
+
+        // 失败case 3 | 非法字符
+        let env = "$0.5; 0.5; +0.5$";
+        let env = idealize_env(format, env);
+
+        let result = state.segment_budget(&env);
+
+        asserts! {
+            result => None // 解析失败
         }
     }
 }
