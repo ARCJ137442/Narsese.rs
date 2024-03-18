@@ -433,3 +433,4 @@ mod tests_enum_narsese {
         test_format("漢文", &FORMAT_HAN);
     }
 }
+ 

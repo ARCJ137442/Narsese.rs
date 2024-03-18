@@ -329,6 +329,160 @@ impl<'a> ParseState<'a> {
         })
     }
 
+    /// 🛠️工具函数/在环境中从某处索引截取字符序列
+    /// * 持续【从左到右】匹配，直到右边界/非法字符/环境边界为止
+    ///   * 右边界⇒`Ok(右边界起始索引)`
+    ///   * 非法字符⇒`Ok(非法字符所在索引)`
+    ///   * 环境边界⇒`Ok(环境长度即索引右边界)`
+    /// * 🎯对应PEG中的Any/Some逻辑
+    /// * 🚩【2024-03-18 08:47:12】现在基本确立「延迟截取字符串」原则
+    ///   * 不到需要的时候，一律以「起止索引」表示「字符串」
+    ///   * 后续一律从[`String::from_iter`]转换
+    /// * 📌「在指定位置开始」的情形，完全可以通过「预先对环境切片」解决
+    ///   * 📄例如：`("abc", start = 1)` ⇒ `(&"abc"[1..])`
+    #[inline(always)]
+    fn segment_some_prefix(
+        &self,
+        env: ParseEnv<'a>,
+        start: ParseIndex,
+        right_chars: ParseEnv,
+        verify_char: impl Fn(char) -> bool,
+    ) -> Result<ParseIndex, ParseIndex> {
+        // 自动计算长度
+        let right_len_chars = right_chars.len();
+        // 然后从起始索引处开始
+        let mut i = start;
+        while i < env.len() {
+            // 右括弧⇒预先返回
+            if env[i..].starts_with(right_chars) {
+                // 计算边界索引
+                let right_border = i + right_len_chars;
+                // 返回`Ok(右边界起始索引)`
+                return Ok(right_border);
+            }
+            // 检测字符是否合法
+            match verify_char(env[i]) {
+                // 合法⇒索引步进
+                true => i += 1,
+                // 非法⇒解析失败⇒返回`Err(非法字符所在索引)`
+                false => return Err(i),
+            }
+        }
+        // 未找到终止括弧 ⇒ `Err(环境长度即索引右边界)`
+        Err(i)
+    }
+
+    /// 🛠️工具函数/在环境中从某处索引截取字符序列
+    /// * 持续【从右到左】匹配，直到左边界/非法字符/环境边界为止
+    ///   * 左边界⇒`Ok(左边界起始索引)`
+    ///   * 非法字符⇒`Ok(非法字符所在索引)`
+    ///   * 环境边界⇒`Ok(环境长度即索引左边界)`
+    /// * 🎯对应PEG中的Any/Some逻辑
+    /// * 🚩【2024-03-18 08:47:12】现在基本确立「延迟截取字符串」原则
+    ///   * 不到需要的时候，一律以「起止索引」表示「字符串」
+    ///   * 后续一律从[`String::from_iter`]转换
+    /// * 📌「在指定位置开始」的情形，完全可以通过「预先对环境切片」解决
+    ///   * 📄例如：`("abc", start = 1)` ⇒ `(&"abc"[..2])`
+    #[inline(always)]
+    fn segment_some_suffix(
+        &self,
+        env: ParseEnv<'a>,
+        left_chars: ParseEnv,
+        verify_char: impl Fn(char) -> bool,
+    ) -> Result<ParseIndex, ParseIndex> {
+        // 自动计算长度，然后从末尾开始
+        let mut right_border = env.len();
+        while right_border > 0 {
+            // 左括弧⇒预先返回
+            if env[..right_border].ends_with(left_chars) {
+                // 计算边界索引
+                let left_border = right_border - left_chars.len();
+                // 返回`Ok(左括弧起始索引)`
+                return Ok(left_border);
+            }
+            // 检测「边界内要检验的字符」是否合法 | 环境是否终止
+            let char_will_pass = env[right_border - 1];
+            match verify_char(char_will_pass) {
+                // 合法 ⇒ 索引步进
+                true => right_border -= 1,
+                // 非法 ⇒ 返回 `Err(非法字符所在索引)`
+                false => return Err(right_border),
+            }
+        }
+        // 找不到左括弧 ⇒ 返回`Err(环境长度即索引左边界)`
+        Err(0)
+    }
+
+    /// 工具函数/依照「前缀匹配」与「内部合法字符」选取区间
+    /// * 🎯【2024-03-18 09:15:24】再度抽象复用「前缀截取预算」
+    /// * 📌「在指定位置开始」的情形，完全可以通过「预先对环境切片」解决
+    ///   * 📄例如：`("abc", start = 1)` ⇒ `(&"abc"[1..])`
+    fn segment_brackets_prefix(
+        &self,
+        env: ParseEnv<'a>,
+        brackets: impl PrefixMatch<(&'a str, &'a str)>,
+        verify_char: impl Fn(char) -> bool,
+    ) -> Option<(String, ParseIndex)> {
+        // 尝试前缀匹配
+        let (left, right) = brackets.match_prefix_char_slice(env)?;
+
+        // 匹配成功⇒将右括弧变成字符数组 | 字符数组不能直接与「静态字串」比对
+        let right_chars = right.chars().collect::<Vec<_>>();
+
+        // 然后从左括弧尾部开始尝试截取
+        let result = self.segment_some_prefix(env, left.chars().count(), &right_chars, verify_char);
+
+        // 从返回结果计算左右边界，并尝试返回结果字符串
+        match result {
+            Ok(right_border) => {
+                // 从给定的左边界从头开始截取
+                let result = String::from_iter(&env[..right_border]);
+                // 返回
+                Some((result, right_border))
+            }
+            // 中间字符非法 || 未找到右括弧 ⇒ 解析失败
+            Err(..) => None,
+        }
+    }
+
+    /// 工具函数/依照「后缀匹配」与「内部合法字符」选取区间
+    /// * 🎯【2024-03-18 09:15:24】再度抽象复用「后缀截取预算」
+    /// * 📌「在指定位置开始」的情形，完全可以通过「预先对环境切片」解决
+    ///   * 📄例如：`("abc", start = 1)` ⇒ `(&"abc"[..2])`
+    fn segment_brackets_suffix(
+        &self,
+        env: ParseEnv<'a>,
+        brackets: impl SuffixMatch<(&'a str, &'a str)>,
+        verify_char: impl Fn(char) -> bool,
+    ) -> Option<(String, ParseIndex)> {
+        // 尝试后缀匹配
+        let (left, right) = brackets.match_suffix_char_slice(env)?;
+
+        // 匹配成功⇒将左括弧变成字符数组 | 字符数组不能直接与「静态字串」比对
+        let left_chars = left.chars().collect::<Vec<_>>();
+
+        // 然后从右括弧头部开始，尝试截取
+        let env_content = &env[..env.len() - right.chars().count()];
+        let result = self.segment_some_suffix(
+            env_content,
+            // * 减去右括弧长度 | 语义：右边界而非位置（相比「后缀」而言）
+            &left_chars,
+            verify_char,
+        );
+
+        // 从返回结果计算左右边界，并尝试返回结果字符串
+        match result {
+            Ok(left_border) => {
+                // 从给定的右边界从头开始截取
+                let result = String::from_iter(&env[left_border..]);
+                // 返回
+                Some((result, left_border))
+            }
+            // 中间字符非法 || 未找到左括弧 ⇒ 解析失败
+            Err(..) => None,
+        }
+    }
+
     /// 前缀截取预算
     /// * 🚩直接在整个环境中进行「前缀截取」
     /// * ⚙️返回一个可空值
@@ -339,53 +493,27 @@ impl<'a> ParseState<'a> {
     /// * 📄匹配的结果如：`Some(("$0.5;0.5;0.5$", 12))` | `12` 对应第二个`$`
     fn segment_budget(&self, env: ParseEnv<'a>) -> Option<(String, ParseIndex)> {
         // 尝试前缀匹配
-        let (left, right) = self
-            .format
-            .task
-            .budget_brackets
-            .match_suffix_char_slice(env)?;
-
-        // 匹配成功⇒将右括弧变成字符数组，并构建返回值 | 字符数组不能直接与「静态字串」比对
-        let right_chars = right.chars().collect::<Vec<_>>();
-        let right_len_chars = right_chars.len();
-        let mut budget_str = left.to_string(); // 💭实际上也可以「预先分割，然后一次返回」，后者更偏函数式写法
-
-        // 然后从左括弧尾部开始搜索
-        let mut i = left.chars().count();
-        while i < env.len() {
-            // 右括弧⇒预先返回
-            if env[i..].starts_with(&right_chars) {
-                // 计算边界与尾部索引
-                let right_border = i + right_len_chars;
-                // 加进右边界
-                budget_str.push_str(right);
-                // 返回截取的字符串
-                return Some((budget_str, right_border));
-            }
-            // 检测字符是否合法
-            match (self.format.task.is_budget_content)(env[i]) {
-                // 合法⇒推进解析结果
-                true => budget_str.push(env[i]),
-                // 非法⇒解析失败⇒返回`None`
-                false => return None,
-            }
-            // 索引步进
-            i += 1;
-        }
-        // 一直合法字符，但没找到右括弧⇒解析失败
-        None
+        self.segment_brackets_prefix(
+            env,
+            self.format.task.budget_brackets,
+            &self.format.task.is_budget_content,
+        )
     }
 
     /// 后缀截取真值
-    /// * 🚩直接在整个环境中进行「前后缀取」
+    /// * 🚩直接在整个环境中进行「后缀截取」
     /// * ⚙️返回一个可空值
     ///   * 📌要么「没匹配到合法的真值（[`None`]）」
     ///   * 📌要么返回「匹配到的完整真值，以及其在『解析环境』中的开头位置（用于切分时间戳）」
     /// * 📄匹配的环境如：`$0.5;0.5;0.5$<A-->B>.%1.0;0.9%`
     /// * 📄匹配的结果如：`Some(("$0.5;0.5;0.5$", 21))` | `21` 对应第一个`%`
     fn segment_truth(&self, env: ParseEnv<'a>) -> Option<(String, ParseIndex)> {
-        // TODO: 有待完成
-        todo!("有待完成")
+        // 尝试后缀匹配
+        self.segment_brackets_suffix(
+            env,
+            self.format.sentence.truth_brackets,
+            &self.format.sentence.is_truth_content,
+        )
     }
 
     /// 向前截取时间戳
@@ -448,7 +576,7 @@ impl<'a> NarseseFormat<'a> {
 #[cfg(test)]
 mod test {
 
-    use util::{asserts, show};
+    use util::asserts;
 
     use super::super::format_instances::*;
     use super::*;
@@ -468,54 +596,122 @@ mod test {
         }
     }
 
+    // 测试case统一定义
+    macro_rules! test_segment {
+        (@PARSE $format:expr, $state:expr, $f:ident; $env_str:expr) => {{
+            // 从自面量构建「理想化环境」
+            let env = idealize_env($format, $env_str);
+            // 解析并返回结果
+            $state.$f(&env)
+        }};
+        { $format:expr, $state:expr, $f:ident; $( $env_str:expr => ($item:expr, $index:expr $(,)?) $(,)? )+ } => {
+            $(
+                // 构造环境并解析出结果
+                let result = test_segment!(@PARSE $format, $state, $f; $env_str);
+                // 解构（成功的）结果
+                let (truth, last_index) = result.expect("解析失败！");
+                // 断言
+                asserts! {
+                    truth => $item,
+                    last_index => $index
+                }
+            )+
+        };
+        { $format:expr, $state:expr, $f:ident; $( $env_str:expr $(,)? )+ } => {
+            $(
+                // 构造环境并解析出结果
+                let result = test_segment!(@PARSE $format, $state, $f; $env_str);
+                // 断言
+                asserts! {
+                    result => None // 解析失败
+                }
+            )+
+        };
+    }
+
     /// 测试/前缀截取预算
     #[test]
     fn test_segment_budget() {
         let format = &FORMAT_ASCII;
         let state = ParseState::new(format);
 
+        // case统一定义
+        macro_rules! test_budget {
+            { $( $content:tt )+ } => {
+                test_segment! {
+                    format, state, segment_budget;
+                    $($content)+
+                }
+            };
+        }
+
         // 成功case
-        let env = "$0.5; 0.5; 0.5$";
-        let env = idealize_env(format, env);
-
-        let result = state.segment_budget(&env);
-        show!(&result);
-
-        let (budget, last_index) = result.expect("没正确解析出预算值！");
         let expected_str = "$0.5;0.5;0.5$";
-        asserts! {
-            budget => expected_str, // 过滤掉了空格
-            last_index => expected_str.len() // 是「潜在的词项」的开头位置
+        test_budget! {
+            "$0.5; 0.5; 0.5$" => (expected_str, expected_str.len())
         }
 
-        // 失败case 1 | 没找到右括弧
-        let env = "$0.5; 0.5; 0.5";
-        let env = idealize_env(format, env);
+        // 所有的失败case
+        test_budget! {
+            // 失败case 1 | 没找到右括弧
+            "$0.5; 0.5; 0.5"
+            // 失败case 2 | 前后缀不匹配
+            "(0.5; 0.5; 0.5)"
+            // 失败case 3 | 前缀不匹配
+            "0.5; 0.5; 0.5$"
+            // 失败case 4 | 非法字符
+            "$0.5; 0.5; +0.5$"
+            // 失败case 5 | 只有左括弧
+            "$"
+            // 失败case 6 | 不是开头前缀
+            "❌$0.5; 0.5; 0.5$"
+        };
+    }
 
-        let result = state.segment_budget(&env);
+    /// 测试/后缀截取真值
+    #[test]
+    fn test_segment_truth() {
+        let format = &FORMAT_ASCII;
+        let state = ParseState::new(format);
 
-        asserts! {
-            result => None // 解析失败
+        // case统一定义
+        macro_rules! test_truth {
+            { $( $content:tt )+ } => {
+                test_segment! {
+                    format, state, segment_truth;
+                    $($content)+
+                }
+            };
         }
 
-        // 失败case 2 | 前缀不匹配
-        let env = "(0.5; 0.5; 0.5)";
-        let env = idealize_env(format, env);
+        // 成功cases
+        test_truth! {
+            "%1.0; 0.9%" => (
+                "%1.0;0.9%", // 过滤掉了空格
+                0, // 是「潜在的时间戳」的右边界
+            )
+            "<A --> B>.\n:|:\t%1.0; 0.9%" => (
+                "%1.0;0.9%", // 过滤掉了空格
+                // ! 理想化之后变成 "<A-->B>.:|:%1.0;0.9%"
+                // * 时间戳的右边界 第一个'%'
+                "<A-->B>.:|:%1.0;0.9%".find('%').unwrap(),
+            )
+        };
 
-        let result = state.segment_budget(&env);
-
-        asserts! {
-            result => None // 解析失败
-        }
-
-        // 失败case 3 | 非法字符
-        let env = "$0.5; 0.5; +0.5$";
-        let env = idealize_env(format, env);
-
-        let result = state.segment_budget(&env);
-
-        asserts! {
-            result => None // 解析失败
-        }
+        // 所有的失败case
+        test_truth! {
+            // 失败case 1 | 没找到左括弧
+            "1.0; 0.9%"
+            // 失败case 2 | 前后缀不匹配
+            "(1.0; 0.9)"
+            // 失败case 3 | 后缀不匹配
+            "%1.0; 0.9"
+            // 失败case 4 | 非法字符
+            "%1.0; +0.9%"
+            // 失败case 5 | 只有右括弧
+            "%"
+            // 失败case 6 | 不是末尾后缀
+            "%1.0; 0.9%❌"
+        };
     }
 }
