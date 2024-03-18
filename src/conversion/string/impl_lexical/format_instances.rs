@@ -3,10 +3,24 @@
 //! * 📌均基于CommonNarsese的语法格式，只是其中的「关键字」不同
 //! * 📄部分参考自[JuNarsese](https://github.com/ARCJ137442/JuNarsese.jl)
 //!   * ℹ️有少量修改
+//! * 🚩【2024-03-18 22:23:20】现在全面采用具备所有权的[`String`]，放弃在此场合使用`&str`
+//!   * 🎯避免后续解析器中「前后缀匹配」的无谓兼容
+//!   * 🎯加快开发，牺牲一定性能，规避一系列的生命周期标注与复杂的生命周期问题
 
 use super::format::*;
 use lazy_static::lazy_static;
 use util::{bi_fix_match_dict_pair, suffix_match_dict_pair, x_fix_match_dict, PrefixMatchDict};
+
+/// 工具宏：减少一些`into`
+/// * 🎯元组⇒[`String`]，&str⇒[`String`]
+macro_rules! s {
+    ($l:literal) => {
+        $l.to_string()
+    };
+    ( $($l:literal $(,)?)+ ) => {
+        ($(s!($l)),+)
+    };
+}
 
 // * 📝有关「全局常量」定义，闭包↔死局？ * //
 // 这里不可以：`Box::new`并非常量函数
@@ -67,7 +81,7 @@ lazy_static! {
     ///
     /// * 📄使用[`lazy_static`]实现「静态常量」
     ///   * 详请参考[`create_format_ascii`]
-    pub static ref FORMAT_ASCII: NarseseFormat<'static> = create_format_ascii();
+    pub static ref FORMAT_ASCII: NarseseFormat = create_format_ascii();
 
     /// LaTeX扩展
     /// * 来源：文档 `NARS ASCII Input.pdf`
@@ -76,14 +90,14 @@ lazy_static! {
     ///
     /// * 📄使用[`lazy_static`]实现「静态常量」
     ///   * 详请参考[`create_format_ascii`]
-    pub static ref FORMAT_LATEX: NarseseFormat<'static> = create_format_latex();
+    pub static ref FORMAT_LATEX: NarseseFormat = create_format_latex();
 
     /// 漢文扩展
     /// * 📌原创
     ///
     /// * 📄使用[`lazy_static`]实现「静态常量」
     ///   * 详请参考[`create_format_ascii`]
-    pub static ref FORMAT_HAN: NarseseFormat<'static> = create_format_han();
+    pub static ref FORMAT_HAN: NarseseFormat = create_format_han();
 }
 
 /// 通用 ASCII格式
@@ -96,12 +110,12 @@ lazy_static! {
 ///   * ❌使用`static`的方法行不通：闭包无法保证线程安全
 ///   * ✅使用[`lazy_static`]实现了一定的「静态常量」定义
 ///     * 🚩【2024-03-15 19:58:20】但目前仍然保留该工厂函数
-pub fn create_format_ascii<'a>() -> NarseseFormat<'a> {
+pub fn create_format_ascii() -> NarseseFormat {
     NarseseFormat {
         space: NarseseFormatSpace {
             is_for_parse: Box::new(|c: char| c.is_whitespace()), // ! 解析时忽略空格
-            format_terms: " ", // 格式化时，词项间需要空格（英文如此）
-            format_items: " ", // 格式化时，条目间需要空格（英文如此）
+            format_terms: s!(" "), // 格式化时，词项间需要空格（英文如此）
+            format_items: s!(" "), // 格式化时，条目间需要空格（英文如此）
             remove_spaces_before_parse: true, // ASCII版本空格无关
         },
         atom: NarseseFormatAtom {
@@ -128,9 +142,9 @@ pub fn create_format_ascii<'a>() -> NarseseFormat<'a> {
                 "[" => "]" // 内涵集
             ),
             // 普通括号
-            brackets: ("(", ")"),
+            brackets: s!("(", ")"),
             // 普通分隔符
-            separator: ",",
+            separator: s!(","),
             // 复合词项连接符
             connecters: x_fix_match_dict!(
                 "&"  // 外延交
@@ -149,7 +163,7 @@ pub fn create_format_ascii<'a>() -> NarseseFormat<'a> {
         },
         statement: NarseseFormatStatement {
             // 陈述括弧
-            brackets: ("<", ">"),
+            brackets: s!("<", ">"),
             // 陈述系词
             copulas: x_fix_match_dict!(
                 "-->" // 继承
@@ -186,12 +200,12 @@ pub fn create_format_ascii<'a>() -> NarseseFormat<'a> {
             ),
             is_stamp_content: Box::new(|c: char| matches!(c, '0'..='9' | '+' | '-')), // regex:`[0-9+\-]`
             // 真值 | 内容已不包含空格
-            truth_brackets: ("%", "%"),
+            truth_brackets: s!("%", "%"),
             is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | ';')),
         },
         task: NarseseFormatTask {
             // 预算 | 内容已不包含空格
-            budget_brackets: ("$", "$"),
+            budget_brackets: s!("$", "$"),
             is_budget_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | ';')),
         },
     }
@@ -215,12 +229,12 @@ fn t() {
 /// * 📌【2024-03-17 11:00:17】现在对「\【字母串】」形式的LaTeX文本**强制要求后缀**`{}`以便实现「空格无关」
 ///   * ⚠️这可能会影响到「LaTeX→Narsese」的语法，但**LaTeX Narsese语法本身就是【面向输出】而非【面向解析】的**
 ///   * ℹ️LaTeX扩展本身不会有多少「需要由此转换成Narsese」的场景
-pub fn create_format_latex<'a>() -> NarseseFormat<'a> {
+pub fn create_format_latex() -> NarseseFormat {
     NarseseFormat {
         space: NarseseFormatSpace {
             is_for_parse: Box::new(|c| c.is_whitespace()), // ! 解析时可跳过空格
-            format_terms: " ", // 格式化时，词项间需要分隔（避免代码粘连）
-            format_items: " ", // 格式化时，条目间需要分隔（避免代码粘连）
+            format_terms: s!(" "), // 格式化时，词项间需要分隔（避免代码粘连）
+            format_items: s!(" "), // 格式化时，条目间需要分隔（避免代码粘连）
             remove_spaces_before_parse: true, // LaTeX版本亦可空格无关——通过「后缀空参数」省去空格
         },
         atom: NarseseFormatAtom {
@@ -241,9 +255,9 @@ pub fn create_format_latex<'a>() -> NarseseFormat<'a> {
         compound: NarseseFormatCompound {
             // 左右括弧
             // * 📌【2024-03-17 14:07:31】目前暂且不对`\left` `\right`做【括号封装】
-            brackets: (r"\left(", r"\right)"),
-            // 以空格作分隔符
-            separator: " ",
+            brackets: s!(r"\left(", r"\right)"),
+            // 以（显式）空格作分隔符
+            separator: s!(r"\;"), // ! LaTeX使用`\space{}`也可使用`\;` | ✅兼容MathJax
             // 词项集
             set_brackets: bi_fix_match_dict_pair!(
                 // ! ↓此中`{` `}`需要转义
@@ -267,15 +281,15 @@ pub fn create_format_latex<'a>() -> NarseseFormat<'a> {
             ),
         },
         statement: NarseseFormatStatement {
-            brackets: (r"\left<", r"\right>"),
+            brackets: s!(r"\left<", r"\right>"),
             copulas: x_fix_match_dict!(
                 r"\rightarrow{}" // 继承
                 r"\leftrightarrow{}" // 相似
                 r"\Rightarrow{}" // 蕴含
                 r"\Leftrightarrow{}" // 等价
-                r"\circ\!\!\!\rightarrow {}" // 实例
-                r"\rightarrow\!\!\!\circ {}" // 属性
-                r"\circ\!\!\!\rightarrow\!\!\!\circ {}" // 实例属性
+                r"\circ\!\!\!\rightarrow{}" // 实例
+                r"\rightarrow\!\!\!\circ{}" // 属性
+                r"\circ\!\!\!\rightarrow\!\!\!\circ{}" // 实例属性
                 r"/\!\!\!\Rightarrow{}" // 预测性蕴含
                 r"|\!\!\!\Rightarrow{}" // 并发性蕴含
                 r"\backslash\!\!\!\Rightarrow{}" // 回顾性蕴含
@@ -304,12 +318,12 @@ pub fn create_format_latex<'a>() -> NarseseFormat<'a> {
             ),
             is_stamp_content: Box::new(|c: char| matches!(c, '0'..='9' | '+' | '-')), // regex:`[0-9+\-]`
             // 真值
-            truth_brackets: (r"\langle{}", r"\rangle{}"),
+            truth_brackets: s!(r"\langle{}", r"\rangle{}"),
             is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | ';')),
         },
         task: NarseseFormatTask {
             // 预算
-            budget_brackets: (r"\$", r"\$"),
+            budget_brackets: s!(r"\$", r"\$"),
             is_budget_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | ';')),
         },
     }
@@ -317,12 +331,12 @@ pub fn create_format_latex<'a>() -> NarseseFormat<'a> {
 
 /// 漢文扩展
 /// * 📌原创
-pub fn create_format_han<'a>() -> NarseseFormat<'a> {
+pub fn create_format_han() -> NarseseFormat {
     NarseseFormat {
         space: NarseseFormatSpace {
             is_for_parse: Box::new(|c| c.is_whitespace()), // ! 解析时忽略空格
-            format_terms: "",  // 格式化时，词项间无需分隔（避免太过松散）
-            format_items: " ", // 格式化时，条目间需要分隔（避免太过密集）
+            format_terms: s!(""),  // 格式化时，词项间无需分隔（避免太过松散）
+            format_items: s!(" "), // 格式化时，条目间需要分隔（避免太过密集）
             remove_spaces_before_parse: true, // 漢文亦空格无关
         },
         atom: NarseseFormatAtom {
@@ -341,8 +355,8 @@ pub fn create_format_han<'a>() -> NarseseFormat<'a> {
             is_identifier: Box::new(|c| c.is_alphanumeric() || c == '_'),
         },
         compound: NarseseFormatCompound {
-            brackets: ("（", "）"),
-            separator: "，",
+            brackets: s!("（", "）"),
+            separator: s!("，"),
             set_brackets: bi_fix_match_dict_pair!(
                 "『" => "』" // 外延集
                 "【" => "】" // 内涵集
@@ -364,7 +378,7 @@ pub fn create_format_han<'a>() -> NarseseFormat<'a> {
             ),
         },
         statement: NarseseFormatStatement {
-            brackets: ("「", "」"),
+            brackets: s!("「", "」"),
             copulas: x_fix_match_dict!(
                 "是" // 继承
                 "似" // 相似
@@ -401,23 +415,25 @@ pub fn create_format_han<'a>() -> NarseseFormat<'a> {
             ),
             is_stamp_content: Box::new(|c: char| matches!(c, '0'..='9' | '+' | '-')), // regex:`[0-9+\-]`
             // 真值
-            truth_brackets: ("真", "值"), // 大改：兼容单真值、空真值
+            truth_brackets: s!("真", "值"), // 大改：兼容单真值、空真值
             is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | '、')), // 此处有特别的分隔符「、」
         },
         task: NarseseFormatTask {
             // 预算
-            budget_brackets: ("预", "算"),
+            budget_brackets: s!("预", "算"),
             is_budget_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | '、')), // 此处有特别的分隔符「、」
         },
     }
 }
 
 /// 单元测试
+///
+/// TODO: 🚧【2024-03-18 23:10:23】仍不完善（需要更多种类的格式）
 #[cfg(test)]
 mod tests_enum_narsese {
 
+    use super::super::tests::_sample_task_ascii;
     use super::*;
-    use crate::conversion::string::impl_lexical::tests::_sample_task_ascii;
 
     fn test_format(label: &str, format: &NarseseFormat) {
         let task = _sample_task_ascii();
@@ -433,4 +449,3 @@ mod tests_enum_narsese {
         test_format("漢文", &FORMAT_HAN);
     }
 }
- 

@@ -146,7 +146,7 @@ mod tests {
         test_matrix! {
             FORMAT_LATEX;
             _test_parse_and_format => [
-                r"\$0.5;0.75;0.4\$ \left<\left(,  \left<\left\{ball\right\} \rightarrow  \left[left\right]\right>  \left<\left(\times   \left\{SELF\right\}  \$any  \#some\right) \rightarrow  \Uparrow do\right>\right) \Rightarrow  \left<\left\{SELF\right\} \rightarrow  \left[good\right]\right>\right>. t=-1 \langle1,0.9\rangle"
+                r"\$0.5;0.75;0.4\$ \left<\left(,\; \left<\left\{ball\right\} \rightarrow{} \left[left\right]\right>\; \left<\left(\times{}\; \left\{SELF\right\}\; \$any\; \#some\right) \rightarrow{} \Uparrow{}do\right>\right) \Rightarrow{} \left<\left\{SELF\right\} \rightarrow{} \left[good\right]\right>\right>. t=-1 \langle{}1,0.9\rangle{}"
             ]
             _test_format_and_parse => [
                 _sample_task()

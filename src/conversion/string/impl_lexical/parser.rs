@@ -33,14 +33,10 @@
 //!       * 💭只要别把括号改得「过于变态」，就可以通过
 //!     * ❌这基本否决了通过「括号树」进行匹配的方案——不然就要时刻提防「系词/连接符冒充括号」的情况
 
-use util::{first, PrefixMatch, SuffixMatch};
-
 use super::NarseseFormat;
-use crate::{
-    lexical::{Narsese, Sentence, Task, Term},
-    util::{BufferIterator, IntoChars},
-};
-use std::{error::Error, fmt::Display, result};
+use crate::lexical::{Narsese, Sentence, Task, Term};
+use std::{error::Error, fmt::Display};
+use util::{PrefixMatch, SuffixMatch};
 
 /// 词法解析 辅助结构对象
 /// * 🚩放在一个独立的模块内，以便折叠
@@ -187,7 +183,7 @@ pub mod structs {
     pub struct ParseState<'a> {
         /// 词法格式
         /// * 📌用于指定解析所用的关键字
-        pub format: &'a NarseseFormat<'a>,
+        pub format: &'a NarseseFormat,
         // /// 解析环境：字符数组切片
         // /// * 📌基本是唯一共享的状态
         // pub env: ParseEnv<'a>,
@@ -297,24 +293,29 @@ impl<'a> ParseState<'a> {
         // 后缀连续切割出真值、时间戳、标点 //
         let truth = self.segment_truth(env);
         // 默认值 "" | 时间戳的索引上界（不含）
-        let (truth, end_index) = truth.right_unwrap_or(env.len());
+        let (truth, right_border) = truth.right_unwrap_or(env.len());
+
         // 时间戳
-        let stamp = self.segment_stamp(env);
+        let stamp = self.segment_stamp(&env[..right_border]);
         // 默认值 "" | 标点的索引上界（不含）
-        let (stamp, end_index) = stamp.right_unwrap_or(end_index);
+        let (stamp, right_border) = stamp.right_unwrap_or(right_border);
+
         // 标点
-        let punctuation = self.segment_punctuation(env);
+        let punctuation = self.segment_punctuation(&env[..right_border]);
         // 默认值 "" | 词项的索引上界（不含）
-        let (punctuation, end_index) = punctuation.right_unwrap_or(end_index);
+        let (punctuation, right_border) = punctuation.right_unwrap_or(right_border);
 
         // 前后缀切割完毕，最后解析出词项 //
         // 获得「词项」的「字符数组切片」
-        let term = match begin_index < end_index {
-            true => self.parse_term(&env[begin_index..end_index])?,
+        let env_term = &env[begin_index..right_border];
+        dbg!(&budget, &truth, &stamp, &punctuation);
+        // 开始解析词项
+        let term = match begin_index < right_border {
+            true => self.parse_term(dbg!(env_term))?,
             false => {
                 return self.err(
-                    env,
-                    &format!("无法在索引[{begin_index}..{end_index}]解析出词项"),
+                    env_term,
+                    &format!("无法在索引[{begin_index}..{right_border}]解析出词项"),
                 )
             }
         };
@@ -338,8 +339,10 @@ impl<'a> ParseState<'a> {
     /// * 🚩【2024-03-18 08:47:12】现在基本确立「延迟截取字符串」原则
     ///   * 不到需要的时候，一律以「起止索引」表示「字符串」
     ///   * 后续一律从[`String::from_iter`]转换
-    /// * 📌「在指定位置开始」的情形，完全可以通过「预先对环境切片」解决
+    /// * 📌「在指定位置开始」的情形，的确可以通过「预先对环境切片」解决
     ///   * 📄例如：`("abc", start = 1)` ⇒ `(&"abc"[1..])`
+    ///   * ⚠️但需要面对「切片之后索引不一致」以及「切片本身有性能开销」的问题
+    ///     * 特别是在「前缀截取」之后，索引应该随即改变
     #[inline(always)]
     fn segment_some_prefix(
         &self,
@@ -381,8 +384,10 @@ impl<'a> ParseState<'a> {
     /// * 🚩【2024-03-18 08:47:12】现在基本确立「延迟截取字符串」原则
     ///   * 不到需要的时候，一律以「起止索引」表示「字符串」
     ///   * 后续一律从[`String::from_iter`]转换
-    /// * 📌「在指定位置开始」的情形，完全可以通过「预先对环境切片」解决
+    /// * 📌「在指定位置开始」的情形，的确可以通过「预先对环境切片」解决
     ///   * 📄例如：`("abc", start = 1)` ⇒ `(&"abc"[..2])`
+    ///   * ⚠️但需要面对「切片之后索引不一致」以及「切片本身有性能开销」的问题
+    ///     * 特别是在「前缀截取」之后，索引应该随即改变
     #[inline(always)]
     fn segment_some_suffix(
         &self,
@@ -392,13 +397,18 @@ impl<'a> ParseState<'a> {
     ) -> Result<ParseIndex, ParseIndex> {
         // 自动计算长度，然后从末尾开始
         let mut right_border = env.len();
-        while right_border > 0 {
+        loop {
             // 左括弧⇒预先返回
+            // * 兼任「零长字串检测」的作用
             if env[..right_border].ends_with(left_chars) {
                 // 计算边界索引
                 let left_border = right_border - left_chars.len();
                 // 返回`Ok(左括弧起始索引)`
-                return Ok(left_border);
+                break Ok(left_border);
+            }
+            // 检查边界 | 找不到左括弧 ⇒ 返回`Err(环境长度即索引左边界)`
+            if right_border == 0 {
+                break Err(0);
             }
             // 检测「边界内要检验的字符」是否合法 | 环境是否终止
             let char_will_pass = env[right_border - 1];
@@ -406,21 +416,41 @@ impl<'a> ParseState<'a> {
                 // 合法 ⇒ 索引步进
                 true => right_border -= 1,
                 // 非法 ⇒ 返回 `Err(非法字符所在索引)`
-                false => return Err(right_border),
+                false => break Err(right_border),
             }
         }
-        // 找不到左括弧 ⇒ 返回`Err(环境长度即索引左边界)`
-        Err(0)
     }
 
     /// 工具函数/依照「前缀匹配」与「内部合法字符」选取区间
     /// * 🎯【2024-03-18 09:15:24】再度抽象复用「前缀截取预算」
     /// * 📌「在指定位置开始」的情形，完全可以通过「预先对环境切片」解决
     ///   * 📄例如：`("abc", start = 1)` ⇒ `(&"abc"[1..])`
+    /// * ❌【2024-03-18 22:16:16】尝试兼容`String`与`&str`失败
+    ///   * 兼容对象：
+    ///     * `PrefixMatch<(String, String)>`
+    ///     * `PrefixMatch<(&'a str, &'a str)>`
+    ///
+    /// ! ❌【2024-03-18 22:15:48】通过「`S: Deref<Target = str>`」的方法行不通
+    ///
+    /// ❌旧签名：
+    /// ```no-test
+    /// fn segment_brackets_prefix<S: Deref<Target = str>>(
+    ///    &self,
+    ///    env: ParseEnv<'a>,
+    ///    brackets: impl PrefixMatch<(S, S)>,
+    ///    verify_char: impl Fn(char) -> bool,
+    ///) -> Option<(String, ParseIndex)>
+    /// ```
+    ///
+    /// ⚠️【2024-03-18 22:18:40】无论是`brackets`中的元组参数填`(S, S)`还是`(&'s S, &'s S)`均不通过编译
+    /// * 📌最接近的一次报错：`cannot move out of `self.format.task.budget_brackets` which is behind a shared reference`
+    ///   * ❌但很可惜，不能拿掉格式对象中字段数据的所有权
+    /// * 📌若为`&'s S`（引入新的生命周期参数），则特征不兼容
+    /// * 📝【2024-03-19 00:15:02】似乎`rust,no-test`在此又失效了
     fn segment_brackets_prefix(
         &self,
         env: ParseEnv<'a>,
-        brackets: impl PrefixMatch<(&'a str, &'a str)>,
+        brackets: &impl PrefixMatch<(String, String)>,
         verify_char: impl Fn(char) -> bool,
     ) -> Option<(String, ParseIndex)> {
         // 尝试前缀匹配
@@ -452,7 +482,7 @@ impl<'a> ParseState<'a> {
     fn segment_brackets_suffix(
         &self,
         env: ParseEnv<'a>,
-        brackets: impl SuffixMatch<(&'a str, &'a str)>,
+        brackets: &impl SuffixMatch<(String, String)>,
         verify_char: impl Fn(char) -> bool,
     ) -> Option<(String, ParseIndex)> {
         // 尝试后缀匹配
@@ -495,7 +525,7 @@ impl<'a> ParseState<'a> {
         // 尝试前缀匹配
         self.segment_brackets_prefix(
             env,
-            self.format.task.budget_brackets,
+            &self.format.task.budget_brackets,
             &self.format.task.is_budget_content,
         )
     }
@@ -511,7 +541,7 @@ impl<'a> ParseState<'a> {
         // 尝试后缀匹配
         self.segment_brackets_suffix(
             env,
-            self.format.sentence.truth_brackets,
+            &self.format.sentence.truth_brackets,
             &self.format.sentence.is_truth_content,
         )
     }
@@ -524,11 +554,16 @@ impl<'a> ParseState<'a> {
     /// * ⚙️返回一个可空值
     ///   * 📌要么「没匹配到合法的时间戳（[`None`]）」
     ///   * 📌要么返回「匹配到的完整时间戳，以及其在『解析环境』中的开头位置（用于切分标点）」
-    /// * 📄匹配的环境如：`G!:|:%1.0;0.9%`
+    /// * 📄匹配的环境如：`G!:|:`
+    ///   * ⚠️此时应该已经截去了真值
     /// * 📄匹配的结果如：`Some((":|:", 2))` | `2` 对应第一个`:`
     fn segment_stamp(&self, env: ParseEnv<'a>) -> Option<(String, ParseIndex)> {
-        // TODO: 有待完成
-        todo!("有待完成")
+        // 尝试后缀匹配
+        self.segment_brackets_suffix(
+            env,
+            &self.format.sentence.stamp_brackets,
+            &self.format.sentence.is_stamp_content,
+        )
     }
 
     /// 向前截取标点
@@ -538,11 +573,19 @@ impl<'a> ParseState<'a> {
     /// * ⚙️返回一个可空值
     ///   * 📌要么「没匹配到合法的标点（[`None`]）」
     ///   * 📌要么返回「匹配到的完整标点，以及其在『解析环境』中的开头位置（用于切分出词项）」
-    /// * 📄匹配的环境如：`G!:|:%1.0;0.9%`
-    /// * 📄匹配的结果如：`Some(("!", 1))` | `1` 对应`!`
+    /// * 📄匹配的环境如：`<A-->B>!`
+    /// * 📄匹配的结果如：`Some(("!", 7))` | `7` 对应`!`
     fn segment_punctuation(&self, env: ParseEnv<'a>) -> Option<(String, ParseIndex)> {
-        // TODO: 有待完成
-        todo!("有待完成")
+        // 尝试解析出标点
+        let punctuation = self
+            .format
+            .sentence
+            .punctuations
+            .match_suffix_char_slice(env)?
+            .clone();
+        // 跳过标点
+        let var_name = env.len() - punctuation.len();
+        Some((punctuation, var_name))
     }
 
     /// 递归解析词项
@@ -553,17 +596,17 @@ impl<'a> ParseState<'a> {
     ///   * 📌要么返回「词项解析成功（仅词项）」
     /// * 💭至于「返回位置标识」可能需要在专门的「分割词项」方法中
     ///   * 🎯复合词项/陈述中的「词项分割」
-    ///   *
     fn parse_term(&self, env: ParseEnv<'a>) -> ParseResult<Option<Term>> {
         // TODO: 有待完成
-        todo!("有待完成")
+        println!("有待完成");
+        Ok(None) // ! 【2024-03-18 22:46:23】占位符
     }
 }
 
 /// 侧门 [`NarseseFormat::parse(format, input)`]
 /// * 💭为何一定要绑在「Narsese格式」中呢？
 ///   * 🚩【2024-03-16 22:12:01】随即独立
-impl<'a> NarseseFormat<'a> {
+impl NarseseFormat {
     /// 主解析函数@字符串
     /// * 🚩【2024-03-16 21:30:25】放弃使用「字符迭代器」的方案
     ///   * ❗本身并没多少实际的「应用场景」
@@ -609,7 +652,7 @@ mod test {
                 // 构造环境并解析出结果
                 let result = test_segment!(@PARSE $format, $state, $f; $env_str);
                 // 解构（成功的）结果
-                let (truth, last_index) = result.expect("解析失败！");
+                let (truth, last_index) = result.expect(&format!("「{}」解析失败！", $env_str));
                 // 断言
                 asserts! {
                     truth => $item,
@@ -713,5 +756,84 @@ mod test {
             // 失败case 6 | 不是末尾后缀
             "%1.0; 0.9%❌"
         };
+    }
+
+    /// 测试/后缀截取时间戳
+    #[test]
+    fn test_segment_stamp() {
+        let format = &FORMAT_ASCII;
+        let state = ParseState::new(format);
+
+        // case统一定义
+        macro_rules! test_stamp {
+            { $( $content:tt )+ } => {
+                test_segment! {
+                    format, state, segment_stamp;
+                    $($content)+
+                }
+            };
+        }
+
+        // 成功cases
+        test_stamp! {
+            ":|:" => (
+                ":|:", // 过滤掉了空格
+                0, // 是「潜在的时间戳」的右边界
+            )
+            " :!\t-123: " => (
+                ":!-123:", // 过滤掉了空格
+                0, // 是「潜在的时间戳」的右边界
+            )
+            "<A --> B>.\n:|:\t" => (
+                ":|:", // 过滤掉了空格
+                // ! 理想化之后变成 "<A-->B>.:|:
+                // * 时间戳的右边界 第一个':'
+                "<A-->B>.:|:".find(':').unwrap(),
+            )
+        };
+
+        // 所有的失败case
+        test_stamp! {
+            // 失败case 1 | 没找到左括弧
+            "+123:"
+            // 失败case 2 | 前后缀不匹配
+            "(+123)"
+            // 失败case 3 | 后缀不匹配
+            ":!+123"
+            // 失败case 4 | 非法字符
+            ":!_+123:"
+            // 失败case 5 | 只有右括弧
+            ":"
+            // 失败case 6 | 不是末尾后缀
+            ":!+123:❌"
+        };
+    }
+
+    /// 测试/所有条目
+    #[test]
+    fn test_parse_items() {
+        // 背景
+        fn test(format: &NarseseFormat, narsese: &str) {
+            // 构建状态
+            let mut state = ParseState::new(format);
+
+            // 解析出条目（中间结果）
+            let result = state
+                .parse_items(&idealize_env(format, narsese))
+                .expect("条目解析失败！");
+
+            // 断言
+            // * 📌【2024-03-18 22:50:58】此处至少要包括除了词项在内的所有数据
+            asserts! {
+                result.budget => @ Some(..)
+                result.truth => @ Some(..)
+                result.stamp => @ Some(..)
+                result.punctuation => @ Some(..)
+            }
+        }
+
+        // 待解析Narsese
+        let narsese = "$0.5; 0.5; 0.5$ <A --> B>. :|: %1.0; 0.9%";
+        test(&FORMAT_ASCII, narsese);
     }
 }

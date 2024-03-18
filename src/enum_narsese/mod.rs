@@ -6,6 +6,10 @@
 
 use crate::api::NarseseValue;
 
+// 超参数
+pub mod hyper_parameters;
+pub use hyper_parameters::*;
+
 // 词项
 pub mod term;
 pub use term::*;

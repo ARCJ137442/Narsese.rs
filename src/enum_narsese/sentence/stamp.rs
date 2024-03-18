@@ -7,7 +7,7 @@
 //! * 未来
 //! * 固定
 
-use util::IntPrecision;
+use crate::enum_narsese::hyper_parameters::*;
 
 /// 时间戳
 #[derive(Debug, Clone, PartialEq)]

@@ -6,15 +6,20 @@
 //! * 🚩目前对此处的「格式」不进行重命名处理
 //!   * 📌理由：可以用「路径限定」「use * as」绕开「重名问题」
 //! * 🚩此处不再开放「内容`Content`」类型
-//!   * 📌「词法Narsese」数据结构中已固定类型为[`&'a str`]/&[`str`]
+//!   * 📌「词法Narsese」数据结构中已固定类型为[`String`]/&[`str`]
 //!   * 因此整个「词法Narsese格式」已经和字符串绑定了
+//!
+//! ! 【2024-03-18 20:33:31】当下统一使用「动态字串」[`String`]
+//!   * ❌弃用`&str`的理由
+//!     * 生命周期管理冗杂 | 💭允许牺牲一定性能，专注功能
+//!     * 前缀匹配字典不兼容 | 无法合并「动态字串前缀匹配」与「静态字串前缀匹配」
 
 use util::{
     BiFixMatchDict, BiFixMatchDictPair, PrefixMatchDict, SuffixMatchDict, SuffixMatchDictPair,
 };
 
 /// Narsese格式/空白符
-pub struct NarseseFormatSpace<'a, F = Box<dyn Fn(char) -> bool + Send + Sync>>
+pub struct NarseseFormatSpace<F = Box<dyn Fn(char) -> bool + Send + Sync>>
 where
     F: Fn(char) -> bool + Send + Sync,
 {
@@ -37,11 +42,11 @@ where
     /// * 🎯复合词项/陈述
     ///   * 📄复合词项：`(&&, A, B, C)`
     ///   * 📄陈述：`<A --> B>`
-    pub format_terms: &'a str,
+    pub format_terms: String,
 
     /// 空白符（格式化/分隔条目）
     /// * 🎯「预算 词项标点 时间戳 真值」
-    pub format_items: &'a str,
+    pub format_items: String,
 }
 
 /// 原子词项格式
@@ -65,17 +70,17 @@ where
 
 /// 复合词项格式
 #[derive(Debug, Clone)]
-pub struct NarseseFormatCompound<'a> {
+pub struct NarseseFormatCompound {
     /// 合法的「集合复合词项括弧对」
     /// * 外延集
     /// * 内涵集
     pub set_brackets: BiFixMatchDictPair,
 
     /// 通用的「复合词项括弧对」
-    pub brackets: (&'a str, &'a str),
+    pub brackets: (String, String),
 
     /// 复合词项元素分隔符
-    pub separator: &'a str,
+    pub separator: String,
 
     /// 合法的「复合词项连接符」
     /// * 外延交/内涵交
@@ -90,9 +95,9 @@ pub struct NarseseFormatCompound<'a> {
 
 /// 陈述格式
 #[derive(Debug, Clone)]
-pub struct NarseseFormatStatement<'a> {
+pub struct NarseseFormatStatement {
     /// 通用的「陈述括弧对」
-    pub brackets: (&'a str, &'a str),
+    pub brackets: (String, String),
 
     /// 合法的「中缀系词」
     /// * 继承
@@ -106,7 +111,7 @@ pub struct NarseseFormatStatement<'a> {
 }
 
 /// 语句格式（含标点、真值、时间戳）
-pub struct NarseseFormatSentence<'a, F = Box<dyn Fn(char) -> bool + Send + Sync>>
+pub struct NarseseFormatSentence<F = Box<dyn Fn(char) -> bool + Send + Sync>>
 where
     F: Fn(char) -> bool + Send + Sync,
 {
@@ -115,7 +120,7 @@ where
 
     /// 真值括弧
     /// * 🚩通过括弧捕获整个「真值」字符串，而**不再细分内部结构**
-    pub truth_brackets: (&'a str, &'a str),
+    pub truth_brackets: (String, String),
 
     /// 判断是否为「真值内部允许的字符」
     /// * 🎯用于提供信息以更快分割边界（从预算值而来）
@@ -144,13 +149,13 @@ where
 }
 
 /// 任务格式（含预算值）
-pub struct NarseseFormatTask<'a, F = Box<dyn Fn(char) -> bool + Send + Sync>>
+pub struct NarseseFormatTask<F = Box<dyn Fn(char) -> bool + Send + Sync>>
 where
     F: Fn(char) -> bool + Send + Sync,
 {
     /// 预算值括弧
     /// * 🚩通过括弧捕获整个「预算值」字符串，而**不再细分内部结构**
-    pub budget_brackets: (&'a str, &'a str),
+    pub budget_brackets: (String, String),
 
     /// 判断是否为「预算值内部允许的字符」
     /// * 🎯用于解决可能的「预算值🆚独立变量」「误报的预算值范围」的问题
@@ -188,27 +193,27 @@ where
 /// * 🚩现在将其中的「函数类型」提取为类型参数
 ///   * 📜默认还是`Box<dyn Fn>`
 ///   * ✅可兼容其它实现了`Fn`特征的对象（如函数指针）
-pub struct NarseseFormat<'a, F = Box<dyn Fn(char) -> bool + Send + Sync + 'a>>
+pub struct NarseseFormat<F = Box<dyn Fn(char) -> bool + Send + Sync>>
 where
-    F: Fn(char) -> bool + Send + Sync + 'a,
+    F: Fn(char) -> bool + Send + Sync,
 {
     /// 空白符格式
-    pub space: NarseseFormatSpace<'a, F>,
+    pub space: NarseseFormatSpace<F>,
 
     /// 原子词项格式
     pub atom: NarseseFormatAtom<F>,
 
     /// 复合词项格式
-    pub compound: NarseseFormatCompound<'a>,
+    pub compound: NarseseFormatCompound,
 
     /// 陈述格式
-    pub statement: NarseseFormatStatement<'a>,
+    pub statement: NarseseFormatStatement,
 
     /// 语句格式（含标点、真值、时间戳）
-    pub sentence: NarseseFormatSentence<'a, F>,
+    pub sentence: NarseseFormatSentence<F>,
 
     /// 任务格式（含预算值）
-    pub task: NarseseFormatTask<'a>,
+    pub task: NarseseFormatTask,
     // ! 相比「枚举Narsese」不再有「关键词截断选项」
     // ! 🚩【2024-03-15 17:48:03】目前`enable_keyword_truncation`强制为`true`
 }

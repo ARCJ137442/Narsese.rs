@@ -1,13 +1,16 @@
 [package]
 name = "enum_narsese"
-version = "0.4.3"
+version = "0.4.4"
 edition = "2021"
 
 [dependencies]
+
 # 用于实现「静态闭包常量」
 # 🔗：https://stackoverflow.com/questions/73260997/rust-boxed-closure-in-global-variable
 # once_cell = "1.19.0" # * 暂时不用
-lazy_static = "1.4.0"
+[dependencies.lazy_static]
+version = "1.4.0"
+optional = true
 
 [dependencies.nar_dev_utils]
 # 【2024-03-13 21:17:55】实用库现在独立为`nar_dev_utils`
@@ -22,4 +25,7 @@ bundled = [
     "lexical_narsese"
 ]
 enum_narsese = []
-lexical_narsese = []
+lexical_narsese = [
+    # 需要以此引入「静态闭包常量」
+    "lazy_static"
+]

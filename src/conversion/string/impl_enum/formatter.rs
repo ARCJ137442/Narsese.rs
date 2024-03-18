@@ -436,9 +436,9 @@ mod test {
         // 平行测试
         f_parallel![
             _test;
-            FORMAT_ASCII "ascii" "$0.5;0.75;0.4$ <(&/, <{ball} --> [left]>, <(*, {SELF}, $any, #some) --> ^do>) ==> <{SELF} --> [good]>>. :!-1: %1;0.9%";
-            FORMAT_LATEX "latex" r#"\$0.5;0.75;0.4\$ \left<\left(,  \left<\left\{ball\right\} \rightarrow  \left[left\right]\right>  \left<\left(\times   \left\{SELF\right\}  \$any  \#some\right) \rightarrow  \Uparrow do\right>\right) \Rightarrow  \left<\left\{SELF\right\} \rightarrow  \left[good\right]\right>\right>. t=-1 \langle1,0.9\rangle"#;
-            FORMAT_HAN "漢" "预0.5、0.75、0.4算 「（接连，「『ball』是【left】」，「（积，『SELF』，任一any，其一some）是操作do」）得「『SELF』是【good】」」。发生在-1真1、0.9值";
+            FORMAT_ASCII "ascii"   "$0.5;0.75;0.4$ <(&/, <{ball} --> [left]>, <(*, {SELF}, $any, #some) --> ^do>) ==> <{SELF} --> [good]>>. :!-1: %1;0.9%";
+            FORMAT_LATEX "latex" r#"\$0.5;0.75;0.4\$ \left<\left(,\; \left<\left\{ball\right\} \rightarrow{} \left[left\right]\right>\; \left<\left(\times{}\; \left\{SELF\right\}\; \$any\; \#some\right) \rightarrow{} \Uparrow{}do\right>\right) \Rightarrow{} \left<\left\{SELF\right\} \rightarrow{} \left[good\right]\right>\right>. t=-1 \langle{}1,0.9\rangle{}"#;
+            FORMAT_HAN   "漢"      "预0.5、0.75、0.4算 「（接连，「『ball』是【left】」，「（积，『SELF』，任一any，其一some）是操作do」）得「『SELF』是【good】」」。发生在-1真1、0.9值";
         ];
     }
 }

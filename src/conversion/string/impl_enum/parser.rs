@@ -28,7 +28,7 @@
 use super::format::*;
 use crate::enum_narsese::*;
 use std::{error::Error, fmt::Display, io::ErrorKind};
-use util::{first, FloatPrecision, IntPrecision, ZeroOneFloat};
+use util::{first, ZeroOneFloat};
 
 /// 特化「CommonNarsese结果」到「枚举Narsese」版本
 /// * 🎯用于存储「最终被解析出来的CommonNarsese对象」

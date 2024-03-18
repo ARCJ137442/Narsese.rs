@@ -5,7 +5,8 @@
 //! * 单真值
 //! * 双真值
 
-use util::{FloatPrecision, ZeroOneFloat};
+use crate::enum_narsese::hyper_parameters::*;
+use util::ZeroOneFloat;
 
 /// 使用枚举表示真值
 /// * 📌与目标使用的「预算值」同一
