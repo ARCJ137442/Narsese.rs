@@ -6,21 +6,16 @@
 
 use crate::api::NarseseValue;
 
-// 超参数
-pub mod hyper_parameters;
-pub use hyper_parameters::*;
-
-// 词项
-pub mod term;
-pub use term::*;
-
-// 语句
-pub mod sentence;
-pub use sentence::*;
-
-// 任务
-pub mod task;
-pub use task::*;
+util::pub_mod_and_pub_use! {
+    // 超参数
+    hyper_parameters
+    // 词项
+    term
+    // 语句
+    sentence
+    // 任务
+    task
+}
 
 // 统合结构体
 

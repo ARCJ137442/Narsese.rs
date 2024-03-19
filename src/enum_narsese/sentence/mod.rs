@@ -14,17 +14,14 @@
 //! * 问题
 //! * 请求
 
-// 真值 //
-pub mod truth;
-pub use truth::*;
-
-// 时间戳 //
-pub mod stamp;
-pub use stamp::*;
-
-// 标点 //
-pub mod punctuation;
-pub use punctuation::*;
+util::pub_mod_and_pub_use! {
+    // 真值 //
+    truth
+    // 时间戳 //
+    stamp
+    // 标点 //
+    punctuation
+}
 
 // 语句 //
 // * 🚩【2024-03-13 21:27:46】现在直接将内部的`sentence`进行内联，以彻底避免「重复重名路径」麻烦

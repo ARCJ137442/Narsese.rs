@@ -7,5 +7,6 @@
 
 // 字符串格式化模板
 // * 进行重导出
-pub mod common_narsese_templates;
-pub use common_narsese_templates::*;
+util::pub_mod_and_pub_use! {
+    common_narsese_templates
+}

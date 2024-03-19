@@ -6,10 +6,9 @@
 //!   * 💫目前这些概念仍然比较凌乱
 //! * 🚩目前除非遇到「重名问题」，否则「导出模块并同时使用其内符号」
 
-// API「获取内部元素」
-pub mod get_inner;
-pub use get_inner::*;
-
-// API「抽象Narsese值」
-pub mod narsese_value;
-pub use narsese_value::*;
+util::pub_mod_and_pub_use! {
+    // API「获取内部元素」
+    get_inner
+    // API「抽象Narsese值」
+    narsese_value
+}

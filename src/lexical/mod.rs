@@ -9,12 +9,13 @@
 //! Compound("&&", Atom("", "word"))
 //! Statement("-->", Atom("+", "123"), Compound("\", Atom("_", ""), Atom("$", "1"), Set("{}", Atom("", "SELF"))))
 //! ```
+//!
+//! ! ⚠️【2024-03-20 02:13:50】注意：此模块导出了宏，故无法使用[`util::pub_mod_and_pub_use`]
 
 use crate::api::NarseseValue;
 
 // 词项部分
 mod term;
-
 pub use term::*;
 
 // 语句部分
