@@ -31,6 +31,17 @@ pub use task::*;
 /// * 🚩现在使用更抽象的「Narsese值」取代
 pub type Narsese = NarseseValue<Term, Sentence, Task>;
 
+/// 快捷方式：用于快速构建「词法Narsese」
+/// * ⚠️不建议直接导出其中的符号，而是通过`lexical::shortcut`引入
+pub mod shortcut {
+    // 自动去掉其中的所有`lexical_`前缀
+    pub use crate::{
+        lexical_atom as atom, lexical_budget as budget, lexical_compound as compound,
+        lexical_set as set, lexical_stamp as stamp, lexical_statement as statement,
+        lexical_task as task, lexical_truth as truth,
+    };
+}
+
 /// 单元测试：词项+语句+任务
 #[cfg(test)]
 #[allow(unused)]

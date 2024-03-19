@@ -893,10 +893,7 @@ mod test {
 
     use super::super::format_instances::*;
     use super::*;
-    use crate::{
-        lexical_atom as atom, lexical_compound as compound, lexical_set as set,
-        lexical_statement as statement,
-    };
+    use crate::lexical::shortcut::*;
     use util::*;
 
     /// 通通用测试/尝试解析并返回错误
