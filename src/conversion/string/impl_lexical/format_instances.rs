@@ -319,7 +319,7 @@ pub fn create_format_latex() -> NarseseFormat {
             is_stamp_content: Box::new(|c: char| matches!(c, '0'..='9' | '+' | '-')), // regex:`[0-9+\-]`
             // 真值
             truth_brackets: s!(r"\langle{}", r"\rangle{}"),
-            is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | ';')),
+            is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | ',')), // ! LaTeX使用逗号而非分号
         },
         task: NarseseFormatTask {
             // 预算

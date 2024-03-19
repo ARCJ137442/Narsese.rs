@@ -32,8 +32,11 @@ mod tests {
     };
     use util::*;
 
-    /// （通用）构造一个格式化样本（ASCII自面量版本）
+    /// （通用）构造一个格式化样本（ASCII字面量版本）
     /// * 基本涵盖其所属模块的全部内容
+    /// * 📌格式稳定版：基本所有其它格式以此为参照
+    ///   * 为何此处版本不如「枚举Narsese」那样通用？
+    ///   * 词项前缀、复合词项连接词、陈述系词都是不同的系统（本身就没法相互解析）
     pub(crate) fn _sample_task_ascii() -> Task {
         // 构造词项
         let ball_left = lexical_statement!(lexical_atom!("ball") "{-]" lexical_atom!("left"));
@@ -69,6 +72,24 @@ mod tests {
         // 构造任务并返回
         let budget = "$0.5; 0.75; 0.4$";
         lexical_task!(budget term.clone() punctuation stamp truth) // * 📝【2024-03-09 10:48:31】Clippy推荐直接返回构造之后的值
+    }
+
+    /// 构造一个格式化样本（LaTeX版本）
+    /// * ⚠️其中有些部分可能会过时
+    /// * 🚩【2024-03-20 01:22:26】目前就从相应字符串中解析得来
+    pub(crate) fn _sample_task_latex() -> Task {
+        // 直接从文本构造词项
+        let input = r"\$0.5;0.75;0.4\$ \left<\left(,\; \left<\left\{ball\right\} \rightarrow{} \left[left\right]\right>\; \left<\left(\times{}\; \left\{SELF\right\}\; \$any\; \#some\right) \rightarrow{} \Uparrow{}do\right>\right) \Rightarrow{} \left<\left\{SELF\right\} \rightarrow{} \left[good\right]\right>\right>. t=-1 \langle{}1,0.9\rangle{}";
+        FORMAT_LATEX.parse(input).unwrap().try_into_task().unwrap()
+    }
+
+    /// 构造一个格式化样本（漢文版本）
+    /// * ⚠️其中有些部分可能会过时
+    /// * 🚩【2024-03-20 01:22:26】目前就从相应字符串中解析得来
+    pub(crate) fn _sample_task_han() -> Task {
+        // 直接从文本构造词项
+        let input = "预0.5、0.75、0.4算「（接连，「『ball』是【left】」，「（积，『SELF』，任一any，其一some ）是操作do」）得「『SELF』是【good】」」。 发生在-1 真1、0.9值";
+        FORMAT_HAN.parse(input).unwrap().try_into_task().unwrap()
     }
 
     /// 用于给格式加上「自动解包并格式化内容」功能
@@ -159,7 +180,7 @@ mod tests {
                 r"\$0.5;0.75;0.4\$ \left<\left(,\; \left<\left\{ball\right\} \rightarrow{} \left[left\right]\right>\; \left<\left(\times{}\; \left\{SELF\right\}\; \$any\; \#some\right) \rightarrow{} \Uparrow{}do\right>\right) \Rightarrow{} \left<\left\{SELF\right\} \rightarrow{} \left[good\right]\right>\right>. t=-1 \langle{}1,0.9\rangle{}"
             ]
             _test_format_and_parse => [
-                _sample_task_ascii()
+                _sample_task_latex()
             ]
         }
     }
@@ -169,11 +190,13 @@ mod tests {
         test_matrix! {
             FORMAT_HAN;
             _test_parse_and_format => [
-                "预0.5、0.75、0.4算「（接连，「『ball』是【left】」，「（积，『SELF』，任一any，其一some ）是操作do」）得「『SELF』是【good】」」。 发生在-1 真1、0.9值"
                 "「我是谁」" // ! 先前的failed case
+                "预0.5、0.75、0.4算
+                「（接连，「『ball』是【left】」，「（积，『SELF』，任一any，其一some ）是操作do」）得「『SELF』是【good】」」。
+                发生在-1 真1、0.9值"
             ]
             _test_format_and_parse => [
-                _sample_task_ascii()
+                _sample_task_han()
             ]
         }
     }
@@ -184,7 +207,7 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "enum_narsese")]
 mod tests_with_enum_narsese {
-    use super::{super::impl_enum::NarseseFormat as EnumNarseseFormat, NarseseFormat};
+    use super::super::impl_enum::NarseseFormat as EnumNarseseFormat;
     use crate::lexical::{shortcut::*, Task};
 
     /// （通用）构造一个格式化样本

@@ -617,7 +617,7 @@ impl<'a> ParseState<'a> {
             .match_suffix_char_slice(env)?
             .clone();
         // 跳过标点
-        let var_name = env.len() - punctuation.len();
+        let var_name = env.len() - punctuation.chars().count();
         Some((punctuation, var_name))
     }
 
@@ -668,7 +668,6 @@ impl<'a> ParseState<'a> {
     ///   * 📌核心原因：「后缀匹配」的需求仅在「原子词项作陈述主词」时出现
     ///   * 📍解决方案：直接作为「陈述解析」的特殊情况对待
     /// * 🚩【2024-03-19 19:02:38】现在添加「额外停止条件」用以应对「吃掉系词」的情况
-    #[inline(always)]
     fn segment_atom(&self, env: ParseEnv<'a>) -> ParseResult<(Term, ParseIndex)> {
         // 尝试解析出前缀
         let prefix = self
@@ -914,7 +913,7 @@ mod test {
     // 测试case统一定义
     macro_rules! test_segment {
         (@PARSE $format:expr, $state:expr, $f:ident; $env_str:expr) => {{
-            // 从自面量构建「理想化环境」
+            // 从字面量构建「理想化环境」
             let env = idealize_env($format, $env_str);
             // 解析并返回结果
             $state.$f(&env)
@@ -963,7 +962,7 @@ mod test {
         // 成功case
         let expected_str = "$0.5;0.5;0.5$";
         test_budget! {
-            "$0.5; 0.5; 0.5$" => (expected_str, expected_str.len())
+            "$0.5; 0.5; 0.5$" => (expected_str, expected_str.chars().count())
         }
 
         // 所有的失败case
@@ -1106,7 +1105,7 @@ mod test {
             "<A --> B>." => (
                 ".", // 过滤掉了空格
                 // ! 理想化之后变成 "<A-->B>.:|:
-                "<A-->B>".len(), // 是「潜在的词项」的右边界
+                "<A-->B>".chars().count(), // 是「潜在的词项」的右边界
             )
         };
 
