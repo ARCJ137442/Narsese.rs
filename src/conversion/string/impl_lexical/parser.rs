@@ -24,19 +24,18 @@
 //!     * 如：` <(*, A, B) --> ^op >` ⇒ `<(*,A,B)-->^op>`
 //!     * 🎯由此可以引入「预筛除空白符」机制，简化先前「处处判断空白符」的问题
 //!
-//! ❓在「解析复合词项」「解析陈述」这类【词项无法简单通过「前后搜寻」分割出来】的情况
-//!   * 💡预先交给一个基于「嵌套括号匹配」的「界定函数」
-//!   * ❗但要避免「系词里含有『括号』」的干扰情况
-//!     * 📄源自CommonNarsese case `<A-->B>`中的`-->`
-//!     * 📌目前假设「只有『陈述系词』才需要特别对待」：连接词可以使用「前缀匹配」随着左括弧一起排除
-//!       * 📄如：漢文版本`（外像，我，某，是，似）`中的两个「系词」（「是」「似」）在「复合词项上下文」中不会被考虑为「复合词项连接词」
-//!       * 💭只要别把括号改得「过于变态」，就可以通过
-//!     * ❌这基本否决了通过「括号树」进行匹配的方案——不然就要时刻提防「系词/连接符冒充括号」的情况
+//! * 🚩【2024-03-19 20:28:45】初步完成解析功能
+//!   * 📌从「陈述环境特殊匹配」到「类似『枚举Narsese』的『前缀匹配解析』」
+//!   * 📝许多波折：有关「空前缀原子词项（词语）」「原子词项字符集与陈述系词重复，吃掉陈述系词」的问题，
+//!     * ❌在陈述中使用后缀匹配谓词，然后匹配系词：对「空前缀原子词项」无法（不依靠陈述系词数据）判断终止条件
+//!     * ❌对「原子词项作为陈述主词」特殊处理：接近重写「词项解析」逻辑
+//!   * 💫即便使用「字符数组切片」，「截取子环境→子环境解析」的作用仍然有限
+//!     * 许多时候仍然是在模拟「枚举Narsese」的「头索引递进」机制
 
 use super::NarseseFormat;
 use crate::lexical::{Narsese, Sentence, Task, Term};
-use std::{error::Error, fmt::Display};
-use util::{PrefixMatch, SuffixMatch};
+use std::{collections::HashSet, error::Error, fmt::Display};
+use util::{PrefixMatch, StartsWithStr, SuffixMatch};
 
 /// 词法解析 辅助结构对象
 /// * 🚩放在一个独立的模块内，以便折叠
@@ -200,9 +199,14 @@ pub mod structs {
             Self { format }
         }
 
+        /// 快速构造`ParseError`
+        pub fn parse_error(&self, env: ParseEnv<'a>, message: &str) -> ParseError {
+            ParseError::new(message, env)
+        }
+
         /// 快速构造`Err`
         pub fn err<T>(&self, env: ParseEnv<'a>, message: &str) -> ParseResult<T> {
-            Err(ParseError::new(message, env))
+            Err(self.parse_error(env, message))
         }
     }
 }
@@ -308,12 +312,12 @@ impl<'a> ParseState<'a> {
         // 前后缀切割完毕，最后解析出词项 //
         // 获得「词项」的「字符数组切片」
         let env_term = &env[begin_index..right_border];
-        dbg!(&budget, &truth, &stamp, &punctuation);
+
         // 开始解析词项
         let term = match begin_index < right_border {
             // 在此提取词项
             // ! 解析过程出错，仍然上报错误
-            true => Some(dbg!(self.segment_term(env_term))?.0),
+            true => Some(self.segment_term(env_term)?.0),
             // ! 🚩不再上抛错误，而是诚实反馈「解析失败」
             false => None,
         };
@@ -373,7 +377,8 @@ impl<'a> ParseState<'a> {
         Err(i)
     }
 
-    /// 🛠️工具函数/在环境中从某处索引截取字符序列
+    /// 🛠️工具函数/在环境中从某处前缀截取字符序列
+    /// * 🎯用于词项的「非贪婪有条件前缀匹配」
     /// * 持续【从左到右】匹配，直到非法字符/环境边界为止
     ///   * 非法字符⇒`非法字符所在索引`
     ///   * 环境边界⇒`环境长度即索引右边界`
@@ -389,14 +394,18 @@ impl<'a> ParseState<'a> {
         verify_char: impl Fn(char) -> bool,
     ) -> ParseIndex {
         // 从起始索引处开始
-        env[start..]
-            .iter()
-            .position(
-                // 检测字符是否合法
-                |c| !verify_char(*c),
-            )
-            // 若没找到，以环境长度为右边界
-            .unwrap_or(env.len())
+        // ! 🚩此处不能用迭代器：`env[start..].iter().position`索引是【相对切片】而非【相对开头】
+        let mut i = start;
+        let len_env = env.len();
+        while i < len_env {
+            // 检测字符是否合法
+            match verify_char(env[i]) {
+                true => i += 1,
+                false => return i,
+            }
+        }
+        // 若没找到，以环境长度为右边界
+        len_env
     }
 
     /// 🛠️工具函数/在环境中从某处索引截取字符序列
@@ -614,6 +623,7 @@ impl<'a> ParseState<'a> {
 
     /// 递归解析词项
     /// * 内部函数[`Self::segment_term`]的独立对外接口
+    /// * 🚩返回一个包含「词项」或「解析错误」的结果
     pub fn parse_term(&self, input: &str) -> ParseResult<Term> {
         let idealized = idealize_env(self.format, input);
         Ok(self.segment_term(&idealized)?.0)
@@ -624,43 +634,241 @@ impl<'a> ParseState<'a> {
     ///   * 💭层层递归深入
     /// * ⚙️返回一个可空值
     ///   * 📌要么「词项解析失败」
-    ///   * 📌要么返回「词项解析成功（仅词项）」
-    /// * 💭至于「返回位置标识」可能需要在专门的「分割词项」方法中
-    ///   * 🎯复合词项/陈述中的「词项分割」
+    ///   * 📌要么返回「解析成功」：词项及其右边界（即长度）
     /// * 🚩因为「递归解析」需要传递信息，故需要额外传递索引
     /// * 📌不传递额外信息、直接传递字符串的才能叫「parse」
     fn segment_term(&self, env: ParseEnv<'a>) -> ParseResult<(Term, ParseIndex)> {
-        // TODO: 有待完成
-        println!("有待完成");
         // 先解析「集合词项」
+        if let Ok(result) = self.segment_term_set(env) {
+            return Ok(result);
+        }
         // 然后解析「复合词项」
+        if let Ok(result) = self.segment_compound(env) {
+            return Ok(result);
+        }
         // 再解析「陈述」
-        // 最后解析「原子」
-        self.parse_atom_prefix(env)
+        if let Ok(result) = self.segment_statement(env) {
+            return Ok(result);
+        }
+        // 最后解析「原子」 | 此时不会附加「停止条件」（只会在陈述上下文中开启）
+        self.segment_atom(env)
     }
 
     /// 前缀解析原子词项（贪婪匹配）
-    /// * ⚠️可能会把系词的一部分算入在内
-    /// * ⚙️返回一个可空值
-    ///   * 📌要么「没匹配到合法的词项（[`None`]）」
+    /// * 🎯正常情况下的原子词项：纯原子词项、复合词项中、陈述主词
+    /// * ❗遇到陈述系词总会停下
+    /// * ⚙️返回一个结果
+    ///   * 📌要么返回解析错误
     ///   * 📌要么返回「匹配到的完整词项，以及其在『解析环境』中的右边界（用于切分出其它词项）」
-    /// * 📄匹配的环境如： `word` `^op` `+123` `$i_var`
-    fn parse_atom_prefix(&self, env: ParseEnv<'a>) -> ParseResult<(Term, ParseIndex)> {
+    /// * 📄匹配的环境如：
+    ///   * 单纯环境：`word` `^op` `+123` `$i_var`
+    ///   * 复合环境：`{subject,predicate}` => `subject`
+    ///   * 陈述环境：`subject-->predicate` => `subject`
+    /// * 🚩现在不再辅以对应的「后缀匹配」方案
+    ///   * 📌核心原因：「后缀匹配」的需求仅在「原子词项作陈述主词」时出现
+    ///   * 📍解决方案：直接作为「陈述解析」的特殊情况对待
+    /// * 🚩【2024-03-19 19:02:38】现在添加「额外停止条件」用以应对「吃掉系词」的情况
+    #[inline(always)]
+    fn segment_atom(&self, env: ParseEnv<'a>) -> ParseResult<(Term, ParseIndex)> {
         // 尝试解析出前缀
-        let prefix_result = self.format.atom.prefixes.match_prefix_char_slice(env);
-        let prefix = match prefix_result {
-            Some(it) => it,
-            None => return self.err(env, "未匹配到原子词项前缀"),
-        }
-        .clone();
+        let prefix = self
+            // 匹配前缀
+            .format
+            .atom
+            .prefixes
+            .match_prefix_char_slice(env)
+            // 从Option打包成Result，然后尝试解包
+            .ok_or(self.parse_error(env, "未匹配到原子词项前缀"))?
+            .to_owned();
+        // 计算出所有系词的首字符 // ! 用于【统一】应对「分割陈述」时「原子词项做主词」的情况
+        let copula_heads = self
+            .format
+            .statement
+            .copulas
+            .iter_x_fixes()
+            .filter_map(|copula| copula.chars().next())
+            .collect::<HashSet<_>>();
         // 计算出起始索引
         let content_start = prefix.chars().count();
         // 朝后贪婪扫描字符
-        let right_border =
-            self.collect_some_prefix(env, content_start, &self.format.atom.is_identifier);
+        let right_border = self.collect_some_prefix(
+            env,
+            content_start,
+            // 检验
+            |c|
+            // 首先是合法字符
+            (self.format.atom.is_identifier)(c) &&
+            // 其次是「不能为任何系词的起始字符」
+            !copula_heads.contains(&c),
+        );
+        // 检查非空
+        // ! 不允许名称为空的原子词项
+        if content_start >= right_border && prefix.is_empty() {
+            return self.err(env, "原子词项名称与前缀不能同时为空");
+        }
+        // 获取名称
         let name = String::from_iter(&env[content_start..right_border]);
-        // 跳过标点
+        // 构造
         let term = Term::Atom { prefix, name };
+        // 返回
+        Ok((term, right_border))
+    }
+
+    /// 解析集合词项
+    fn segment_term_set(&self, env: ParseEnv<'a>) -> ParseResult<(Term, ParseIndex)> {
+        // 前缀匹配并跳过左括弧
+        let (left, right) = self
+            .format
+            .compound
+            .set_brackets
+            .match_prefix_char_slice(env)
+            .ok_or(self.parse_error(env, "缺少陈述左括弧"))?;
+
+        // 前缀切片最需要注意的是长度
+        let mut term_begin = left.chars().count();
+
+        // 开始解析其中的元素
+        let mut terms = Vec::new();
+        let right_border;
+        // 第一个元素
+        let (term, term_len) = self.segment_term(&env[term_begin..])?;
+        terms.push(term);
+        term_begin += term_len;
+        loop {
+            // 右括弧⇒跳过，结束
+            if env[term_begin..].starts_with_str(right) {
+                right_border = term_begin + right.chars().count();
+                break;
+            }
+            // 分隔符⇒跳过
+            if env[term_begin..].starts_with_str(&self.format.compound.separator) {
+                term_begin += self.format.compound.separator.chars().count();
+            }
+            // 解析一个词项
+            let (term, term_len) = self.segment_term(&env[term_begin..])?;
+            terms.push(term);
+            term_begin += term_len;
+        }
+
+        // 解包 & 构造 //
+        let term = Term::Set {
+            left_bracket: left.clone(),
+            terms,
+            right_bracket: right.clone(),
+        };
+        // 返回
+        Ok((term, right_border))
+    }
+
+    /// 解析复合词项
+    fn segment_compound(&self, env: ParseEnv<'a>) -> ParseResult<(Term, ParseIndex)> {
+        // 前缀匹配并跳过左括弧
+        let (left, right) = self
+            .format
+            .compound
+            .brackets
+            .match_prefix_char_slice(env)
+            .ok_or(self.parse_error(env, "缺少陈述左括弧"))?;
+
+        // 前缀切片最需要注意的是长度
+        let connecter_start = left.chars().count();
+
+        // 解析连接符 //
+        let connecter = self
+            .format
+            .compound
+            .connecters
+            .match_prefix_char_slice(&env[connecter_start..])
+            .ok_or(self.parse_error(env, "缺少陈述左括弧"))?
+            .clone();
+
+        // 不断解析「分隔符-词项-分隔符-词项……」
+        let mut terms = Vec::new();
+        let mut term_begin = connecter_start + connecter.chars().count();
+        let right_border;
+        loop {
+            // 右括弧⇒跳过，结束
+            if env[term_begin..].starts_with_str(right) {
+                right_border = term_begin + right.chars().count();
+                break;
+            }
+            // 分隔符⇒跳过
+            if env[term_begin..].starts_with_str(&self.format.compound.separator) {
+                term_begin += self.format.compound.separator.chars().count();
+            }
+            // 解析一个词项
+            let (term, term_len) = self.segment_term(&env[term_begin..])?;
+            terms.push(term);
+            term_begin += term_len;
+        }
+
+        // 解包 & 构造 //
+        let term = Term::Compound { connecter, terms };
+        // 返回
+        Ok((term, right_border))
+    }
+
+    /// 解析陈述
+    /// * 🎯基础、统一的陈述解析支持
+    /// * ⚙️返回一个结果
+    ///   * 📌要么返回解析错误
+    ///   * 📌要么返回「匹配到的完整词项，以及其在『解析环境』中的右边界（用于切分出其它词项）」
+    ///   * 📌为【原子词项作为主词】的特殊情况作适配
+    /// * 📄匹配的环境如：
+    ///   * 原子词项作为主词：`<A-->B>`
+    ///   * 其它常规情况：`<(*,{SELF})-->yes>` `<<A-->B>==><B-->C>>`
+    ///
+    /// * ❌【2024-03-19 19:14:08】放弃对「原子词项作为主词」的适配：宁愿一刀切，也不要让代码变复杂
+    /// * ❌【2024-03-19 19:10:28】不要过于复杂化：解析主词最好跟其它情况一样
+    /// * ❌【2024-03-19 16:29:22】弃用「后缀匹配谓词，再以此定位系词」的方案：后缀匹配还得分开「无前缀原子词项」的情况
+    /// * 🚩方案：使用「原子词项前缀」结合「原子词项内容（首个字符）」作为判断依据
+    /// ! ⚠️不能直接使用「原子词项前缀」作为判断依据：必须考虑**空前缀**情况
+    fn segment_statement(&self, env: ParseEnv<'a>) -> ParseResult<(Term, ParseIndex)> {
+        // 前缀匹配并跳过左括弧
+        let (left, right) = self
+            .format
+            .statement
+            .brackets
+            .match_prefix_char_slice(env)
+            .ok_or(self.parse_error(env, "缺少陈述左括弧"))?;
+        // 前缀切片最需要注意的是长度
+        let subject_start = left.chars().count();
+
+        // 解析主词 //
+        // ! 【2024-03-19 19:26:16】现在不再特别区分对待「原子词项作为主词，贪婪解析内容吃掉系词」的情况了
+        // * 🚩解决方案：「一刀切」拒绝系词开头作为原子词项内容
+        let (subject, subject_len) = self.segment_term(&env[subject_start..])?;
+        let copula_start = subject_start + subject_len;
+
+        // 解析系词 //
+        let copula = self
+            .format
+            .statement
+            .copulas
+            .match_prefix_char_slice(&env[copula_start..])
+            .ok_or(self.parse_error(env, "未解析出系词"))?
+            .clone();
+        let predicate_start = copula_start + copula.chars().count();
+
+        // 解析谓词 //
+        let (predicate, relative_len) = self.segment_term(&env[predicate_start..])?;
+
+        // 跳过右括弧 //
+        let right_bracket_start = predicate_start + relative_len;
+        let right_border = match env[right_bracket_start..].starts_with_str(right) {
+            true => right_bracket_start + right.chars().count(),
+            false => return self.err(env, "未匹配到右括弧"),
+        };
+
+        // 解包 & 构造 //
+        let subject = Box::new(subject);
+        let predicate = Box::new(predicate);
+        let term = Term::Statement {
+            subject,
+            copula,
+            predicate,
+        };
+
         // 返回
         Ok((term, right_border))
     }
@@ -681,11 +889,15 @@ impl NarseseFormat {
 /// 单元测试
 #[cfg(test)]
 mod test {
-
-    use util::asserts;
+    #![allow(unused)]
 
     use super::super::format_instances::*;
     use super::*;
+    use crate::{
+        lexical_atom as atom, lexical_compound as compound, lexical_set as set,
+        lexical_statement as statement,
+    };
+    use util::*;
 
     /// 通通用测试/尝试解析并返回错误
     fn __test_parse(format: &NarseseFormat, input: &str) -> Narsese {
@@ -903,35 +1115,167 @@ mod test {
 
         // 所有的失败case
         test_segment_punctuation! {
+            // 原子词项 //
             // 非法前缀
-            ";" "#" "$" "%"
-            "^" "&" "*" "-"
-            "_" "+" "=" "/"
-            ":" "|" "\\" "0"
+            ";" "#" r"$" "%"
+            "^" "&" r"*" "-"
+            "_" "+" r"=" "/"
+            ":" "|" r"\" "0"
         };
     }
 
-    /// 测试/后缀截取时间戳
+    // case统一定义
+    macro_rules! test_parse_term {
+        // 成功case
+        {
+            $state:expr;
+            $( $narsese:expr => $expected:expr )*
+        } => {
+            asserts! {
+                $(
+                    $state
+                        .parse_term($narsese)
+                        .expect(&format!("词项「{}」解析失败！", $narsese))
+                    => $expected
+                )*
+            }
+        };
+        // 成功case
+        {
+            $state:expr;
+            $( $narsese:expr )*
+        } => {
+            asserts! {
+                $(
+                    {
+                        let parsed = $state.parse_term($narsese);
+                        if parsed.is_ok() {dbg!(&parsed);}
+                        parsed.is_err()
+                    }
+                )*
+            }
+        };
+    }
+
+    /// 测试/解析词项
     #[test]
     fn test_parse_term() {
         let format = &FORMAT_ASCII;
         let state = ParseState::new(format);
 
-        // case统一定义
-        // macro_rules! test_parse_term {
-        //     { $( $content:tt )+ } => {
-        //         test_segment! {
-        //             format, state, parse_term;
-        //             $($content)+
-        //         }
-        //     };
-        // }
-
         // 成功cases
-        let narsese = "$A";
-        let term = state.parse_term(narsese).unwrap();
-        asserts! {
-            term => Term::Atom { prefix: "$".into(), name: "A".into() }
+        test_parse_term! {
+            state;
+            // 原子词项 //
+            // 正常完整形式 | 会去掉空格
+            "\n\tA" => atom!("A")
+            "#A" => atom!("#" "A")
+            "真の词项" => atom!("真の词项")
+            "_" => atom!("_" "") // * 占位符
+            "_占位符" => atom!("_" "占位符") // * 占位符
+            // 舍去无效后缀
+            "$A❗" => atom!("$" "A")
+            "+123%%%" => atom!("+" "123")
+            "^op --> あ" => atom!("^" "op")
+            // 陈述 //
+            "<^op --> あ>" => statement!(atom!("^" "op") "-->" atom!("あ"))
+            "<<A --> B> ==> <B --> C>>" => statement!(
+                statement!(atom!("A") "-->" atom!("B"))
+                "==>"
+                statement!(atom!("B") "-->" atom!("C"))
+            )
+            // 复合词项 //
+            "(*, A, B, C)" => compound!("*"; atom!("A") atom!("B") atom!("C"))
+            "(* A, B, C)" => compound!("*";
+                // 此处允许没有分隔符
+                atom!("A")
+                atom!("B")
+                atom!("C")
+            )
+            "(* A #B #C)" => compound!("*";
+                // 此处允许没有分隔符
+                atom!("" "A")
+                atom!("#" "B")
+                atom!("#" "C")
+            )
+            "(*, A  B, C)" => compound!(
+                "*";
+                atom!("AB") // * ←理想化去掉空格之后，这俩粘在一起
+                atom!("C")
+            )
+            "(*, A)" => compound!("*"; atom!("A"))
+            "(*, _)" => compound!("*"; atom!("_" ""))
+            "(&&, <A --> B>, <B --> C>, <C --> D>)" => compound!(
+                "&&";
+                statement!(atom!("A") "-->" atom!("B"))
+                statement!(atom!("B") "-->" atom!("C"))
+                statement!(atom!("C") "-->" atom!("D"))
+            )
+            // 集合词项
+            "{SELF}" => set!("{"; "SELF"; "}")
+        }
+
+        // 失败cases
+        test_parse_term! {
+            state;
+            // 原子词项 //
+            // 空内容
+            ""
+            // 非法前缀
+            "@A"
+            "-A"
+            // 非法字符 | ⚠️不允许名称为空
+            "❗"
+            "!"
+            "!因为前面这个非法前缀_这玩意儿无法被解析成原子词项"
+            "~不会被解析到"
+            // 复合词项/集合词项 //
+            // 非法连接符
+            "(A, B, C)"
+            "(@, A, B, C)"
+            "(;, A, B, C)"
+            "(%, A, B, C)"
+            "($, A, B, C)"
+            "(#, A, B, C)"
+            "(!, A, B, C)"
+            "(^, A, B, C)"
+            "(_, A, B, C)"
+            // 缺少括弧
+            "(*, A, B, C"
+            "[A, B, C"
+            "{A, B, C"
+            // 多余括弧
+            "((*, A, B, C)"
+            "[[A, B, C]"
+            "{{A, B, C}"
+            // "(A, B, C))" // ! ←这些会只认前缀
+            // "[A, B, C]]" // ! ←这些会只认前缀
+            // "{A, B, C}}" // ! ←这些会只认前缀
+            // 多余分隔符 | 分隔符可缺省，但不可多余
+            "(*,, A,  B,  C )"
+            "(*,  A,, B,  C )"
+            "(*,  A,  B,, C )"
+            "(*,  A,  B,  C,)"
+            // 陈述 //
+            // 缺少括弧
+            "<A --> B"
+            // 多余括弧
+            "<<A ==> B>"
+            // 非法系词
+            "<A --> B ==> C>" // 连续系词不受支持
+            "<A -|> B>"
+            "<A -?> B>"
+            "<A -#> B>"
+            "<A ==< B>"
+            "<A =>> B>"
+            "<A -=> B>"
+            "<A <-- B>"
+            "<A <== B>"
+            "<A <:> B>"
+            "<A <#> B>"
+            "<A ==@ B>"
+            "<A --} B>"
+            "<A [-- B>"
         }
     }
 
@@ -980,5 +1324,34 @@ mod test {
             // 原子词项 | 独立变量🆚预算
             "$0.5; 0.5; 0.5$ $i_var@ :|: %1.0; 0.9%"
         }
+    }
+
+    /// 集中测试/鲁棒性
+    #[test]
+    fn test_parse_robust() {
+        let format = &FORMAT_ASCII;
+        let parse = |input| format.parse(input).expect("解析失败");
+        let results = f_parallel![
+            parse;
+            "<(&&, <<$x-->A>==><$x-->B>>, <<$y-->C>==><$y-->D>>) ==> E>.";
+            "<{tim} --> (/,livingIn,_,{graz})>. %0%";
+            "<<(*,$1,sunglasses) --> own> ==> <$1 --> [aggressive]>>.";
+            "<(*,{tom},sunglasses) --> own>.";
+            "<<$1 --> [aggressive]> ==> <$1 --> murder>>.";
+            "<<$1 --> (/,livingIn,_,{graz})> ==> <$1 --> murder>>.";
+            "<{?who} --> murder>?";
+            "<{tim} --> (/,livingIn,_,{graz})>.";
+            "<{tim} --> (/,livingIn,_,{graz})>. %0%";
+            "<<(*,$1,sunglasses) --> own> ==> <$1 --> [aggressive]>>.";
+            "<(*,{tom},(&,[black],glasses)) --> own>.";
+            "<<$1 --> [aggressive]> ==> <$1 --> murder>>.";
+            "<<$1 --> (/,livingIn,_,{graz})> ==> <$1 --> murder>>.";
+            "<sunglasses --> (&,[black],glasses)>.";
+            "<{?who} --> murder>?";
+        ];
+        show!(&results);
+        // for result in &results {
+        //     assert!(result.is_ok());
+        // }
     }
 }

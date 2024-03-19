@@ -108,7 +108,7 @@ macro_rules! lexical_compound {
 macro_rules! lexical_set {
     // 左括号；字符串自面量（直接作为「无参原子」加入）；右括号
     [ $left:expr ; $name:literal ; $right:expr ] => {
-        $crate::lexical::Term::new_set($left, vec![lexical_atom!($name)], $right)
+        $crate::lexical::Term::new_set($left, vec![$crate::lexical_atom!($name)], $right)
     };
     // 左括号；中间内容（可选逗号）；右括号
     [ $left:expr ; $($term:expr $(,)?)* ; $right:expr ] => {
