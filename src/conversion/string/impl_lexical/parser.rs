@@ -311,13 +311,11 @@ impl<'a> ParseState<'a> {
         dbg!(&budget, &truth, &stamp, &punctuation);
         // 开始解析词项
         let term = match begin_index < right_border {
-            true => self.parse_term(dbg!(env_term))?,
-            false => {
-                return self.err(
-                    env_term,
-                    &format!("无法在索引[{begin_index}..{right_border}]解析出词项"),
-                )
-            }
+            // 在此提取词项
+            // ! 解析过程出错，仍然上报错误
+            true => Some(dbg!(self.segment_term(env_term))?.0),
+            // ! 🚩不再上抛错误，而是诚实反馈「解析失败」
+            false => None,
         };
 
         // 构造「中间结果」 //
@@ -333,8 +331,8 @@ impl<'a> ParseState<'a> {
     /// 🛠️工具函数/在环境中从某处索引截取字符序列
     /// * 持续【从左到右】匹配，直到右边界/非法字符/环境边界为止
     ///   * 右边界⇒`Ok(右边界起始索引)`
-    ///   * 非法字符⇒`Ok(非法字符所在索引)`
-    ///   * 环境边界⇒`Ok(环境长度即索引右边界)`
+    ///   * 非法字符⇒`Err(非法字符所在索引)`
+    ///   * 环境边界⇒`Err(环境长度即索引右边界)`
     /// * 🎯对应PEG中的Any/Some逻辑
     /// * 🚩【2024-03-18 08:47:12】现在基本确立「延迟截取字符串」原则
     ///   * 不到需要的时候，一律以「起止索引」表示「字符串」
@@ -373,6 +371,32 @@ impl<'a> ParseState<'a> {
         }
         // 未找到终止括弧 ⇒ `Err(环境长度即索引右边界)`
         Err(i)
+    }
+
+    /// 🛠️工具函数/在环境中从某处索引截取字符序列
+    /// * 持续【从左到右】匹配，直到非法字符/环境边界为止
+    ///   * 非法字符⇒`非法字符所在索引`
+    ///   * 环境边界⇒`环境长度即索引右边界`
+    /// * 📌相比[`Self::segment_some_prefix`]不再有（固定的）右括号
+    /// * 🎯对应PEG中的Any/Some逻辑
+    /// * 🚩【2024-03-18 08:47:12】现在基本确立「延迟截取字符串」原则
+    /// * 📄参考：[`Self::segment_some_prefix`]
+    #[inline(always)]
+    fn collect_some_prefix(
+        &self,
+        env: ParseEnv<'a>,
+        start: ParseIndex,
+        verify_char: impl Fn(char) -> bool,
+    ) -> ParseIndex {
+        // 从起始索引处开始
+        env[start..]
+            .iter()
+            .position(
+                // 检测字符是否合法
+                |c| !verify_char(*c),
+            )
+            // 若没找到，以环境长度为右边界
+            .unwrap_or(env.len())
     }
 
     /// 🛠️工具函数/在环境中从某处索引截取字符序列
@@ -589,17 +613,56 @@ impl<'a> ParseState<'a> {
     }
 
     /// 递归解析词项
-    /// * 🚩分「复合」「陈述」「原子」三类
+    /// * 内部函数[`Self::segment_term`]的独立对外接口
+    pub fn parse_term(&self, input: &str) -> ParseResult<Term> {
+        let idealized = idealize_env(self.format, input);
+        Ok(self.segment_term(&idealized)?.0)
+    }
+
+    /// 递归分隔词项
+    /// * 🚩分「集合」「复合」「陈述」「原子」四类
     ///   * 💭层层递归深入
     /// * ⚙️返回一个可空值
     ///   * 📌要么「词项解析失败」
     ///   * 📌要么返回「词项解析成功（仅词项）」
     /// * 💭至于「返回位置标识」可能需要在专门的「分割词项」方法中
     ///   * 🎯复合词项/陈述中的「词项分割」
-    fn parse_term(&self, env: ParseEnv<'a>) -> ParseResult<Option<Term>> {
+    /// * 🚩因为「递归解析」需要传递信息，故需要额外传递索引
+    /// * 📌不传递额外信息、直接传递字符串的才能叫「parse」
+    fn segment_term(&self, env: ParseEnv<'a>) -> ParseResult<(Term, ParseIndex)> {
         // TODO: 有待完成
         println!("有待完成");
-        Ok(None) // ! 【2024-03-18 22:46:23】占位符
+        // 先解析「集合词项」
+        // 然后解析「复合词项」
+        // 再解析「陈述」
+        // 最后解析「原子」
+        self.parse_atom_prefix(env)
+    }
+
+    /// 前缀解析原子词项（贪婪匹配）
+    /// * ⚠️可能会把系词的一部分算入在内
+    /// * ⚙️返回一个可空值
+    ///   * 📌要么「没匹配到合法的词项（[`None`]）」
+    ///   * 📌要么返回「匹配到的完整词项，以及其在『解析环境』中的右边界（用于切分出其它词项）」
+    /// * 📄匹配的环境如： `word` `^op` `+123` `$i_var`
+    fn parse_atom_prefix(&self, env: ParseEnv<'a>) -> ParseResult<(Term, ParseIndex)> {
+        // 尝试解析出前缀
+        let prefix_result = self.format.atom.prefixes.match_prefix_char_slice(env);
+        let prefix = match prefix_result {
+            Some(it) => it,
+            None => return self.err(env, "未匹配到原子词项前缀"),
+        }
+        .clone();
+        // 计算出起始索引
+        let content_start = prefix.chars().count();
+        // 朝后贪婪扫描字符
+        let right_border =
+            self.collect_some_prefix(env, content_start, &self.format.atom.is_identifier);
+        let name = String::from_iter(&env[content_start..right_border]);
+        // 跳过标点
+        let term = Term::Atom { prefix, name };
+        // 返回
+        Ok((term, right_border))
     }
 }
 
@@ -809,6 +872,69 @@ mod test {
         };
     }
 
+    /// 测试/后缀截取时间戳
+    #[test]
+    fn test_segment_punctuation() {
+        let format = &FORMAT_ASCII;
+        let state = ParseState::new(format);
+
+        // case统一定义
+        macro_rules! test_segment_punctuation {
+            { $( $content:tt )+ } => {
+                test_segment! {
+                    format, state, segment_punctuation;
+                    $($content)+
+                }
+            };
+        }
+
+        // 成功cases
+        test_segment_punctuation! {
+            "! " => (
+                "!", // 过滤掉了空格
+                0, // 是「潜在的词项」的右边界
+            )
+            "<A --> B>." => (
+                ".", // 过滤掉了空格
+                // ! 理想化之后变成 "<A-->B>.:|:
+                "<A-->B>".len(), // 是「潜在的词项」的右边界
+            )
+        };
+
+        // 所有的失败case
+        test_segment_punctuation! {
+            // 非法前缀
+            ";" "#" "$" "%"
+            "^" "&" "*" "-"
+            "_" "+" "=" "/"
+            ":" "|" "\\" "0"
+        };
+    }
+
+    /// 测试/后缀截取时间戳
+    #[test]
+    fn test_parse_term() {
+        let format = &FORMAT_ASCII;
+        let state = ParseState::new(format);
+
+        // case统一定义
+        // macro_rules! test_parse_term {
+        //     { $( $content:tt )+ } => {
+        //         test_segment! {
+        //             format, state, parse_term;
+        //             $($content)+
+        //         }
+        //     };
+        // }
+
+        // 成功cases
+        let narsese = "$A";
+        let term = state.parse_term(narsese).unwrap();
+        asserts! {
+            term => Term::Atom { prefix: "$".into(), name: "A".into() }
+        }
+    }
+
     /// 测试/所有条目
     #[test]
     fn test_parse_items() {
@@ -832,8 +958,27 @@ mod test {
             }
         }
 
-        // 待解析Narsese
-        let narsese = "$0.5; 0.5; 0.5$ <A --> B>. :|: %1.0; 0.9%";
-        test(&FORMAT_ASCII, narsese);
+        // 批量生成的宏
+        macro_rules! tests {
+            {
+                $format:expr;
+                $($narsese:expr)*
+            } => {
+                $(
+                    test($format, $narsese);
+                )*
+            };
+        }
+
+        // 测试 @ ASCII
+        tests! {
+            &FORMAT_ASCII;
+            // 正常陈述
+            "$0.5; 0.5; 0.5$ <A --> B>. :|: %1.0; 0.9%"
+            // 原子词项 | 查询变量🆚问题
+            "$0.5; 0.5; 0.5$ ?v? :|: %1.0; 0.9%"
+            // 原子词项 | 独立变量🆚预算
+            "$0.5; 0.5; 0.5$ $i_var@ :|: %1.0; 0.9%"
+        }
     }
 }
