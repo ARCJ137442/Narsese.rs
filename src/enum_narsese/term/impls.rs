@@ -1,10 +1,9 @@
 //! 统一定义词项实现
 
-use util::ResultTransform;
-
 use super::structs::*;
 use crate::api::{GetTerm, UIntPrecision};
 use std::{any::type_name, error::Error, hash::Hash, io::ErrorKind};
+use util::ResultTransform;
 
 // 实现 //
 

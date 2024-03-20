@@ -1,6 +1,5 @@
-use crate::api::{GetBudget, GetPunctuation, GetStamp, GetTerm, GetTruth};
-
 use super::{Sentence, Term};
+use crate::api::{GetBudget, GetPunctuation, GetStamp, GetTerm, GetTruth};
 
 /// 词法上的「任务」：预算值+语句
 /// * 🚩【2024-03-15 22:03:48】现在不再特别加上「Lexical」前缀，而是使用命名空间区分

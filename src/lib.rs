@@ -6,24 +6,16 @@
 // * 📝↓此处进行了三个操作：导入外部库、改名、重新导出
 pub extern crate nar_dev_utils as util;
 
-// 共用API
+// 共用API //
 pub mod api;
 
-// 词法
-#[cfg(feature = "lexical_narsese")]
-pub mod lexical;
-
+// 枚举Narsese //
 #[cfg(feature = "enum_narsese")]
 pub mod enum_narsese;
 
-// 转换
+// 词法Narsese //
+#[cfg(feature = "lexical_narsese")]
+pub mod lexical;
+
+// 转换 //
 pub mod conversion;
-
-#[cfg(test)]
-#[allow(unused)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn main() {}
-}

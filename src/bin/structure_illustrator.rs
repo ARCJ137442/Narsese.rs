@@ -3,9 +3,8 @@
 //! * 基于「枚举Narsese」实现
 #![cfg(feature = "enum_narsese")]
 
-use std::io::{stdin, stdout, Stdin, Write};
-
 use narsese::conversion::string::impl_enum::{format_instances::*, NarseseFormat, NarseseResult};
+use std::io::{stdin, stdout, Stdin, Write};
 
 /// REPL主函数
 fn main() {

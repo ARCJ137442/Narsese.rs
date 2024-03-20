@@ -1,6 +1,5 @@
-use crate::api::{GetPunctuation, GetStamp, GetTerm, GetTruth};
-
 use super::Term;
+use crate::api::{GetPunctuation, GetStamp, GetTerm, GetTruth};
 
 /// 词法上的「语句」：词项+标点+时间戳+真值
 /// * 仅作为「最大并集」，不考虑「问题/请求 无真值」等情况
