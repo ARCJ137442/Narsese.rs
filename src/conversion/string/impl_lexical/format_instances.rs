@@ -427,8 +427,6 @@ pub fn create_format_han() -> NarseseFormat {
 }
 
 /// 单元测试
-///
-/// TODO: 🚧【2024-03-18 23:10:23】仍不完善（需要更多种类的格式）
 #[cfg(test)]
 mod tests_enum_narsese {
 

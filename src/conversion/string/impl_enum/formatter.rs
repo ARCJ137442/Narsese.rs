@@ -1,7 +1,7 @@
 //! 实现/格式化器
 
 use crate::{
-    api::{GetBudget, GetStamp, GetTerm, GetTruth},
+    api::{FloatPrecision, GetBudget, GetStamp, GetTerm, GetTruth, UIntPrecision},
     conversion::string::common_narsese_templates::*,
     enum_narsese::*,
 };
@@ -58,7 +58,7 @@ impl NarseseFormat<&str> {
     fn format_image(
         &self,
         out: &mut String,
-        index: usize,
+        index: UIntPrecision,
         components: Vec<&Term>,
         connecter: &str,
     ) {
@@ -389,9 +389,7 @@ impl NarseseFormat<&str> {
 
     /// 格式化函数/任务
     pub fn format_task(&self, task: &Task) -> String {
-        let mut out = String::new();
-        self._format_task(&mut out, task);
-        out
+        catch_flow!(self._format_task; task)
     }
 
     /// 总格式化函数/任务
@@ -404,6 +402,24 @@ impl NarseseFormat<&str> {
         self._format_sentence(&mut buffer, task.get_sentence());
         // 添加空格
         add_space_if_necessary_and_flush_buffer(out, &mut buffer, self.space.format_items);
+    }
+
+    /// 格式化函数/Narsese
+    /// * 🚩自动分派
+    pub fn format_narsese(&self, narsese: &Narsese) -> String {
+        catch_flow!(self._format_narsese; narsese)
+    }
+
+    /// 总格式化函数/Narsese
+    fn _format_narsese(&self, out: &mut String, narsese: &Narsese) {
+        match narsese {
+            // 词项
+            Narsese::Term(term) => self._format_term(out, term),
+            // 语句
+            Narsese::Sentence(sentence) => self._format_sentence(out, sentence),
+            // 任务
+            Narsese::Task(task) => self._format_task(out, task),
+        }
     }
 }
 

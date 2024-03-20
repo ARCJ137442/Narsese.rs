@@ -5,7 +5,7 @@
 //! * 单真值
 //! * 双真值
 
-use crate::enum_narsese::hyper_parameters::*;
+use crate::api::hyper_parameters::*;
 use util::ZeroOneFloat;
 
 /// 使用枚举表示真值

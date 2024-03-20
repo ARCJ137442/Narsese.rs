@@ -26,9 +26,12 @@
 //!     * ✨有相应的「结果索引」类型
 
 use super::format::*;
-use crate::enum_narsese::*;
+use crate::{
+    api::{FloatPrecision, FromParse, IntPrecision, UIntPrecision},
+    enum_narsese::*,
+};
 use std::{error::Error, fmt::Display, io::ErrorKind};
-use util::{first, ZeroOneFloat};
+use util::*;
 
 /// 特化「CommonNarsese结果」到「枚举Narsese」版本
 /// * 🎯用于存储「最终被解析出来的CommonNarsese对象」
@@ -109,13 +112,24 @@ impl MidParseResult {
             punctuation: None,
         }
     }
+    /// 拿走其中所有结果，将自身变回空值
+    /// * 🚩一个个字段[`Option::take`]
+    pub fn take(&mut self) -> Self {
+        Self {
+            term: self.term.take(),
+            truth: self.truth.take(),
+            budget: self.budget.take(),
+            stamp: self.stamp.take(),
+            punctuation: self.punctuation.take(),
+        }
+    }
 }
 
 /// 用于表征「解析环境」
 /// * 具有所有权
 type ParseEnv<T = char> = Vec<T>;
 /// 用于表征「解析索引」
-type ParseIndex = usize;
+type ParseIndex = UIntPrecision;
 
 /// 用于表征「解析结果」
 /// * 用于表示「解析对象」
@@ -170,7 +184,7 @@ impl ParseError {
     }
 }
 /// 用于在报错时展示周边文本
-const ERR_CHAR_VIEW_RANGE: usize = 4;
+const ERR_CHAR_VIEW_RANGE: UIntPrecision = 4;
 /// 呈现报错文本
 impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -195,7 +209,7 @@ pub struct ParseState<'a, Content = &'a str> {
     /// 「解析环境」
     env: ParseEnv,
     /// 「解析环境」的长度 | 用于缓存常用变量
-    len_env: usize,
+    len_env: UIntPrecision,
     /// 当前解析的位置 | 亦用作「下一起始索引」
     head: ParseIndex,
     /// 「中间解析结果」
@@ -237,14 +251,23 @@ impl<'a, C> ParseState<'a, C> {
     }
 
     /// 生成「解析错误」结果：直接根据消息内联自身解析状态
+    /// * 在[`parse_error`]的基础上包装成[`ParseResult`]
     /// * 🎯用于最后「生成结果」的情况
+    #[inline(always)]
+    pub fn err<T>(&self, message: &str) -> ParseResult<T> {
+        Err(self.parse_error(message))
+    }
+
+    /// 生成「解析错误」：直接根据消息内联自身解析状态
+    /// * 🎯用于[`Option`]的「[`ok_or`]+`?`」方法
+    ///   * 方便将[`Option`]转换为[`Err`]进行上抛
     /// * 📝生成的结果不能与自身有任何瓜葛
     ///   * 📌后续「错误」中引用的「解析环境」可能在「状态销毁」后导致「悬垂引用」问题
     /// * 📝合并「消耗错误」结果：泛型参数可以自动捕获返回类型
     /// * 📌自动内联
     #[inline(always)]
-    pub fn err<T>(&self, message: &str) -> ParseResult<T> {
-        Err(ParseError::new(message, self.env.clone(), self.head))
+    pub fn parse_error(&self, message: &str) -> ParseError {
+        ParseError::new(message, self.env.clone(), self.head)
     }
 
     /// 生成「消耗成功」结果：无需内联自身状态
@@ -429,11 +452,17 @@ impl<'a> ParseState<'a, &str> {
     }
 
     /// 解析总入口 | 全部使用自身状态
-    pub fn parse(&mut self) -> ParseResult {
-        // 消耗文本，构建「中间解析结果」
-        self.build_mid_result()?;
-        // 转换解析结果
-        self.transform_mid_result()
+    /// * 📌现在实现细节放到`impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult`
+    /// * 📝对泛型参数的限制，不一定是裸露的`参数: 限制`形式
+    ///   * 可以是类似「模式匹配」的`含参类型<参数>: 限制`
+    /// * 🚩因为此处没有引入新输入，所以使用「零大小类型」空元组
+    /// * ⚠️【2024-03-20 15:48:59】此处可能会导致生命周期冲突：[`ParseResult::from_parse`]可能会持续借用[`self`]
+    #[inline]
+    pub fn parse<To>(&'a mut self) -> ParseResult<To>
+    where
+        ParseResult<To>: FromParse<(), &'a mut Self> + 'a,
+    {
+        ParseResult::from_parse((), self)
     }
 
     // 消耗文本 | 构建「中间解析结果」 //
@@ -473,7 +502,7 @@ impl<'a> ParseState<'a, &str> {
     /// * 🚩逻辑：头部索引增加赋值
     /// * 📌自动内联
     #[inline(always)]
-    fn head_step(&mut self, step: usize) {
+    fn head_step(&mut self, step: UIntPrecision) {
         self.head += step;
     }
 
@@ -609,7 +638,7 @@ impl<'a> ParseState<'a, &str> {
             self.head_move;
             // 要缓存的索引
             self.head;
-            // ! s要缓存进的错误集
+            // ! 要缓存进的错误集
             errs;
 
             // 空格⇒跳过 //
@@ -732,17 +761,17 @@ impl<'a> ParseState<'a, &str> {
     /// * 使用常量`N`指定解析的数目
     ///   * 多的会报错
     ///   * 少的会忽略（额外返回「解析出的数目」作为标记）
-    fn parse_separated_floats<const N: usize>(
+    fn parse_separated_floats<const N: UIntPrecision>(
         &mut self,
         separator: &str,
         right_bracket: &str,
-    ) -> ParseResult<([FloatPrecision; N], usize)> {
+    ) -> ParseResult<([FloatPrecision; N], UIntPrecision)> {
         // 直接初始化定长数组
         let mut result: [FloatPrecision; N] = [0.0; N];
         // 构造数值缓冲区
         let mut value_buffer = String::new();
         // 填充数组
-        let mut i: usize = 0;
+        let mut i: UIntPrecision = 0;
         while self.can_consume() && i < N {
             match self.head_char() {
                 // 空白⇒跳过
@@ -1070,7 +1099,7 @@ impl<'a> ParseState<'a, &str> {
     /// * 🚩找到并删除首个像占位符，并返回索引
     /// * 📌自动内联
     #[inline(always)]
-    fn parse_terms_with_image(&self, terms: &mut Vec<Term>) -> ParseResult<usize> {
+    fn parse_terms_with_image(&self, terms: &mut Vec<Term>) -> ParseResult<UIntPrecision> {
         // 找到首个像占位符的位置
         let placeholder_index = terms.iter().position(|term| *term == Term::Placeholder);
         // 分「找到/没找到」讨论
@@ -1324,6 +1353,7 @@ impl<'a> ParseState<'a, &str> {
             return self.err("词项名不能为空");
         }
         // 尝试将缓冲区转为词项名，返回词项/错误
+        // ! ❌【2024-03-20 21:55:48】此处无法使用[`transform`]：闭包の所有权と生命周期の问题
         match term.set_atom_name(&name_buffer) {
             // 成功⇒返回词项
             Ok(_) => Ok(term),
@@ -1418,7 +1448,120 @@ impl<'a> ParseState<'a, &str> {
     }
 }
 
-/// 总定义
+/// 解析状态的入口实现
+/// * 🎯多态化`parse`函数：简写`parse_budget`、`parse_truth`等函数
+impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult {
+    /// 原先在[`ParseState`]的「解析总入口」留到这儿执行
+    fn from_parse(_: (), parser: &mut ParseState) -> Self {
+        // 消耗文本，构建「中间解析结果」
+        parser.build_mid_result()?;
+        // 转换解析结果
+        parser.transform_mid_result()
+    }
+}
+
+/// 解析状态的入口实现
+/// * 🎯用于自定义的「条目提取」功能
+/// * 🎯最初用于「词法折叠」，但后续不用
+impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<MidParseResult> {
+    /// 原先在[`ParseState`]的「解析总入口」留到这儿执行
+    fn from_parse(_: (), parser: &mut ParseState) -> Self {
+        // 消耗文本，构建「中间解析结果」
+        parser.build_mid_result()?;
+        // 直接拿走并返回「中间解析结果」
+        Self::Ok(parser.mid_result.take())
+    }
+}
+
+impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<Truth> {
+    /// 侧门/解析真值
+    /// * 🎯用于单独解析真值
+    ///   * 📄【2024-03-20 14:14:51】最初case: 词法折叠
+    /// * 🚩直接消耗一个真值，然后返回
+    /// * 📄case: `%0.5; 0.5%`
+    fn from_parse(_: (), parser: &mut ParseState) -> Self {
+        // 尝试消耗一个条目 | 默认这个条目会是真值
+        parser.consume_one(&mut vec![])?;
+        // 从「中间结果」中提取真值
+        let truth = parser
+            .mid_result
+            .truth
+            .take()
+            .ok_or(parser.parse_error("无法解析出真值"))?;
+        // 返回真值
+        // ! 📌这里引用关联函数无法自动使用`C`的默认值，干脆直接上`Ok`
+        // ! 否则就要用`ParseState::<&'a str>::ok(truth)`，过于冗长
+        Self::Ok(truth)
+    }
+}
+
+impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<Stamp> {
+    /// 侧门/解析时间戳
+    /// * 🎯用于单独解析时间戳
+    ///   * 📄【2024-03-20 14:14:51】最初case: 词法折叠
+    /// * 🚩直接消耗一个时间戳，然后返回
+    /// * 📄case: `:|:`
+    fn from_parse(_: (), parser: &mut ParseState) -> Self {
+        // 尝试消耗一个条目 | 默认这个条目会是时间戳
+        parser.consume_one(&mut vec![])?;
+        // 从「中间结果」中提取时间戳
+        let stamp = parser
+            .mid_result
+            .stamp
+            .take()
+            .ok_or(parser.parse_error("无法解析出时间戳"))?;
+        // 返回时间戳
+        // ! 📌这里引用关联函数无法自动使用`C`的默认值，干脆直接上`Ok`
+        // ! 否则就要用`ParseState::<&'a str>::ok(truth)`，过于冗长
+        Self::Ok(stamp)
+    }
+}
+
+impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<Punctuation> {
+    /// 侧门/解析标点
+    /// * 🎯用于单独解析标点
+    ///   * 📄【2024-03-20 14:14:51】最初case: 词法折叠
+    /// * 🚩直接消耗一个标点，然后返回
+    /// * 📄case: `.`
+    fn from_parse(_: (), parser: &mut ParseState) -> Self {
+        // 尝试消耗一个条目 | 默认这个条目会是标点
+        parser.consume_one(&mut vec![])?;
+        // 从「中间结果」中提取标点
+        let punctuation = parser
+            .mid_result
+            .punctuation
+            .take()
+            .ok_or(parser.parse_error("无法解析出标点"))?;
+        // 返回标点
+        // ! 📌这里引用关联函数无法自动使用`C`的默认值，干脆直接上`Ok`
+        // ! 否则就要用`ParseState::<&'a str>::ok(truth)`，过于冗长
+        Self::Ok(punctuation)
+    }
+}
+
+impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<Budget> {
+    /// 侧门/解析预算值
+    /// * 🎯用于单独解析预算值
+    ///   * 📄【2024-03-20 14:14:51】最初case: 词法折叠
+    /// * 🚩直接消耗一个预算值，然后返回
+    /// * 📄case: `$0.5; 0.5; 0.5$`
+    fn from_parse(_: (), parser: &mut ParseState) -> Self {
+        // 尝试消耗一个条目 | 默认这个条目会是预算值
+        parser.consume_one(&mut vec![])?;
+        // 从「中间结果」中提取预算值
+        let budget = parser
+            .mid_result
+            .budget
+            .take()
+            .ok_or(parser.parse_error("无法解析出预算值"))?;
+        // 返回预算值
+        // ! 📌这里引用关联函数无法自动使用`C`的默认值，干脆直接上`Ok`
+        // ! 否则就要用`ParseState::<&'a str>::ok(truth)`，过于冗长
+        Self::Ok(budget)
+    }
+}
+
+/// 主解析实现 | 从解析格式开始解析
 impl NarseseFormat<&str> {
     /// 构造解析状态
     /// * 索引默认从开头开始
@@ -1427,35 +1570,113 @@ impl NarseseFormat<&str> {
     }
 
     /// 主解析函数
-    pub fn parse<'a>(&'a self, input: &'a str) -> ParseResult {
-        // 构造解析状态
-        let mut state: ParseState<&str> = self.build_parse_state(input);
-        // 用状态进行解析
-        state.parse()
-        // ! 随后丢弃状态
+    /// * ✨【2024-03-20 15:30:43】现在支持任意扩展可解析的目标类型，而无需为之分别添加函数
+    ///   * 📌通过模仿标准库[`String::parse`]与[`From`]实现
+    pub fn parse<'a, To>(&'a self, input: &'a str) -> ParseResult<To>
+    where
+        ParseResult<To>: FromParse<&'a str, &'a Self>,
+    {
+        ParseResult::from_parse(input, self)
     }
 
-    /// 主解析函数
-    pub fn parse_multi<'a>(
-        &'a self,
-        inputs: impl IntoIterator<Item = &'a str>,
-    ) -> Vec<ParseResult> {
+    /// 解析多个Narsese
+    /// * ✨解析成Vec⇒多个Result数组
+    /// * 🚩将以某一类型解析一系列Narsese
+    pub fn parse_multi<'a, Inputs>(&'a self, inputs: Inputs) -> Vec<ParseResult>
+    where
+        Inputs: IntoIterator<Item = &'a str>,
+    {
         // 构造结果
-        let mut result = vec![];
+        let mut results = vec![];
         // 构造空的解析状态
-        let mut state: ParseState<&str> = self.build_parse_state("");
+        let mut state = self.build_parse_state("");
         // 复用状态进行解析
         for input in inputs {
             // 重置状态
             state.reset_to(input, 0);
             // 添加解析结果
-            result.push(state.parse());
+            // ! 📌【2024-03-20 15:48:00】不能使用`state.parse`：会引入不确定的借用
+            results.push(ParseResult::from_parse((), &mut state));
         }
         // 返回所有结果
-        result
+        results
         // ! 随后丢弃状态
     }
 }
+
+/// 用于量产「解析到某值」的宏
+/// * 🎯产生原因：在不造成编译错误的情况下，节省模板代码
+///
+/// ! ❌解析到一般项不可行：有可能把[`ParseState`]的引用带走，并在状态销毁时产生悬垂引用
+/// * 📌报错信息：`state` does not live long enough
+/// * 📝编译器无法确定`from_parse`是否有借用`state`的值
+/// * 已发帖询问：https://users.rust-lang.org/t/preventing-variable-borrowing-to-solve-lifetime-problem/10860
+macro_rules! from_parse_to_types {
+    {
+        $(
+            // $( #[$attr:meta] )*
+            // ! ❌local ambiguity when calling macro `from_parse_to_types`: multiple parsing options: built-in NTs tt ('parse_target') or 1 other option.rustcClick for full compiler diagnostic
+            $parse_target:tt
+        )*
+    } => {
+        $(
+            // $( #[$attr] )*
+            impl<'a> FromParse<&'a str, &'a NarseseFormat<&'a str>> for ParseResult<$parse_target> {
+                // /// 侧门/解析真值
+                // /// * 🎯用于解析单个的真值
+                fn from_parse(input: &'a str, parser: &'a NarseseFormat<&'a str>) -> Self {
+                    // 构造空的解析状态
+                    let mut state = parser.build_parse_state(input);
+                    // 返回对真值的解析结果
+                    state.parse()
+                    // ! 随后丢弃状态
+                }
+            }
+        )*
+    };
+}
+
+from_parse_to_types! {
+    // 主解析函数
+    // * 🎯解析通常的Narsese：词项/语句/任务
+    Narsese
+    // 中间结果
+    // * 🎯用于「自定义提取值」的行为
+    MidParseResult
+    // 解析到预算值
+    // * 🎯【2024-03-20 14:38:24】最初用于「词法折叠」单独解析出预算值
+    Budget
+    // 解析到真值
+    // * 🎯【2024-03-20 14:38:24】最初用于「词法折叠」单独解析出真值
+    Truth
+    // 解析到标点
+    // * 🎯【2024-03-20 14:38:24】最初用于「词法折叠」单独解析出标点
+    Punctuation
+    // 解析到时间戳
+    // * 🎯【2024-03-20 14:38:24】最初用于「词法折叠」单独解析出时间戳
+    Stamp
+}
+
+// impl<'a, 'result, To> FromParse<&'a str, &'a NarseseFormat<&'a str>> for ParseResult<To>
+// where
+//     ParseResult<To>: FromParse<(), &'a mut ParseState<'a>>,
+// {
+//     /// 主解析函数
+//     fn from_parse(input: &'a str, parser: &'a NarseseFormat<&'a str>) -> Self {
+//         let result;
+//         {
+//             // 构造解析状态
+//             let mut state = parser.build_parse_state(input);
+//             // 用状态进行解析
+//             // result = ParseResult::from_parse((), &mut state);
+//             result = state.parse();
+//             // 借用检查器以为`result`还（有可能）在借用`state`，因此报错
+//             // ❓如何声明`result`的生命周期长于`state`呢
+//         }
+//         // ! 随后丢弃状态
+//         result
+//     }
+// }
 
 /// 单元测试
 #[cfg(test)]
@@ -1835,7 +2056,7 @@ mod tests_parse {
     /// * 🎯仅用于检测是否会panic
     fn _test_parse_stability(format: &NarseseFormat<&str>, input: &str) {
         // 解析，忽略结果
-        let _ = format.parse(input);
+        let _: ParseResult = format.parse(input);
     }
 
     /// 集成测试/健壮性测试

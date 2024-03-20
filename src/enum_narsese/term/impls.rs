@@ -1,12 +1,10 @@
 //! 统一定义词项实现
 
-use crate::api::GetTerm;
+use util::ResultTransform;
 
 use super::structs::*;
-use std::any::type_name;
-use std::error::Error;
-use std::hash::Hash;
-use std::io::ErrorKind;
+use crate::api::{GetTerm, UIntPrecision};
+use std::{any::type_name, error::Error, hash::Hash, io::ErrorKind};
 
 // 实现 //
 
@@ -59,7 +57,7 @@ fn from_term_settable_to_term_vec(settable: impl IntoIterator<Item = Term>) -> T
 
 /// 在像中测试像索引
 /// * ⚠️若不合法，则panic
-fn test_term_vec_for_image(placeholder_index: usize, vec: &TermVecType) {
+fn test_term_vec_for_image(placeholder_index: UIntPrecision, vec: &TermVecType) {
     // 检查 | 判断索引是否越界
     // * 📌在`placeholder_index == vec.len()`时，相当于「占位符在最后一个」的情况
     if placeholder_index > vec.len() {
@@ -69,7 +67,7 @@ fn test_term_vec_for_image(placeholder_index: usize, vec: &TermVecType) {
 
 /// 创造一个合法的像与索引
 fn new_term_vec_for_image(
-    placeholder_index: usize,
+    placeholder_index: UIntPrecision,
     terms: impl IntoIterator<Item = Term>,
 ) -> TermVecType {
     // 创建
@@ -111,7 +109,7 @@ impl Term {
     }
 
     /// 构造/间隔
-    pub fn new_interval(interval: usize) -> Self {
+    pub fn new_interval(interval: UIntPrecision) -> Self {
         Interval(interval)
     }
 
@@ -159,7 +157,7 @@ impl Term {
 
     /// 构造/外延像
     pub fn new_image_extension(
-        placeholder_index: usize,
+        placeholder_index: UIntPrecision,
         terms: impl IntoIterator<Item = Term>,
     ) -> Self {
         ImageExtension(
@@ -170,7 +168,7 @@ impl Term {
 
     /// 构造/内涵像
     pub fn new_image_intension(
-        placeholder_index: usize,
+        placeholder_index: UIntPrecision,
         terms: impl IntoIterator<Item = Term>,
     ) -> Self {
         ImageIntension(
@@ -279,7 +277,7 @@ impl Term {
     // 特殊初始化 //
 
     /// 工具函数/像：伴随占位符的初始化
-    /// * 🚩找到并消耗第一个占位符，并将其用作「占位符位置」
+    /// * �找到并消耗第一个占位符，并将其用作「占位符位置」
     /// * 📝特征[`IntoIterator`]不直接支持`enumerate`方法
     ///   * 需要先使用[`IntoIterator::into_iter`]进行转换
     ///   * 或使用[`Iterator`]规避所有权问题（若需对自身进行处理）
@@ -287,7 +285,7 @@ impl Term {
     pub fn to_terms_with_image(
         terms: impl IntoIterator<Item = Term>,
         target: &mut Vec<Term>, // ? 是否直接使用数组，以便提升性能
-    ) -> Option<usize> {
+    ) -> Option<UIntPrecision> {
         let mut placeholder_index = None;
         // 顺序遍历
         for (i, term) in terms.into_iter().enumerate() {
@@ -415,7 +413,7 @@ mod test_new {
     fn valid_image() {
         let x = Term::new_word("");
         // 在一个基础的长度中测试
-        const N: usize = 10000;
+        const N: UIntPrecision = 10000;
         for len in 1..(N + 1) {
             // 构造一个长度为L的词项数组
             let mut vec: TermVecType = vec![];
@@ -625,17 +623,12 @@ impl Term {
             // 占位符⇒静默失败
             Placeholder => Ok(()),
             // 间隔⇒解析数值
-            Interval(interval) => match new_name.parse() {
-                Ok(new_interval) => {
-                    *interval = new_interval;
-                    Ok(())
-                }
-                // 需要转换类型
-                Err(_) => Err(std::io::Error::new(
-                    ErrorKind::InvalidInput,
-                    "尝试在间隔中设置无效的数值",
-                )),
-            },
+            Interval(interval) => new_name.parse().transform(
+                |new_interval| {
+                    *interval = new_interval // * ↓隐式返回Ok(())
+                },
+                |_| std::io::Error::new(ErrorKind::InvalidInput, "尝试在间隔中设置无效的数值"),
+            ),
             // 其它情况：静默失败
             _ => Err(std::io::Error::new(
                 ErrorKind::InvalidData,
@@ -706,7 +699,7 @@ impl Term {
 /// 实现/修改
 impl Term {
     /// 复合词项：向组分中追加词项
-    /// * 📌原子词项|陈述|一元复合词项|二元复合词项⇒失败
+    /// * �原子词项|陈述|一元复合词项|二元复合词项⇒失败
     /// * 📌陈述⇒返回主谓词
     /// * 📌复合词项⇒追加词项
     /// * ⚠️对「像」不做特殊处理
@@ -906,15 +899,15 @@ impl GetTerm<Term> for Term {
 /// * 📝此中使用泛型参数，将类型变得更通用更宽泛
 pub struct ImageIterator<'a, I: Iterator<Item = &'a Term>> {
     raw_components: I,
-    now_index: usize,
-    placeholder_index: usize,
+    now_index: UIntPrecision,
+    placeholder_index: UIntPrecision,
 }
 
 impl<'a, I> ImageIterator<'a, I>
 where
     I: Iterator<Item = &'a Term>,
 {
-    pub fn new(raw_components: I, placeholder_index: usize) -> Self {
+    pub fn new(raw_components: I, placeholder_index: UIntPrecision) -> Self {
         Self {
             raw_components,
             now_index: 0,

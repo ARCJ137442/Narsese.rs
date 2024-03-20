@@ -7,10 +7,9 @@ use util::*;
 pub_mod_and_pub_use! {
     // 特征
     traits
-    // 格式
-    format
 }
 
 feature_pub_mod_and_reexport! {
+    // 枚举Narsese
     "enum_narsese" => impl_enum
 }

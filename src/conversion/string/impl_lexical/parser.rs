@@ -33,7 +33,10 @@
 //!     * 许多时候仍然是在模拟「枚举Narsese」的「头索引递进」机制
 
 use super::NarseseFormat;
-use crate::lexical::{Narsese, Sentence, Task, Term};
+use crate::{
+    api::UIntPrecision,
+    lexical::{Narsese, Sentence, Task, Term},
+};
 use std::{collections::HashSet, error::Error, fmt::Display};
 use util::{PrefixMatch, StartsWithStr, SuffixMatch};
 
@@ -50,8 +53,8 @@ pub mod structs {
     pub type ParseEnvOwned = Vec<char>;
 
     /// 定义「解析索引」
-    /// * 🎯用于区分「长度」与「位置」：与直接使用的`usize`区分开
-    pub type ParseIndex = usize;
+    /// * 🎯用于区分「长度」与「位置」：与直接使用的`UIntPrecision`区分开
+    pub type ParseIndex = UIntPrecision;
 
     /// 定义「解析结果」
     /// * 🚩实际就是「错误类型已指定的[`Result`]」

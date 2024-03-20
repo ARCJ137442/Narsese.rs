@@ -7,8 +7,6 @@
 use crate::api::NarseseValue;
 
 util::pub_mod_and_pub_use! {
-    // 超参数
-    hyper_parameters
     // 词项
     term
     // 语句

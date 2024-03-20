@@ -1,6 +1,6 @@
 //! 统一定义「预算值」
 
-use crate::enum_narsese::hyper_parameters::*;
+use crate::api::hyper_parameters::*;
 use util::*;
 
 /// 使用枚举表示预算值
