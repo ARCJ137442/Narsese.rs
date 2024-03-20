@@ -161,7 +161,7 @@ fn fold_set(
         // 外延集
         &folder.compound.brackets_set_extension => EnumTerm::new_set_extension(terms),
         // 内涵集
-        &folder.compound.brackets_set_intension => EnumTerm::new_set_extension(terms),
+        &folder.compound.brackets_set_intension => EnumTerm::new_set_intension(terms),
         // 未知 //
         _ => return Err(FoldError!("非法集合词项括弧组「{left_bracket} {right_bracket}」")),
     })
@@ -233,7 +233,7 @@ fn fold_atom(
     Ok(first! {
         (prefix.eq) => (_);
         // 词语 | ✅这里不用再害怕「空前缀」问题
-        folder.atom.prefix_word => EnumTerm::VariableQuery(name),
+        folder.atom.prefix_word => EnumTerm::Word(name),
         // 占位符
         folder.atom.prefix_placeholder => EnumTerm::Placeholder,
         // 独立变量
@@ -250,7 +250,7 @@ fn fold_atom(
                 // 转换错误并尝试解包
                 .transform_err(FoldError::from)?
         ),
-        folder.atom.prefix_operator => EnumTerm::VariableQuery(name),
+        folder.atom.prefix_operator => EnumTerm::Operator(name),
 
         _ => return Err(FoldError!("非法原子词项词缀「{prefix}」")),
     })
@@ -309,7 +309,16 @@ impl<'a> TryFoldInto<'a, EnumTask, FoldError> for Task {
 mod tests {
     use super::*;
     use crate::{
-        conversion::string::impl_enum::format_instances::*, lexical::tests::_sample_task_ascii,
+        conversion::string::{
+            impl_enum::format_instances::*,
+            impl_lexical::{
+                format_instances::{
+                    FORMAT_ASCII as L_ASCII, FORMAT_HAN as L_HAN, FORMAT_LATEX as L_LATEX,
+                },
+                NarseseFormat,
+            },
+        },
+        lexical::tests::_sample_task_ascii,
     };
 
     fn _test_fold_narsese(
@@ -323,7 +332,7 @@ mod tests {
         // 格式化@枚举
         let formatted = format.format_narsese(&narsese_enum);
         // 解析@枚举
-        let narsese_enum_2 = format.parse(&formatted).unwrap();
+        let narsese_enum_2 = format.parse(&formatted).expect("枚举Narsese解析失败");
         // 「从枚举Narsese解析的」，应该与「从词法Narsese解析的」一致
         assert_eq!(narsese_enum, narsese_enum_2);
         // 返回折叠后的Narsese
@@ -334,7 +343,216 @@ mod tests {
     #[test]
     fn test_fold() {
         let task = _sample_task_ascii();
-        let folder = &FORMAT_ASCII;
-        dbg!(_test_fold_narsese(folder, Narsese::Task(task)));
+        let format = &FORMAT_ASCII;
+        dbg!(_test_fold_narsese(format, Narsese::Task(task)));
+    }
+
+    /// 根据传入的「枚举Narsese格式」「词法Narsese格式」分别生成解析器、格式化器
+    fn _generate_from_format<'a>(
+        enum_format: &'a EnumNarseseFormat<&'a str>,
+        lexical_format: &'a NarseseFormat,
+    ) -> (
+        impl Fn(String) -> EnumNarsese + 'a,
+        impl Fn(String) -> EnumNarsese + 'a,
+        impl Fn(EnumNarsese) -> Narsese + 'a,
+        impl Fn(Narsese) -> EnumNarsese + 'a,
+        impl Fn(EnumNarsese) -> String + 'a,
+        impl Fn(Narsese) -> String + 'a,
+    ) {
+        // 字符串→枚举 枚举解析器：直接进行解析
+        let enum_parser = |input: String| {
+            enum_format
+                .parse::<EnumNarsese>(&input)
+                .expect("字符串→枚举：枚举Narsese解析失败")
+        };
+        // 字符串→枚举 词法解析器：先进行词法解析，然后再词法折叠
+        let lexical_parser = |input: String| {
+            {
+                lexical_format
+                    .parse(&input)
+                    .expect("字符串→枚举：词法Narsese解析失败")
+                    .try_fold_into(enum_format)
+            }
+            .expect("字符串Narsese：词法Narsese折叠失败")
+        };
+        // 枚举→词法：先格式化，然后词法解析
+        let enum_to_lexical = |input: EnumNarsese| {
+            lexical_format
+                .parse(&enum_format.format_narsese(&input))
+                .expect("枚举→词法：词法Narsese解析失败")
+        };
+        // 词法→枚举：先格式化，再枚举解析（不同于「词法折叠」）
+        let lexical_to_enum = |input: Narsese| {
+            enum_format
+                .parse::<EnumNarsese>(&lexical_format.format_narsese(&input))
+                .expect("词法→枚举：枚举Narsese解析失败")
+        };
+        // 枚举→字符串 枚举格式化器：直接进行格式化
+        let enum_formatter = |input: EnumNarsese| enum_format.format_narsese(&input);
+        // 词法→字符串 词法格式化器：先进行词法折叠，然后再格式化（不同于「直接格式化」）
+        let lexical_formatter = |input: Narsese| {
+            enum_format.format_narsese(
+                &input
+                    .clone()
+                    .try_fold_into(enum_format)
+                    .expect("词法→字符串：词法Narsese折叠失败"),
+            )
+        };
+        (
+            // 解析器
+            enum_parser,
+            lexical_parser,
+            // 互转器
+            enum_to_lexical,
+            lexical_to_enum,
+            // 格式化器
+            enum_formatter,
+            lexical_formatter,
+        )
+    }
+
+    /// 测试/比对性
+    fn _test_comparability<'a>(
+        enum_format: &'a EnumNarseseFormat<&'a str>,
+        lexical_format: &'a NarseseFormat,
+        sample_narsese: EnumNarsese,
+    ) {
+        // 获取解析器、格式化器、互转器
+        let (
+            // 解析器
+            enum_parser,
+            lexical_parser,
+            // 互转器
+            enum_to_lexical,
+            lexical_to_enum,
+            // 格式化器
+            enum_formatter,
+            lexical_formatter,
+        ) = _generate_from_format(enum_format, lexical_format);
+        // 辅助宏：复合函数
+        macro_rules! combine {
+            ($f1:ident, $($f2:tt)*) => {
+                |value| $($f2)*($f1(value))
+            };
+        }
+        // 一些辅助的函数（用于`String`↔`&str`这类细碎转换）
+        let lexical_parser_str = |s: String| {
+            lexical_format
+                .parse(&s)
+                .expect("辅助函数：词法Narsese解析失败")
+        };
+        // 构造「单位函数」 | 可逆性
+        let unit_enum_enum = combine!(enum_formatter, enum_parser);
+        let unit_enum_lexical = combine!(enum_to_lexical, lexical_to_enum);
+        let unit_lexical_enum = combine!(lexical_to_enum, enum_to_lexical);
+        let unit_lexical_lexical = combine!(lexical_formatter, lexical_parser_str);
+        let unit_string_enum = combine!(enum_parser, enum_formatter);
+        let unit_string_lexical_enum = combine!(lexical_parser, enum_formatter);
+        // 样例
+        let sample_enum = sample_narsese;
+        let sample_lexical = enum_to_lexical(sample_enum.clone());
+        let sample_string = lexical_format.format_narsese(&sample_lexical);
+        dbg!(&sample_lexical, &sample_enum, &sample_string);
+
+        /// 统一判等方法
+        trait TestEq {
+            /// 统一的判等测试方法
+            fn test_eq<'a>(
+                self,
+                other: Self,
+                enum_format: &'a EnumNarseseFormat<&'a str>,
+                lexical_format: &'a NarseseFormat,
+            ) where
+                Self: std::marker::Sized,
+            {
+                // 转换自身与「其他」
+                assert_eq!(
+                    self.convert(enum_format, lexical_format),
+                    other.convert(enum_format, lexical_format),
+                    "转换后仍不相等！"
+                );
+            }
+            fn convert<'a>(
+                self,
+                enum_format: &'a EnumNarseseFormat<&'a str>,
+                lexical_format: &'a NarseseFormat,
+            ) -> EnumNarsese;
+        }
+        /// 枚举Narsese直接判等
+        impl TestEq for EnumNarsese {
+            fn convert<'a>(
+                self,
+                enum_format: &'a EnumNarseseFormat<&'a str>,
+                lexical_format: &'a NarseseFormat,
+            ) -> EnumNarsese {
+                self
+            }
+        }
+        /// 词法Narsese：折叠为「枚举Narsese」再判等
+        impl TestEq for Narsese {
+            fn convert<'a>(
+                self,
+                enum_format: &'a EnumNarseseFormat<&'a str>,
+                lexical_format: &'a NarseseFormat,
+            ) -> EnumNarsese {
+                self.try_fold_into(enum_format)
+                    .expect("词法Narsese：词法Narsese折叠失败")
+            }
+        }
+        /// 字符串：解析成「枚举Narsese」再判等
+        impl TestEq for String {
+            fn convert<'a>(
+                self,
+                enum_format: &'a EnumNarseseFormat<&'a str>,
+                lexical_format: &'a NarseseFormat,
+            ) -> EnumNarsese {
+                enum_format
+                    .parse(&self)
+                    .expect("枚举Narsese：枚举Narsese解析失败")
+            }
+        }
+        /// 辅助宏：执行「单位函数」后是否自相等
+        /// * 🚩相等条件：依照[`TestEq`]
+        macro_rules! test_unit {
+            ($f:ident, $value:expr) => {
+                TestEq::test_eq(
+                    $f($value.clone()),
+                    $value.clone(),
+                    enum_format,
+                    lexical_format,
+                );
+            };
+        }
+
+        // 💭最终还是要转换到「枚举Narsese」以便判等
+        // * 📌字符串/词法Narsese会因为「排序不稳定」而出错
+        // 开始「单位函数」测试
+        test_unit!(unit_enum_enum, sample_enum);
+        test_unit!(unit_enum_lexical, sample_enum);
+        test_unit!(unit_lexical_enum, sample_lexical);
+        test_unit!(unit_lexical_lexical, sample_lexical);
+        test_unit!(unit_string_enum, sample_string);
+        test_unit!(unit_string_lexical_enum, sample_string);
+        // * 📝【2024-03-21 00:29:14】后记：
+        // * 虽然测试期间用了大量`clone`到处复制值，
+        // * 混合集成测试也用上了所有case和样例，
+        // * 但速度还是快到飞起（跑完就0.23s）
+    }
+
+    /// 测试/比对性
+    /// * 🎯混合集成测试：当「词法解析」「词法折叠」等基础功能有用之后，才进行
+    #[test]
+    fn test_comparability() {
+        // ! 📌【2024-03-21 00:07:55】由始至终必须使用「枚举Narsese」以保证最大的「跨格式性」与「有序无序性」
+        let task = _sample_task_ascii();
+        let task = task
+            .try_fold_into(&FORMAT_ASCII)
+            .expect("词法Narsese：折叠失败");
+        // ASCII
+        _test_comparability(&FORMAT_ASCII, &L_ASCII, EnumNarsese::Task(task.clone()));
+        // LATEX
+        _test_comparability(&FORMAT_LATEX, &L_LATEX, EnumNarsese::Task(task.clone()));
+        // HAN
+        _test_comparability(&FORMAT_HAN, &L_HAN, EnumNarsese::Task(task.clone()));
     }
 }

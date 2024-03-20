@@ -1,5 +1,6 @@
 //! 实现/格式化器
 
+use super::NarseseFormat;
 use crate::{
     api::{FloatPrecision, GetBudget, GetStamp, GetTerm, GetTruth, UIntPrecision},
     conversion::string::common_narsese_templates::*,
@@ -7,11 +8,12 @@ use crate::{
 };
 use util::*;
 
-use super::NarseseFormat;
-
 /// 实现：转换
 ///
 /// ! ℹ️单元测试在[`super::formats`]模块中定义
+///
+/// TODO: ❓实际上可以通过类似[`str::parse`]的方式重构
+/// * 针对不同类型，压缩到一个函数[`format`]？
 impl NarseseFormat<&str> {
     // ! 🚩现在「纯字符串模板」已被提取到`common`模块
 

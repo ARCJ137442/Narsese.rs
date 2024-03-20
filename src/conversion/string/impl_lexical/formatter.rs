@@ -4,7 +4,7 @@ use super::NarseseFormat;
 use crate::{
     api::{GetBudget, GetTerm},
     conversion::string::common_narsese_templates::*,
-    lexical::{Sentence, Task, Term},
+    lexical::{Narsese, Sentence, Task, Term},
     util::{add_space_if_necessary_and_flush_buffer, catch_flow},
 };
 
@@ -96,6 +96,24 @@ impl NarseseFormat {
         // 语句
         self._format_sentence(&mut buffer, task.get_sentence());
         add_space_if_necessary_and_flush_buffer(out, &mut buffer, &self.space.format_items);
+    }
+
+    /// 格式化函数/Narsese
+    /// * 🚩自动分派
+    pub fn format_narsese(&self, narsese: &Narsese) -> String {
+        catch_flow!(self._format_narsese; narsese)
+    }
+
+    /// 总格式化函数/Narsese
+    fn _format_narsese(&self, out: &mut String, narsese: &Narsese) {
+        match narsese {
+            // 词项
+            Narsese::Term(term) => self._format_term(out, term),
+            // 语句
+            Narsese::Sentence(sentence) => self._format_sentence(out, sentence),
+            // 任务
+            Narsese::Task(task) => self._format_task(out, task),
+        }
     }
 }
 
