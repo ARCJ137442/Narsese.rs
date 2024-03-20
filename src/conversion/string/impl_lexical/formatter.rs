@@ -104,10 +104,11 @@ impl NarseseFormat {
 mod tests {
 
     #![allow(unused)]
-    use crate::conversion::string::impl_lexical::format_instances::*;
-
-    use super::super::tests::_sample_task_ascii as _sample_task;
     use super::*;
+    use crate::{
+        conversion::string::impl_lexical::format_instances::*,
+        lexical::tests::_sample_task_ascii as _sample_task,
+    };
     use util::f_parallel;
 
     /// 测试其中一个格式

@@ -44,35 +44,82 @@ pub mod shortcut {
 }
 
 /// 单元测试：词项+语句+任务
+/// * 🚩【2024-03-20 12:42:48】公开：共享测试集
 #[cfg(test)]
 #[allow(unused)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
-    use crate::{
-        lexical_atom, lexical_compound, lexical_set, lexical_statement, lexical_task, util::*,
-    };
+    use crate::lexical::shortcut::*;
+    use util::*;
 
-    #[test]
-    fn main() {
-        let task = lexical_task![
-            "$0.5; 0.5; 0.5$" lexical_compound![
+    /// （通用）构造一个格式化样本（ASCII字面量版本）
+    /// * 基本涵盖其所属模块的全部内容
+    /// * 📌格式稳定版：基本所有其它格式以此为参照
+    ///   * 为何此处版本不如「枚举Narsese」那样通用？
+    ///   * 词项前缀、复合词项连接词、陈述系词都是不同的系统（本身就没法相互解析）
+    pub(crate) fn _sample_task_ascii() -> Task {
+        // 构造词项
+        let ball_left = statement!(atom!("ball") "{-]" atom!("left"));
+        let conditional_operation = compound!(
+            "&/",
+            ball_left.clone(),
+            statement!(
+                compound!(
+                    "*",
+                    set!("{"; "SELF" ;"}"),
+                    atom!("$" "any"),
+                    atom!("#" "some"),
+                )
+                "-->"
+                atom!("^" "do")
+            ),
+        );
+        let self_good = statement!(atom!("SELF") "{-]" atom!("good"));
+        let term = statement!(
+            conditional_operation.clone()
+            "==>"
+            self_good.clone()
+        );
+
+        // 构造语句
+        let truth = "%1.0; 0.9%";
+        let stamp = ":!-1:";
+        let punctuation = ".";
+        // let sentence = sentence!(
+        //     term.clone() "." stamp truth
+        // ); // ! 此处无需构建；直接构建任务
+
+        // 构造任务并返回
+        let budget = "$0.5; 0.75; 0.4$";
+        task!(budget term.clone() punctuation stamp truth) // * 📝【2024-03-09 10:48:31】Clippy推荐直接返回构造之后的值
+    }
+
+    /// 使用ASCII格式构造「样本任务」的最初版本
+    pub(crate) fn _sample_task_ascii_0() -> Task {
+        task![
+            "$0.5; 0.5; 0.5$" compound![
                 "复合词项连接词";
-                lexical_atom!("word term")
-                lexical_atom!("^", "操作")
-                lexical_set![
-                    "{"; lexical_atom!("SELF"); "}"
+                atom!("word term")
+                atom!("^", "操作")
+                set![
+                    "{"; atom!("SELF"); "}"
                 ]
-                lexical_statement![
-                    lexical_set![
-                        "{"; lexical_atom!("word1"), lexical_atom!("word2"); "}"
+                statement![
+                    set![
+                        "{"; atom!("word1"), atom!("word2"); "}"
                     ]
                     "-->"
-                    lexical_set![
-                        "["; lexical_atom!("word1"), lexical_atom!("word2"); "]"
+                    set![
+                        "["; atom!("word1"), atom!("word2"); "]"
                     ]
                 ]
             ] "." ":|:" "%1.0; 0.9%"
-        ];
+        ]
+    }
+
+    #[test]
+    fn main() {
+        let task = _sample_task_ascii_0();
         show!(task);
     }
 }

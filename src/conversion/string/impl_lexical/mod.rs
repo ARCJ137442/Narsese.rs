@@ -26,52 +26,9 @@ mod tests {
     use super::NarseseFormat;
     use crate::{
         conversion::string::impl_lexical::format_instances::*,
-        lexical::{Narsese, Task},
-        lexical_atom, lexical_compound, lexical_set, lexical_statement, lexical_task,
+        lexical::{tests::_sample_task_ascii, Narsese, Task},
     };
     use util::*;
-
-    /// （通用）构造一个格式化样本（ASCII字面量版本）
-    /// * 基本涵盖其所属模块的全部内容
-    /// * 📌格式稳定版：基本所有其它格式以此为参照
-    ///   * 为何此处版本不如「枚举Narsese」那样通用？
-    ///   * 词项前缀、复合词项连接词、陈述系词都是不同的系统（本身就没法相互解析）
-    pub(crate) fn _sample_task_ascii() -> Task {
-        // 构造词项
-        let ball_left = lexical_statement!(lexical_atom!("ball") "{-]" lexical_atom!("left"));
-        let conditional_operation = lexical_compound!(
-            "&/",
-            ball_left.clone(),
-            lexical_statement!(
-                lexical_compound!(
-                    "*",
-                    lexical_set!("{"; "SELF" ;"}"),
-                    lexical_atom!("$" "any"),
-                    lexical_atom!("#" "some"),
-                )
-                "-->"
-                lexical_atom!("^" "do")
-            ),
-        );
-        let self_good = lexical_statement!(lexical_atom!("SELF") "{-]" lexical_atom!("good"));
-        let term = lexical_statement!(
-            conditional_operation.clone()
-            "==>"
-            self_good.clone()
-        );
-
-        // 构造语句
-        let truth = "%1.0; 0.9%";
-        let stamp = ":!-1:";
-        let punctuation = ".";
-        // let sentence = lexical_sentence!(
-        //     term.clone() "." stamp truth
-        // ); // ! 此处无需构建；直接构建任务
-
-        // 构造任务并返回
-        let budget = "$0.5; 0.75; 0.4$";
-        lexical_task!(budget term.clone() punctuation stamp truth) // * 📝【2024-03-09 10:48:31】Clippy推荐直接返回构造之后的值
-    }
 
     /// 构造一个格式化样本（LaTeX版本）
     /// * ⚠️其中有些部分可能会过时

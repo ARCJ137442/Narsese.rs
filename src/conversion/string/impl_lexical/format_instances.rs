@@ -432,8 +432,8 @@ pub fn create_format_han() -> NarseseFormat {
 #[cfg(test)]
 mod tests_enum_narsese {
 
-    use super::super::tests::_sample_task_ascii;
     use super::*;
+    use crate::lexical::tests::_sample_task_ascii;
 
     fn test_format(label: &str, format: &NarseseFormat) {
         let task = _sample_task_ascii();
