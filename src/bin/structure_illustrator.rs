@@ -5,9 +5,7 @@
 
 use std::io::{stdin, stdout, Stdin, Write};
 
-use enum_narsese::conversion::string::impl_enum::{
-    format_instances::*, NarseseFormat, NarseseResult,
-};
+use narsese::conversion::string::impl_enum::{format_instances::*, NarseseFormat, NarseseResult};
 
 /// REPL主函数
 fn main() {
