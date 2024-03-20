@@ -1,26 +1,20 @@
-//! 使用枚举简单实现一个Narsese数据结构库
-//! 三种数据结构
-//! * 词项（首要）
-//! * 语句（封装）
-//! * 任务（封装）
-//!
-//! ⚠️【2024-02-19 10:58:46】暂不考虑通用性，仅考虑「MWE」
+//! 库的主模块
 
-// 实用
-pub mod macros;
-pub mod util;
+// 实用 | 包括工具宏
+// * 🚩对于在「后续实现中需要调用`util`库中的符号」的情况：
+//   * 【统一使用`util`而非`crate::util`】
+// * 📝↓此处进行了三个操作：导入外部库、改名、重新导出
+pub extern crate nar_dev_utils as util;
 
-// 词项
-pub mod term;
-pub use term::*;
+// 共用API
+pub mod api;
 
-// 语句
-pub mod sentence;
-pub use sentence::*;
+// 词法
+#[cfg(feature = "lexical_narsese")]
+pub mod lexical;
 
-// 任务
-pub mod task;
-pub use task::*;
+#[cfg(feature = "enum_narsese")]
+pub mod enum_narsese;
 
 // 转换
 pub mod conversion;

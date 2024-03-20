@@ -25,29 +25,20 @@
 //!   * 📌解析函数总是从某个「起始位置」开始，通过系列解析过程，返回「解析结果」以及
 //!     * ✨有相应的「结果索引」类型
 
+use super::format::*;
 use crate::{
-    first,
-    util::{FloatPrecision, IntPrecision, ZeroOneFloat},
-    Budget, Punctuation, Sentence, Stamp, Task, Term, Truth,
+    api::{FloatPrecision, FromParse, IntPrecision, UIntPrecision},
+    enum_narsese::*,
 };
 use std::{error::Error, fmt::Display, io::ErrorKind};
+use util::*;
 
-use super::NarseseFormat;
-
-/// 定义一个「CommonNarsese结果」类型
+/// 特化「CommonNarsese结果」到「枚举Narsese」版本
 /// * 🎯用于存储「最终被解析出来的CommonNarsese对象」
 ///   * 词项
 ///   * 语句
 ///   * 任务
-#[derive(Debug, Clone)]
-pub enum NarseseResult {
-    /// 解析出来的词项
-    Term(Term),
-    /// 解析出来的语句
-    Sentence(Sentence),
-    /// 解析出来的任务
-    Task(Task),
-}
+pub type NarseseResult = Narsese;
 
 // 实现`(try_)From/To`转换方法
 impl TryFrom<NarseseResult> for Term {
@@ -121,13 +112,24 @@ impl MidParseResult {
             punctuation: None,
         }
     }
+    /// 拿走其中所有结果，将自身变回空值
+    /// * 🚩一个个字段[`Option::take`]
+    pub fn take(&mut self) -> Self {
+        Self {
+            term: self.term.take(),
+            truth: self.truth.take(),
+            budget: self.budget.take(),
+            stamp: self.stamp.take(),
+            punctuation: self.punctuation.take(),
+        }
+    }
 }
 
 /// 用于表征「解析环境」
 /// * 具有所有权
 type ParseEnv<T = char> = Vec<T>;
 /// 用于表征「解析索引」
-type ParseIndex = usize;
+type ParseIndex = UIntPrecision;
 
 /// 用于表征「解析结果」
 /// * 用于表示「解析对象」
@@ -182,7 +184,7 @@ impl ParseError {
     }
 }
 /// 用于在报错时展示周边文本
-const ERR_CHAR_VIEW_RANGE: usize = 4;
+const ERR_CHAR_VIEW_RANGE: UIntPrecision = 4;
 /// 呈现报错文本
 impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -201,13 +203,13 @@ impl Error for ParseError {}
 /// 定义一个「解析器状态」类型
 /// * 🎯除了内置「格式」外，还可【缓存】解析状态
 /// * 📄学习参考：[tomllib/parser.rs](https://github.com/joelself/tomllib/blob/master/src/internals/parser.rs)
-pub struct ParseState<'a, Content> {
+pub struct ParseState<'a, Content = &'a str> {
     /// 引用的「解析格式」
     format: &'a NarseseFormat<Content>,
     /// 「解析环境」
     env: ParseEnv,
     /// 「解析环境」的长度 | 用于缓存常用变量
-    len_env: usize,
+    len_env: UIntPrecision,
     /// 当前解析的位置 | 亦用作「下一起始索引」
     head: ParseIndex,
     /// 「中间解析结果」
@@ -249,14 +251,23 @@ impl<'a, C> ParseState<'a, C> {
     }
 
     /// 生成「解析错误」结果：直接根据消息内联自身解析状态
+    /// * 在[`parse_error`]的基础上包装成[`ParseResult`]
     /// * 🎯用于最后「生成结果」的情况
+    #[inline(always)]
+    pub fn err<T>(&self, message: &str) -> ParseResult<T> {
+        Err(self.parse_error(message))
+    }
+
+    /// 生成「解析错误」：直接根据消息内联自身解析状态
+    /// * 🎯用于[`Option`]的「[`ok_or`]+`?`」方法
+    ///   * 方便将[`Option`]转换为[`Err`]进行上抛
     /// * 📝生成的结果不能与自身有任何瓜葛
     ///   * 📌后续「错误」中引用的「解析环境」可能在「状态销毁」后导致「悬垂引用」问题
     /// * 📝合并「消耗错误」结果：泛型参数可以自动捕获返回类型
     /// * 📌自动内联
     #[inline(always)]
-    pub fn err<T>(&self, message: &str) -> ParseResult<T> {
-        Err(ParseError::new(message, self.env.clone(), self.head))
+    pub fn parse_error(&self, message: &str) -> ParseError {
+        ParseError::new(message, self.env.clone(), self.head)
     }
 
     /// 生成「消耗成功」结果：无需内联自身状态
@@ -266,26 +277,6 @@ impl<'a, C> ParseState<'a, C> {
     pub fn ok_consume() -> ConsumeResult {
         Ok(())
     }
-}
-
-/// 匹配并执行第一个匹配到的分支
-/// * 🎯用于快速识别开头
-/// 📝`self`是一个内容相关的关键字，必须向其中传递`self`作为参数
-macro_rules! first_method {
-    {
-        // * 传入「self.方法名」作为被调用的方法
-        $self_:ident.$method_name: ident;
-        // * 传入所有的分支
-        $( $pattern:expr => $branch:expr ),*,
-        // * 传入「else」分支
-        _ => $branch_else:expr $(,)?
-    } => {
-        // 插入`first!`宏中
-        first! {
-            $( $self_.$method_name($pattern) => $branch ),*,
-            _ => $branch_else
-        }
-    };
 }
 
 /// 匹配首个前缀匹配的分支，自动跳过前缀并执行代码
@@ -461,11 +452,17 @@ impl<'a> ParseState<'a, &str> {
     }
 
     /// 解析总入口 | 全部使用自身状态
-    pub fn parse(&mut self) -> ParseResult {
-        // 消耗文本，构建「中间解析结果」
-        self.build_mid_result()?;
-        // 转换解析结果
-        self.transform_mid_result()
+    /// * 📌现在实现细节放到`impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult`
+    /// * 📝对泛型参数的限制，不一定是裸露的`参数: 限制`形式
+    ///   * 可以是类似「模式匹配」的`含参类型<参数>: 限制`
+    /// * 🚩因为此处没有引入新输入，所以使用「零大小类型」空元组
+    /// * ⚠️【2024-03-20 15:48:59】此处可能会导致生命周期冲突：[`ParseResult::from_parse`]可能会持续借用[`self`]
+    #[inline]
+    pub fn parse<To>(&'a mut self) -> ParseResult<To>
+    where
+        ParseResult<To>: FromParse<(), &'a mut Self> + 'a,
+    {
+        ParseResult::from_parse((), self)
     }
 
     // 消耗文本 | 构建「中间解析结果」 //
@@ -505,7 +502,7 @@ impl<'a> ParseState<'a, &str> {
     /// * 🚩逻辑：头部索引增加赋值
     /// * 📌自动内联
     #[inline(always)]
-    fn head_step(&mut self, step: usize) {
+    fn head_step(&mut self, step: UIntPrecision) {
         self.head += step;
     }
 
@@ -626,7 +623,7 @@ impl<'a> ParseState<'a, &str> {
     /// * 此处使用`first!`代表「截断条件表达式」
     /// * 📌该函数仅承担分支工作
     ///   * 「头部索引位移」在分支中进行
-    ///   * 当前一分支失败（返回Err）时，自动尝试匹配下一个分支
+    ///   * 当前一分支失败（返回Err）时，自动移回索引并尝试匹配下一个分支
     ///     * 🎯用于解决「『预算值』『独立变量』相互冲突」的问题
     /// * ⚠️【2024-02-21 17:17:58】此处引入「词项→标点」的固定顺序
     ///   * 🎯为了解决如 `?查询变量vs问题?` 的冲突
@@ -641,11 +638,14 @@ impl<'a> ParseState<'a, &str> {
             self.head_move;
             // 要缓存的索引
             self.head;
-            // ! s要缓存进的错误集
+            // ! 要缓存进的错误集
             errs;
 
             // 空格⇒跳过 //
-            self.starts_with(self.format.space.parse) => Ok(self.head_skip(self.format.space.parse)),
+            self.starts_with(self.format.space.parse) => {
+                self.head_skip(self.format.space.parse);
+                Ok(()) // * 📌Clippy：明确返回单元值，而非（可能后续会变的）「索引头跳过」的结果
+            },
             // 1 预算值 //
             (
                 self.starts_with(self.format.task.budget_brackets.0) &&
@@ -692,9 +692,9 @@ impl<'a> ParseState<'a, &str> {
 
     /// 消耗
     fn consume_punctuation(&mut self) -> ConsumeResult {
-        first_method! {
+        first! {
             // 匹配开头
-            self.starts_with;
+            (self.starts_with) => (_);
             // 标点 // ⚠️因开头不同且无法兜底，故直接内联至此
             // 判断
             self.format.sentence.punctuation_judgement => self.consume_punctuation_judgement(),
@@ -761,17 +761,17 @@ impl<'a> ParseState<'a, &str> {
     /// * 使用常量`N`指定解析的数目
     ///   * 多的会报错
     ///   * 少的会忽略（额外返回「解析出的数目」作为标记）
-    fn parse_separated_floats<const N: usize>(
+    fn parse_separated_floats<const N: UIntPrecision>(
         &mut self,
         separator: &str,
         right_bracket: &str,
-    ) -> ParseResult<([FloatPrecision; N], usize)> {
+    ) -> ParseResult<([FloatPrecision; N], UIntPrecision)> {
         // 直接初始化定长数组
         let mut result: [FloatPrecision; N] = [0.0; N];
         // 构造数值缓冲区
         let mut value_buffer = String::new();
         // 填充数组
-        let mut i: usize = 0;
+        let mut i: UIntPrecision = 0;
         while self.can_consume() && i < N {
             match self.head_char() {
                 // 空白⇒跳过
@@ -808,19 +808,15 @@ impl<'a> ParseState<'a, &str> {
                 }
                 // 尾括弧⇒解析并存入数值&跳出循环 | 「跳出尾括弧」在循环外操作
                 _ if self.starts_with(right_bracket) => {
-                    // 解析并存入数值
-                    match value_buffer.parse::<FloatPrecision>() {
-                        // 有效数值
-                        Ok(value) => {
-                            // 填充数组
-                            result[i] = value;
-                            // 清空缓冲区
-                            value_buffer.clear();
-                            // 增加计数
-                            i += 1;
-                        }
-                        // 无效数值⇒不做任何事
-                        Err(_) => {}
+                    // 只在数值有效时做事
+                    // * 📝Clippy：没必要使用`Err(..) => {}`这样的分支
+                    if let Ok(value) = value_buffer.parse::<FloatPrecision>() {
+                        // 填充数组
+                        result[i] = value;
+                        // 清空缓冲区
+                        value_buffer.clear();
+                        // 增加计数
+                        i += 1;
                     }
                     // 跳出循环
                     break;
@@ -877,9 +873,9 @@ impl<'a> ParseState<'a, &str> {
         // 跳过左括弧
         self.head_skip_and_spaces(self.format.sentence.stamp_brackets.0);
         // 开始匹配时间戳类型标识符
-        let stamp = first_method! {
+        let stamp = first! {
             // 前缀匹配
-            self.starts_with;
+            (self.starts_with) => (_);
             // 固定
             self.format.sentence.stamp_fixed => {
                 // 跳过自身
@@ -999,8 +995,8 @@ impl<'a> ParseState<'a, &str> {
     /// * ⚠️解析的同时跳过词项
     ///   * 乃至无需`?`语法糖（错误直接传递，而无需提取值）
     fn parse_term(&mut self) -> ParseResult<Term> {
-        first_method! {
-            self.starts_with;
+        first! {
+            (self.starts_with) => (_);
             // 词项/外延集
             self.format.compound.brackets_set_extension.0 => self.parse_compound_set_extension(),
             // 词项/内涵集
@@ -1026,9 +1022,9 @@ impl<'a> ParseState<'a, &str> {
         right_bracket: &str,
     ) -> ConsumeResult {
         while self.can_consume() {
-            first_method! {
+            first! {
                 // 检查开头
-                self.starts_with;
+                (self.starts_with) => (_);
                 // 空白⇒跳过
                 self.format.space.parse => self.head_skip(self.format.space.parse),
                 // 分隔符⇒跳过
@@ -1103,7 +1099,7 @@ impl<'a> ParseState<'a, &str> {
     /// * 🚩找到并删除首个像占位符，并返回索引
     /// * 📌自动内联
     #[inline(always)]
-    fn parse_terms_with_image(&self, terms: &mut Vec<Term>) -> ParseResult<usize> {
+    fn parse_terms_with_image(&self, terms: &mut Vec<Term>) -> ParseResult<UIntPrecision> {
         // 找到首个像占位符的位置
         let placeholder_index = terms.iter().position(|term| *term == Term::Placeholder);
         // 分「找到/没找到」讨论
@@ -1357,6 +1353,7 @@ impl<'a> ParseState<'a, &str> {
             return self.err("词项名不能为空");
         }
         // 尝试将缓冲区转为词项名，返回词项/错误
+        // ! ❌【2024-03-20 21:55:48】此处无法使用[`transform`]：闭包の所有权と生命周期の问题
         match term.set_atom_name(&name_buffer) {
             // 成功⇒返回词项
             Ok(_) => Ok(term),
@@ -1451,7 +1448,127 @@ impl<'a> ParseState<'a, &str> {
     }
 }
 
-/// 总定义
+/// 解析状态的入口实现
+/// * 🎯多态化`parse`函数：简写`parse_budget`、`parse_truth`等函数
+impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult {
+    /// 原先在[`ParseState`]的「解析总入口」留到这儿执行
+    fn from_parse(_: (), parser: &mut ParseState) -> Self {
+        // 消耗文本，构建「中间解析结果」
+        parser.build_mid_result()?;
+        // 转换解析结果
+        parser.transform_mid_result()
+    }
+}
+
+/// 解析状态的入口实现
+/// * 🎯用于自定义的「条目提取」功能
+/// * 🎯最初用于「词法折叠」，但后续不用
+impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<MidParseResult> {
+    /// 原先在[`ParseState`]的「解析总入口」留到这儿执行
+    fn from_parse(_: (), parser: &mut ParseState) -> Self {
+        // 消耗文本，构建「中间解析结果」
+        parser.build_mid_result()?;
+        // 直接拿走并返回「中间解析结果」
+        Self::Ok(parser.mid_result.take())
+    }
+}
+
+impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<Truth> {
+    /// 侧门/解析真值
+    /// * 🎯用于单独解析真值
+    ///   * 📄【2024-03-20 14:14:51】最初case: 词法折叠
+    /// * 🚩直接消耗一个真值，然后返回
+    /// * 📄case: `%0.5; 0.5%`
+    fn from_parse(_: (), parser: &mut ParseState) -> Self {
+        // 尝试消耗一个真值
+        // ! 不能「消耗条目，然后默认条目」：还是原子词项的问题（LaTeX/漢文 情况）
+        // * ✅【2024-03-21 00:26:05】安全：有进行长度检验
+        parser.consume_truth()?;
+        // 从「中间结果」中提取真值
+        let truth = parser
+            .mid_result
+            .truth
+            .take()
+            .ok_or(parser.parse_error("无法解析出真值"))?;
+        // 返回真值
+        // ! 📌这里引用关联函数无法自动使用`C`的默认值，干脆直接上`Ok`
+        // ! 否则就要用`ParseState::<&'a str>::ok(truth)`，过于冗长
+        Self::Ok(truth)
+    }
+}
+
+impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<Stamp> {
+    /// 侧门/解析时间戳
+    /// * 🎯用于单独解析时间戳
+    ///   * 📄【2024-03-20 14:14:51】最初case: 词法折叠
+    /// * 🚩直接消耗一个时间戳，然后返回
+    /// * 📄case: `:|:`
+    fn from_parse(_: (), parser: &mut ParseState) -> Self {
+        // 尝试消耗一个时间戳
+        // ! 不能「消耗条目，然后默认条目」：还是原子词项的问题（LaTeX/漢文 情况）
+        // * ✅【2024-03-21 00:26:05】安全：有进行长度检验
+        parser.consume_stamp()?;
+        // 从「中间结果」中提取时间戳
+        let stamp = parser
+            .mid_result
+            .stamp
+            .take()
+            .ok_or(parser.parse_error("无法解析出时间戳"))?;
+        // 返回时间戳
+        // ! 📌这里引用关联函数无法自动使用`C`的默认值，干脆直接上`Ok`
+        // ! 否则就要用`ParseState::<&'a str>::ok(truth)`，过于冗长
+        Self::Ok(stamp)
+    }
+}
+
+impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<Punctuation> {
+    /// 侧门/解析标点
+    /// * 🎯用于单独解析标点
+    ///   * 📄【2024-03-20 14:14:51】最初case: 词法折叠
+    /// * 🚩直接消耗一个标点，然后返回
+    /// * 📄case: `.`
+    fn from_parse(_: (), parser: &mut ParseState) -> Self {
+        // 尝试消耗一个标点 | 默认这个条目会是标点
+        // * ✅【2024-03-21 00:26:05】安全：有进行长度检验
+        parser.consume_punctuation()?;
+        // 从「中间结果」中提取标点
+        let punctuation = parser
+            .mid_result
+            .punctuation
+            .take()
+            .ok_or(parser.parse_error("无法解析出标点"))?;
+        // 返回标点
+        // ! 📌这里引用关联函数无法自动使用`C`的默认值，干脆直接上`Ok`
+        // ! 否则就要用`ParseState::<&'a str>::ok(truth)`，过于冗长
+        Self::Ok(punctuation)
+    }
+}
+
+impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<Budget> {
+    /// 侧门/解析预算值
+    /// * 🎯用于单独解析预算值
+    ///   * 📄【2024-03-20 14:14:51】最初case: 词法折叠
+    /// * 🚩直接消耗一个预算值，然后返回
+    /// * 📄case: `$0.5; 0.5; 0.5$`
+    fn from_parse(_: (), parser: &mut ParseState) -> Self {
+        // 尝试消耗一个预算值
+        // ! 不能「消耗条目，然后默认条目」：还是原子词项的问题（LaTeX/漢文 情况）
+        // * ✅【2024-03-21 00:26:05】安全：有进行长度检验
+        parser.consume_budget()?;
+        // 从「中间结果」中提取预算值
+        let budget = parser
+            .mid_result
+            .budget
+            .take()
+            .ok_or(parser.parse_error("无法解析出预算值"))?;
+        // 返回预算值
+        // ! 📌这里引用关联函数无法自动使用`C`的默认值，干脆直接上`Ok`
+        // ! 否则就要用`ParseState::<&'a str>::ok(truth)`，过于冗长
+        Self::Ok(budget)
+    }
+}
+
+/// 主解析实现 | 从解析格式开始解析
 impl NarseseFormat<&str> {
     /// 构造解析状态
     /// * 索引默认从开头开始
@@ -1460,77 +1577,120 @@ impl NarseseFormat<&str> {
     }
 
     /// 主解析函数
-    pub fn parse<'a>(&'a self, input: &'a str) -> ParseResult {
-        // 构造解析状态
-        let mut state: ParseState<&str> = self.build_parse_state(input);
-        // 用状态进行解析
-        state.parse()
-        // ! 随后丢弃状态
+    /// * ✨【2024-03-20 15:30:43】现在支持任意扩展可解析的目标类型，而无需为之分别添加函数
+    ///   * 📌通过模仿标准库[`String::parse`]与[`From`]实现
+    pub fn parse<'a, To>(&'a self, input: &'a str) -> ParseResult<To>
+    where
+        ParseResult<To>: FromParse<&'a str, &'a Self>,
+    {
+        ParseResult::from_parse(input, self)
     }
 
-    /// 主解析函数
-    pub fn parse_multi<'a>(
-        &'a self,
-        inputs: impl IntoIterator<Item = &'a str>,
-    ) -> Vec<ParseResult> {
+    /// 解析多个Narsese
+    /// * ✨解析成Vec⇒多个Result数组
+    /// * 🚩将以某一类型解析一系列Narsese
+    pub fn parse_multi<'a, Inputs>(&'a self, inputs: Inputs) -> Vec<ParseResult>
+    where
+        Inputs: IntoIterator<Item = &'a str>,
+    {
         // 构造结果
-        let mut result = vec![];
+        let mut results = vec![];
         // 构造空的解析状态
-        let mut state: ParseState<&str> = self.build_parse_state("");
+        let mut state = self.build_parse_state("");
         // 复用状态进行解析
         for input in inputs {
             // 重置状态
             state.reset_to(input, 0);
             // 添加解析结果
-            result.push(state.parse());
+            // ! 📌【2024-03-20 15:48:00】不能使用`state.parse`：会引入不确定的借用
+            results.push(ParseResult::from_parse((), &mut state));
         }
         // 返回所有结果
-        result
+        results
         // ! 随后丢弃状态
     }
 }
 
+/// 用于量产「解析到某值」的宏
+/// * 🎯产生原因：在不造成编译错误的情况下，节省模板代码
+///
+/// ! ❌解析到一般项不可行：有可能把[`ParseState`]的引用带走，并在状态销毁时产生悬垂引用
+/// * 📌报错信息：`state` does not live long enough
+/// * 📝编译器无法确定`from_parse`是否有借用`state`的值
+/// * 已发帖询问：https://users.rust-lang.org/t/preventing-variable-borrowing-to-solve-lifetime-problem/10860
+macro_rules! from_parse_to_types {
+    {
+        $(
+            // $( #[$attr:meta] )*
+            // ! ❌local ambiguity when calling macro `from_parse_to_types`: multiple parsing options: built-in NTs tt ('parse_target') or 1 other option.rustcClick for full compiler diagnostic
+            $parse_target:tt
+        )*
+    } => {
+        $(
+            // $( #[$attr] )*
+            impl<'a> FromParse<&'a str, &'a NarseseFormat<&'a str>> for ParseResult<$parse_target> {
+                // /// 侧门/解析真值
+                // /// * 🎯用于解析单个的真值
+                fn from_parse(input: &'a str, parser: &'a NarseseFormat<&'a str>) -> Self {
+                    // 构造空的解析状态
+                    let mut state = parser.build_parse_state(input);
+                    // 返回对真值的解析结果
+                    state.parse()
+                    // ! 随后丢弃状态
+                }
+            }
+        )*
+    };
+}
+
+from_parse_to_types! {
+    // 主解析函数
+    // * 🎯解析通常的Narsese：词项/语句/任务
+    Narsese
+    // 中间结果
+    // * 🎯用于「自定义提取值」的行为
+    MidParseResult
+    // 解析到预算值
+    // * 🎯【2024-03-20 14:38:24】最初用于「词法折叠」单独解析出预算值
+    Budget
+    // 解析到真值
+    // * 🎯【2024-03-20 14:38:24】最初用于「词法折叠」单独解析出真值
+    Truth
+    // 解析到标点
+    // * 🎯【2024-03-20 14:38:24】最初用于「词法折叠」单独解析出标点
+    Punctuation
+    // 解析到时间戳
+    // * 🎯【2024-03-20 14:38:24】最初用于「词法折叠」单独解析出时间戳
+    Stamp
+}
+
+// impl<'a, 'result, To> FromParse<&'a str, &'a NarseseFormat<&'a str>> for ParseResult<To>
+// where
+//     ParseResult<To>: FromParse<(), &'a mut ParseState<'a>>,
+// {
+//     /// 主解析函数
+//     fn from_parse(input: &'a str, parser: &'a NarseseFormat<&'a str>) -> Self {
+//         let result;
+//         {
+//             // 构造解析状态
+//             let mut state = parser.build_parse_state(input);
+//             // 用状态进行解析
+//             // result = ParseResult::from_parse((), &mut state);
+//             result = state.parse();
+//             // 借用检查器以为`result`还（有可能）在借用`state`，因此报错
+//             // ❓如何声明`result`的生命周期长于`state`呢
+//         }
+//         // ! 随后丢弃状态
+//         result
+//     }
+// }
+
 /// 单元测试
 #[cfg(test)]
 mod tests_parse {
-    use crate::{
-        conversion::string::{NarseseFormat, FORMAT_ASCII},
-        fail_tests, show, Sentence, Task, Term,
-    };
-
-    use super::NarseseResult;
-
-    /// 生成「矩阵」
-    /// * 结果：`Vec<(format, Vec<result>)>`
-    macro_rules! f_matrix {
-        [
-            $f:ident;
-            $($format:expr $(,)?)+ ;
-            $($input:expr $(,)?)+ $(;)?
-            // *【2024-02-22 15:32:02】↑现在所有逗号都可选了
-        ] => {
-            {
-                // 新建一个矩阵
-                let mut matrix = vec![];
-                // 生成行列
-                let formats = [$($format),+];
-                let inputs = [$($input),+];
-                // 给矩阵添加元素
-                for format in formats {
-                    // 新建一个列
-                    let mut col = vec![];
-                    // 生成列元素
-                    for input in inputs {
-                        col.push($f(format, input))
-                    }
-                    // 添加列
-                    matrix.push((format, col));
-                }
-                // 返回矩阵
-                matrix
-            }
-        };
-    }
+    use super::super::format_instances::*;
+    use super::*;
+    use util::{f_tensor, fail_tests, show};
 
     /// 通通用测试/尝试解析并返回错误
     fn __test_parse(format: &NarseseFormat<&str>, input: &str) -> NarseseResult {
@@ -1571,39 +1731,39 @@ mod tests_parse {
     }
 
     /// 通用测试/词项
-    fn _test_parse_term(format: &NarseseFormat<&str>, input: &str) {
+    fn _test_parse_term(format: &NarseseFormat<&str>, input: &str) -> Term {
         // 尝试解析并检验
         let term: Term = __test_parse(format, input).try_into().unwrap();
         // 展示
-        show!(term);
+        show!(term)
     }
 
     /// 通用测试/语句
-    fn _test_parse_sentence(format: &NarseseFormat<&str>, input: &str) {
+    fn _test_parse_sentence(format: &NarseseFormat<&str>, input: &str) -> Sentence {
         // 尝试解析并检验
         let sentence: Sentence = __test_parse(format, input).try_into().unwrap();
         // 展示
-        show!(sentence);
+        show!(sentence)
     }
 
     /// 通用测试/任务
-    fn _test_parse_task(format: &NarseseFormat<&str>, input: &str) {
+    fn _test_parse_task(format: &NarseseFormat<&str>, input: &str) -> Task {
         // 尝试解析并检验
         let task: Task = __test_parse(format, input).try_into().unwrap();
         // 展示
-        show!(task);
+        show!(task)
     }
 
     /// 测试/原子词项
     #[test]
     fn test_parse_atom() {
         let format_ascii = FORMAT_ASCII;
-        let matrix = f_matrix! [
+        let matrix = f_tensor! [
             // 应用的函数
             _test_parse_term;
             // 格式×输入
             &format_ascii;
-            "word", "_", "$i_var", "#d_var", "?q_var", "+137", "^op",
+            "word" "_" "$i_var" "#d_var" "?q_var" "+137" "^op"
             // "^go-to" // * ←该操作符OpenNARS可解析，而ONA、PyNARS不能
             // ! ↑【2024-02-22 14:46:16】现因需兼顾`<主词-->谓词>`的结构（防止系词中的`-`被消耗），故不再兼容
         ];
@@ -1652,31 +1812,31 @@ mod tests_parse {
     #[test]
     fn test_parse_compound() {
         let format_ascii = FORMAT_ASCII;
-        let matrix = f_matrix! [
-            // 应用的函数
-            _test_parse_term;
-            // 格式×输入
-            &format_ascii;
-            "{word, w2}",
-            "{{word}, {w2}}",
-            "{{{{{{嵌套狂魔}}}}}}",
-            "[1 , 2 , 3  , 4 ,   5 ]",
-            "[_ , _ , _  , _ ,   _ ]", // ! 看起来是五个，实际上因为是「集合」只有一个
-            "(&, word, $i_var, #d_var, ?q_var, _, +137, ^op)",
-            "(|, word, $i_var, #d_var, ?q_var, _, +137, ^op)",
-            "(-, {被减的}, [减去的])",
-            "(~, {[被减的]}, [{减去的}])",
-            "(~, (-, 被减的被减的, {[被减的减去的]}), [{减去的}])",
-            "(*, word, $i_var, #d_var, ?q_var, _, +137, ^op)",
-            "(/, word, _, $i_var, #d_var, ?q_var, +137, ^op)",
-            "(\\,word,$i_var,#d_var,?q_var,_,+137,^op)",
-            "(/, _, 0)",
-            "(\\, 0, _)",
-            "( &&  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )",
-            "( ||  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )",
-            "( --  , 我是被否定的)",
-            "( &/  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )",
-            "( &|  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )",
+        let matrix = f_tensor! [
+        // 应用的函数
+        _test_parse_term;
+        // 格式×输入
+        &format_ascii;
+        "{word, w2}"
+        "{{word}, {w2}}"
+        "{{{{{{嵌套狂魔}}}}}}"
+        "[1 , 2 , 3  , 4 ,   5 ]"
+        "[_ , _ , _  , _ ,   _ ]" // ! 看起来是五个，实际上因为是「集合」只有一个
+        "(&, word, $i_var, #d_var, ?q_var, _, +137, ^op)"
+        "(|, word, $i_var, #d_var, ?q_var, _, +137, ^op)"
+        "(-, {被减的}, [减去的])"
+        "(~, {[被减的]}, [{减去的}])"
+        "(~, (-, 被减的被减的, {[被减的减去的]}), [{减去的}])"
+        "(*, word, $i_var, #d_var, ?q_var, _, +137, ^op)"
+        "(/, word, _, $i_var, #d_var, ?q_var, +137, ^op)"
+        "(\\,word,$i_var,#d_var,?q_var,_,+137,^op)"
+        "(/, _, 0)"
+        "(\\, 0, _)"
+        "( &&  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )"
+        "( ||  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )"
+        "( --  , 我是被否定的)"
+        "( &/  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )"
+        "( &|  , word  , $i_var  , #d_var  , ?q_var  , _  , +137  , ^op )"
         ];
         show!(matrix);
     }
@@ -1709,33 +1869,33 @@ mod tests_parse {
     #[test]
     fn test_parse_statement() {
         let format_ascii = FORMAT_ASCII;
-        let matrix = f_matrix! [
+        let matrix = f_tensor! [
             // 应用的函数
             _test_parse_term;
             // 格式×输入
             &format_ascii;
             // 普通情况
-            "<外延-->内涵>",
-            "<我是右边的外延 --> 我是左边的内涵>",
-            "<前提 ==> 结论>",
-            "<等价物 <=> 等價物>",
+            "<外延-->内涵>"
+            "<我是右边的外延 --> 我是左边的内涵>"
+            "<前提 ==> 结论>"
+            "<等价物 <=> 等價物>"
             // 派生系词
-            "<实例 {-- 类型>",
-            "<类型 --] 属性>",
-            "<实例 {-] 属性>",
-            r#"<当下行动 =/> 未来预期>"#,
-            r#"<当下条件 =|> 当下结论>"#,
-            r#"<当下结果 =\> 过往原因>"#,
-            r#"<统一前提 </> 未来等价>"#,
-            r#"<统一前提 <|> 当下等价>"#,
-            r#"<统一前提 <\> 过往等价>"#, // ! ⚠️允许出现，但会被自动转换为「未来等价」
+            "<实例 {-- 类型>"
+            "<类型 --] 属性>"
+            "<实例 {-] 属性>"
+            r#"<当下行动 =/> 未来预期>"#
+            r#"<当下条件 =|> 当下结论>"#
+            r#"<当下结果 =\> 过往原因>"#
+            r#"<统一前提 </> 未来等价>"#
+            r#"<统一前提 <|> 当下等价>"#
+            r#"<统一前提 <\> 过往等价>"# // ! ⚠️允许出现，但会被自动转换为「未来等价」
 
             // 集成测试：原子&复合
-            "<[蕴含]==>{怪论}>",
-            "<$我很相似 <-> #我也是>",
-            "<^咱俩相同<->^咱俩相同>",
-            "<+123<->加一二三>",
-            "<(*, {SELF}) --> ^left>",
+            "<[蕴含]==>{怪论}>"
+            "<$我很相似 <-> #我也是>"
+            "<^咱俩相同<->^咱俩相同>"
+            "<+123<->加一二三>"
+            "<(*, {SELF}) --> ^left>"
         ];
         show!(matrix);
     }
@@ -1746,12 +1906,12 @@ mod tests_parse {
     /// 测试/标点（语句）
     #[test]
     fn test_parse_punctuation() {
-        let matrix = f_matrix! [
+        let matrix = f_tensor! [
         // 应用的函数
         _test_parse_sentence;
         // 格式×输入
         &FORMAT_ASCII;
-        "判断.", "目标!", "问题?", "请求@", "?查询变量vs问题?"
+        "判断." "目标!" "问题?" "请求@" "?查询变量vs问题?"
         ];
         show!(matrix);
     }
@@ -1782,19 +1942,19 @@ mod tests_parse {
     /// 测试/真值（语句）
     #[test]
     fn test_parse_truth() {
-        let matrix = f_matrix! [
+        let matrix = f_tensor! [
             // 应用的函数
             _test_parse_sentence;
             // 格式×输入
             &FORMAT_ASCII;
-            "判断. %1.0;0.9%", "目标! %.0;.9%", "问题?", "请求@",
-            "单真值. %1.0%",
-            "单真值. %00%",
-            "单真值. %00.00%",
-            "单真值2. %.0%",
-            "空真值. %%", // * 视作空真值
-            "空真值2. %", // * 这个会预先退出
-            "空真值3.",
+            "判断. %1.0;0.9%" "目标! %.0;.9%" "问题?" "请求@"
+            "单真值. %1.0%"
+            "单真值. %00%"
+            "单真值. %00.00%"
+            "单真值2. %.0%"
+            "空真值. %%" // * 视作空真值
+            "空真值2. %" // * 这个会预先退出
+            "空真值3."
         ];
         show!(matrix);
     }
@@ -1815,19 +1975,19 @@ mod tests_parse {
     /// 测试/预算值（任务）
     #[test]
     fn test_parse_budget() {
-        let matrix = f_matrix! [
+        let matrix = f_tensor! [
             // 应用的函数
             _test_parse_task;
             // 格式×输入
             &FORMAT_ASCII;
-            "$0.5;0.5;0.5$ 判断. %1.0%",
-            "$.7;.75;0.555$目标! %.0;.9%",
-            "$1;1;1$ 问题?",
-            "$0;0;0$请求@",
-            "$0;0$双预算?",
-            "$0$单预算@",
-            "$$空预算?",
-            "$$$独立变量vs空运算?",
+            "$0.5;0.5;0.5$ 判断. %1.0%"
+            "$.7;.75;0.555$目标! %.0;.9%"
+            "$1;1;1$ 问题?"
+            "$0;0;0$请求@"
+            "$0;0$双预算?"
+            "$0$单预算@"
+            "$$空预算?"
+            "$$$独立变量vs空运算?"
         ];
         show!(matrix);
     }
@@ -1850,18 +2010,18 @@ mod tests_parse {
     /// 测试/时间戳（语句）
     #[test]
     fn test_parse_stamp() {
-        let matrix = f_matrix! [
+        let matrix = f_tensor! [
             // 应用的函数
             _test_parse_sentence;
             // 格式×输入
             &FORMAT_ASCII;
-            "固定.:!114514:",
-            "固定正.:!+137:",
-            "固定负.:!-442:",
-            "过去.:\\:",
-            "现在? :|:",
-            "未来! :/:",
-            "永恒.",
+            "固定.:!114514:"
+            "固定正.:!+137:"
+            "固定负.:!-442:"
+            "过去.:\\:"
+            "现在? :|:"
+            "未来! :/:"
+            "永恒."
         ];
         show!(matrix);
     }
@@ -1903,14 +2063,14 @@ mod tests_parse {
     /// * 🎯仅用于检测是否会panic
     fn _test_parse_stability(format: &NarseseFormat<&str>, input: &str) {
         // 解析，忽略结果
-        let _ = format.parse(input);
+        let _: ParseResult = format.parse(input);
     }
 
     /// 集成测试/健壮性测试
     /// * 🎯用于检验是否可能panic
     #[test]
     fn test_parse_stability_cases() {
-        f_matrix! [
+        f_tensor! [
             // 应用的函数
             _test_parse_stability;
             // 格式×输入
@@ -1954,7 +2114,7 @@ mod tests_parse {
     /// 集成测试/解析器
     #[test]
     fn test_parse_integrated() {
-        let matrix = f_matrix! [
+        let matrix = f_tensor! [
             // 应用的函数
             _test_parse_common;
             // 格式×输入

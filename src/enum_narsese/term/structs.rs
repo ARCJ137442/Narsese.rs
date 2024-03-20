@@ -1,5 +1,6 @@
 //! 统一定义词项结构
 
+use crate::api::UIntPrecision;
 use std::collections::HashSet;
 
 // 定义 //
@@ -27,7 +28,7 @@ pub enum Term {
     /// 查询变量
     VariableQuery(String),
     /// 间隔
-    Interval(usize),
+    Interval(UIntPrecision),
     /// 操作符
     Operator(String),
     // 复合词项 //
@@ -46,9 +47,9 @@ pub enum Term {
     /// 乘积
     Product(TermVecType),
     /// 外延像
-    ImageExtension(usize, TermVecType),
+    ImageExtension(UIntPrecision, TermVecType),
     /// 内涵像
-    ImageIntension(usize, TermVecType),
+    ImageIntension(UIntPrecision, TermVecType),
     /// 合取
     Conjunction(TermSetType),
     /// 析取

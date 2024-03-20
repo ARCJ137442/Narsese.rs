@@ -3,12 +3,18 @@
         ".\\Cargo.toml"
     ],
     "cSpell.words": [
+        "doctest",
         "EVCXR",
+        "Hasher",
         "Rightarrow",
+        "rposition",
         "tomllib",
         "Uparrow"
     ],
     "conventionalCommits.scopes": [
-        "解析器&格式化"
-    ]
+        "解析器&格式化",
+        "词法"
+    ],
+    "editor.formatOnSave": true,
+    "rust-analyzer.cargo.features": "all"
 }

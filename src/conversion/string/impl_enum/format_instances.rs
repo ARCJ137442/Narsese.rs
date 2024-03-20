@@ -1,3 +1,8 @@
+//! 定义「Narsese格式」的常用实例
+//! * 📌均基于CommonNarsese的语法格式，只是其中的「关键字」不同
+//! * 📄部分参考自[JuNarsese](https://github.com/ARCJ137442/JuNarsese.jl)
+//!   * ℹ️有少量修改
+
 use super::format::*;
 
 /// 通用 ASCII格式
@@ -5,19 +10,19 @@ use super::format::*;
 /// * 另可参考：<https://github.com/opennars/opennars/wiki/Narsese-Grammar-(Input-Output-Format)>
 /// * 可用于打印Narsese的默认形式
 pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
-    space : NarseseFormatSpace {
-        parse: " ", // ! 解析时忽略空格
+    space: NarseseFormatSpace {
+        parse: " ",        // ! 解析时忽略空格
         format_terms: " ", // 格式化时，词项间需要空格（英文如此）
         format_items: " ", // 格式化时，条目间需要空格（英文如此）
     },
     atom: NarseseFormatAtom {
         prefix_word: "",
+        prefix_placeholder: "_",
         prefix_variable_independent: "$",
         prefix_variable_dependent: "#",
         prefix_variable_query: "?",
         prefix_interval: "+",
         prefix_operator: "^",
-        prefix_placeholder: "_",
     },
     compound: NarseseFormatCompound {
         brackets: ("(", ")"),
@@ -48,10 +53,10 @@ pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
         copula_instance_property: "{-]",
         copula_implication_predictive: "=/>",
         copula_implication_concurrent: "=|>",
-        copula_implication_retrospective: "=\\>",
+        copula_implication_retrospective: r"=\>",
         copula_equivalence_predictive: "</>",
         copula_equivalence_concurrent: "<|>",
-        copula_equivalence_retrospective: "<\\>",
+        copula_equivalence_retrospective: r"<\>",
     },
     sentence: NarseseFormatSentence {
         punctuation_judgement: ".",
@@ -78,6 +83,8 @@ pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
 /// * 来源：文档 `NARS ASCII Input.pdf`
 /// * 【20230809 10:22:34】注：暂未找到官方格式模板，此仅基于个人观察
 /// * 【20230811 0:26:55】不能很好地兼容「二元运算」表达（需要更专业者优化）
+///
+/// TODO: ❓是否有必要从「词法Narsese」中迁移过来？
 pub const FORMAT_LATEX: NarseseFormat<&str> = NarseseFormat {
     space: NarseseFormatSpace {
         parse: " ",        // ! 解析时可跳过空格
@@ -86,46 +93,48 @@ pub const FORMAT_LATEX: NarseseFormat<&str> = NarseseFormat {
     },
     atom: NarseseFormatAtom {
         prefix_word: "",
+        prefix_placeholder: r"\diamond{}",
         prefix_variable_independent: r"\$",
         prefix_variable_dependent: r"\#",
         prefix_variable_query: "?",
         prefix_interval: "+",
-        prefix_operator: r"\Uparrow ",
-        prefix_placeholder: r"\diamond ",
+        prefix_operator: r"\Uparrow{}",
     },
     compound: NarseseFormatCompound {
         brackets: (r"\left(", r"\right)"),
-        separator: " ",
+        separator: r"\;", // ! 【2024-03-18 23:55:17】LaTeX使用`\space{}`也可使用`\;` | ✅兼容MathJax
         brackets_set_extension: (r"\left\{", r"\right\}"), // ! 此中`{` `}`需要转义
         brackets_set_intension: (r"\left[", r"\right]"),
-        connecter_intersection_extension: r"\cap ",
-        connecter_intersection_intension: r"\cup ",
-        connecter_difference_extension: r"\minus ",
-        connecter_difference_intension: r"\sim ",
-        connecter_product: r"\times ",
+        connecter_intersection_extension: r"\cap{}",
+        connecter_intersection_intension: r"\cup{}",
+        connecter_difference_extension: r"\minus{}",
+        connecter_difference_intension: r"\sim{}",
+        connecter_product: r"\times{}",
         connecter_image_extension: "/",
-        connecter_image_intension: r"\backslash ",
-        connecter_conjunction: r"\wedge ",
-        connecter_disjunction: r"\vee ",
-        connecter_negation: r"\neg ",
+        connecter_image_intension: r"\backslash{}",
+        connecter_conjunction: r"\wedge{}",
+        connecter_disjunction: r"\vee{}",
+        connecter_negation: r"\neg{}",
         connecter_conjunction_sequential: ",",
         connecter_conjunction_parallel: ";",
     },
     statement: NarseseFormatStatement {
         brackets: (r"\left<", r"\right>"),
-        copula_inheritance: r"\rightarrow ",
-        copula_similarity: r"\leftrightarrow ",
-        copula_implication: r"\Rightarrow ",
-        copula_equivalence: r"\Leftrightarrow ",
-        copula_instance: r"\circ\!\!\!\rightarrow  ",
-        copula_property: r"\rightarrow\!\!\!\circ  ",
-        copula_instance_property: r"\circ\!\!\!\rightarrow\!\!\!\circ  ",
-        copula_implication_predictive: r"/\!\!\!\Rightarrow ",
-        copula_implication_concurrent: r"|\!\!\!\Rightarrow ",
-        copula_implication_retrospective: r"\backslash\!\!\!\Rightarrow ",
-        copula_equivalence_predictive: r"/\!\!\!\Leftrightarrow ",
-        copula_equivalence_concurrent: r"|\!\!\!\Leftrightarrow ",
-        copula_equivalence_retrospective: r"\backslash\!\!\!\Leftrightarrow ",
+        // ! 【2024-03-18 23:53:37】↓现在由于格式化时自动添加的空格，故此处不尾缀空格也能进入MathJax
+        // * 🚩同步自「词法Narsese」
+        copula_inheritance: r"\rightarrow{}",
+        copula_similarity: r"\leftrightarrow{}",
+        copula_implication: r"\Rightarrow{}",
+        copula_equivalence: r"\Leftrightarrow{}",
+        copula_instance: r"\circ\!\!\!\rightarrow{}",
+        copula_property: r"\rightarrow\!\!\!\circ{}",
+        copula_instance_property: r"\circ\!\!\!\rightarrow\!\!\!\circ{}",
+        copula_implication_predictive: r"/\!\!\!\Rightarrow{}",
+        copula_implication_concurrent: r"|\!\!\!\Rightarrow{}",
+        copula_implication_retrospective: r"\backslash\!\!\!\Rightarrow{}",
+        copula_equivalence_predictive: r"/\!\!\!\Leftrightarrow{}",
+        copula_equivalence_concurrent: r"|\!\!\!\Leftrightarrow{}",
+        copula_equivalence_retrospective: r"\backslash\!\!\!\Leftrightarrow{}",
     },
     sentence: NarseseFormatSentence {
         punctuation_judgement: ".",
@@ -133,11 +142,11 @@ pub const FORMAT_LATEX: NarseseFormat<&str> = NarseseFormat {
         punctuation_question: "?",
         punctuation_quest: "¿", // 【20230806 23:46:18】倒问号没有对应的LaTeX。。。
         stamp_brackets: ("", ""), // !【2024-02-25 16:31:38】此处时态没括号。。
-        stamp_past: r"\backslash\!\!\!\Rightarrow",
-        stamp_present: r"|\!\!\!\Rightarrow",
-        stamp_future: r"/\!\!\!\Rightarrow",
-        stamp_fixed: "t=", // ? LaTeX语法未知
-        truth_brackets: (r"\langle", r"\rangle"),
+        stamp_past: r"\backslash\!\!\!\Rightarrow{}",
+        stamp_present: r"|\!\!\!\Rightarrow{}",
+        stamp_future: r"/\!\!\!\Rightarrow{}",
+        stamp_fixed: "t=",                            // ? LaTeX语法未知
+        truth_brackets: (r"\langle{}", r"\rangle{}"), // ! 【2024-03-18 23:58:02】末尾使用空参数集分隔
         truth_separator: ",",
     },
     task: NarseseFormatTask {
@@ -152,18 +161,18 @@ pub const FORMAT_LATEX: NarseseFormat<&str> = NarseseFormat {
 /// * 📌原创
 pub const FORMAT_HAN: NarseseFormat<&str> = NarseseFormat {
     space: NarseseFormatSpace {
-        parse: " ",       // ! 解析时忽略空格
-        format_terms: "", // 格式化时，词项间无需分隔（避免太过松散）
+        parse: " ",        // ! 解析时忽略空格
+        format_terms: "",  // 格式化时，词项间无需分隔（避免太过松散）
         format_items: " ", // 格式化时，条目间需要分隔（避免太过密集）
     },
     atom: NarseseFormatAtom {
         prefix_word: "", // 置空
+        prefix_placeholder: "某",
         prefix_variable_independent: "任一",
         prefix_variable_dependent: "其一",
         prefix_variable_query: "所问",
         prefix_interval: "间隔",
         prefix_operator: "操作",
-        prefix_placeholder: "某",
     },
     compound: NarseseFormatCompound {
         brackets: ("（", "）"),
@@ -203,12 +212,12 @@ pub const FORMAT_HAN: NarseseFormat<&str> = NarseseFormat {
         punctuation_judgement: "。",
         punctuation_goal: "！",
         punctuation_question: "？",
-        punctuation_quest: "；", // 暂且没有更合适、更方便输入的全角标点
+        punctuation_quest: "；",  // 暂且没有更合适、更方便输入的全角标点
         stamp_brackets: ("", ""), // !【2024-02-25 16:31:38】此处时态没括号。。
         stamp_past: "过去",
         stamp_present: "现在",
         stamp_future: "将来",
-        stamp_fixed: "发生在", // 另一个候选是「时为」，但欠缺可读性
+        stamp_fixed: "发生在",        // 另一个候选是「时为」，但欠缺可读性
         truth_brackets: ("真", "值"), // 大改：兼容单真值、空真值
         truth_separator: "、",
     },
@@ -222,10 +231,11 @@ pub const FORMAT_HAN: NarseseFormat<&str> = NarseseFormat {
 
 /// 单元测试
 #[cfg(test)]
-mod tests {
+#[cfg(feature = "enum_narsese")]
+mod tests_enum_narsese {
 
     use super::*;
-    use crate::*;
+    use crate::enum_narsese::*;
 
     fn test_format(label: &str, format: NarseseFormat<&str>) {
         // 展示格式
