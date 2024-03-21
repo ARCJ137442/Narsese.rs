@@ -452,15 +452,15 @@ impl<'a> ParseState<'a, &str> {
     }
 
     /// 解析总入口 | 全部使用自身状态
-    /// * 📌现在实现细节放到`impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult`
+    /// *s📌现在实现细节放到`impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult`
     /// * 📝对泛型参数的限制，不一定是裸露的`参数: 限制`形式
     ///   * 可以是类似「模式匹配」的`含参类型<参数>: 限制`
     /// * 🚩因为此处没有引入新输入，所以使用「零大小类型」空元组
     /// * ⚠️【2024-03-20 15:48:59】此处可能会导致生命周期冲突：[`ParseResult::from_parse`]可能会持续借用[`self`]
     #[inline]
-    pub fn parse<To>(&'a mut self) -> ParseResult<To>
+    pub fn parse<'s, To>(&'s mut self) -> ParseResult<To>
     where
-        ParseResult<To>: FromParse<(), &'a mut Self> + 'a,
+        ParseResult<To>: FromParse<(), &'s mut Self>,
     {
         ParseResult::from_parse((), self)
     }
@@ -1450,9 +1450,9 @@ impl<'a> ParseState<'a, &str> {
 
 /// 解析状态的入口实现
 /// * 🎯多态化`parse`函数：简写`parse_budget`、`parse_truth`等函数
-impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult {
+impl<'s> FromParse<(), &'s mut ParseState<'_>> for ParseResult {
     /// 原先在[`ParseState`]的「解析总入口」留到这儿执行
-    fn from_parse(_: (), parser: &mut ParseState) -> Self {
+    fn from_parse(_: (), parser: &'s mut ParseState) -> Self {
         // 消耗文本，构建「中间解析结果」
         parser.build_mid_result()?;
         // 转换解析结果
@@ -1463,9 +1463,9 @@ impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult {
 /// 解析状态的入口实现
 /// * 🎯用于自定义的「条目提取」功能
 /// * 🎯最初用于「词法折叠」，但后续不用
-impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<MidParseResult> {
+impl<'s> FromParse<(), &'s mut ParseState<'_>> for ParseResult<MidParseResult> {
     /// 原先在[`ParseState`]的「解析总入口」留到这儿执行
-    fn from_parse(_: (), parser: &mut ParseState) -> Self {
+    fn from_parse(_: (), parser: &'s mut ParseState) -> Self {
         // 消耗文本，构建「中间解析结果」
         parser.build_mid_result()?;
         // 直接拿走并返回「中间解析结果」
@@ -1473,13 +1473,13 @@ impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<MidParseResult> {
     }
 }
 
-impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<Truth> {
+impl<'s> FromParse<(), &'s mut ParseState<'_>> for ParseResult<Truth> {
     /// 侧门/解析真值
     /// * 🎯用于单独解析真值
     ///   * 📄【2024-03-20 14:14:51】最初case: 词法折叠
     /// * 🚩直接消耗一个真值，然后返回
     /// * 📄case: `%0.5; 0.5%`
-    fn from_parse(_: (), parser: &mut ParseState) -> Self {
+    fn from_parse(_: (), parser: &'s mut ParseState) -> Self {
         // 尝试消耗一个真值
         // ! 不能「消耗条目，然后默认条目」：还是原子词项的问题（LaTeX/漢文 情况）
         // * ✅【2024-03-21 00:26:05】安全：有进行长度检验
@@ -1497,13 +1497,13 @@ impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<Truth> {
     }
 }
 
-impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<Stamp> {
+impl<'s> FromParse<(), &'s mut ParseState<'_>> for ParseResult<Stamp> {
     /// 侧门/解析时间戳
     /// * 🎯用于单独解析时间戳
     ///   * 📄【2024-03-20 14:14:51】最初case: 词法折叠
     /// * 🚩直接消耗一个时间戳，然后返回
     /// * 📄case: `:|:`
-    fn from_parse(_: (), parser: &mut ParseState) -> Self {
+    fn from_parse(_: (), parser: &'s mut ParseState) -> Self {
         // 尝试消耗一个时间戳
         // ! 不能「消耗条目，然后默认条目」：还是原子词项的问题（LaTeX/漢文 情况）
         // * ✅【2024-03-21 00:26:05】安全：有进行长度检验
@@ -1521,13 +1521,13 @@ impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<Stamp> {
     }
 }
 
-impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<Punctuation> {
+impl<'s> FromParse<(), &'s mut ParseState<'_>> for ParseResult<Punctuation> {
     /// 侧门/解析标点
     /// * 🎯用于单独解析标点
     ///   * 📄【2024-03-20 14:14:51】最初case: 词法折叠
     /// * 🚩直接消耗一个标点，然后返回
     /// * 📄case: `.`
-    fn from_parse(_: (), parser: &mut ParseState) -> Self {
+    fn from_parse(_: (), parser: &'s mut ParseState) -> Self {
         // 尝试消耗一个标点 | 默认这个条目会是标点
         // * ✅【2024-03-21 00:26:05】安全：有进行长度检验
         parser.consume_punctuation()?;
@@ -1544,13 +1544,13 @@ impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<Punctuation> {
     }
 }
 
-impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<Budget> {
+impl<'s> FromParse<(), &'s mut ParseState<'_>> for ParseResult<Budget> {
     /// 侧门/解析预算值
     /// * 🎯用于单独解析预算值
     ///   * 📄【2024-03-20 14:14:51】最初case: 词法折叠
     /// * 🚩直接消耗一个预算值，然后返回
     /// * 📄case: `$0.5; 0.5; 0.5$`
-    fn from_parse(_: (), parser: &mut ParseState) -> Self {
+    fn from_parse(_: (), parser: &'s mut ParseState) -> Self {
         // 尝试消耗一个预算值
         // ! 不能「消耗条目，然后默认条目」：还是原子词项的问题（LaTeX/漢文 情况）
         // * ✅【2024-03-21 00:26:05】安全：有进行长度检验
@@ -1572,7 +1572,7 @@ impl<'a> FromParse<(), &mut ParseState<'a>> for ParseResult<Budget> {
 impl NarseseFormat<&str> {
     /// 构造解析状态
     /// * 索引默认从开头开始
-    pub fn build_parse_state<'a>(&'a self, input: &'a str) -> ParseState<'a, &str> {
+    pub fn build_parse_state<'a>(&'a self, input: &'a str) -> ParseState<'_, &str> {
         ParseState::new(self, input, 0)
     }
 
@@ -1583,6 +1583,7 @@ impl NarseseFormat<&str> {
     where
         ParseResult<To>: FromParse<&'a str, &'a Self>,
     {
+        // 调用关联函数进行解析
         ParseResult::from_parse(input, self)
     }
 
@@ -1611,80 +1612,33 @@ impl NarseseFormat<&str> {
     }
 }
 
-/// 用于量产「解析到某值」的宏
-/// * 🎯产生原因：在不造成编译错误的情况下，节省模板代码
-///
-/// ! ❌解析到一般项不可行：有可能把[`ParseState`]的引用带走，并在状态销毁时产生悬垂引用
-/// * 📌报错信息：`state` does not live long enough
-/// * 📝编译器无法确定`from_parse`是否有借用`state`的值
-/// * 已发帖询问：https://users.rust-lang.org/t/preventing-variable-borrowing-to-solve-lifetime-problem/10860
-macro_rules! from_parse_to_types {
-    {
-        $(
-            // $( #[$attr:meta] )*
-            // ! ❌local ambiguity when calling macro `from_parse_to_types`: multiple parsing options: built-in NTs tt ('parse_target') or 1 other option.rustcClick for full compiler diagnostic
-            $parse_target:tt
-        )*
-    } => {
-        $(
-            // $( #[$attr] )*
-            impl<'a> FromParse<&'a str, &'a NarseseFormat<&'a str>> for ParseResult<$parse_target> {
-                // /// 侧门/解析真值
-                // /// * 🎯用于解析单个的真值
-                fn from_parse(input: &'a str, parser: &'a NarseseFormat<&'a str>) -> Self {
-                    // 构造空的解析状态
-                    let mut state = parser.build_parse_state(input);
-                    // 返回对真值的解析结果
-                    state.parse()
-                    // ! 随后丢弃状态
-                }
-            }
-        )*
-    };
+/// 对所有「能被[`ParseState`]解析出来的」实现「能被[`NarseseFormat`]解析出来」
+/// * 🎯用于统一联系[`ParseState::parse`]到[`NarseseFormat::parse`]
+/// * ✅【2024-03-21 17:33:10】已解决有关`state`的生命周期问题
+///   * 📄原报错信息：`state` does not live long enough
+///   * 🔗参考链接：<https://users.rust-lang.org/t/preventing-variable-borrowing-to-solve-lifetime-problem/10860>
+/// * 📝编译器无法确定`from_parse`是否有借用`state`的值，
+///   * ✨但可以从局部的`'s`中确认「解析结果不会带着解析状态的借用走」
+///   * ❓【2024-03-21 19:00:50】目前仍然对以下用法不够熟悉：
+///     * 隐式推断的生命周期：`NarseseFormat<&'_ str>`
+///     * 高阶特征约束：`for<'s> FromParse<(), &'s mut ParseState<'a>>`
+///       * 🔗参考：`https://doc.rust-lang.org/nomicon/hrtb.html`
+impl<'a, To> FromParse<&'a str, &'a NarseseFormat<&'_ str>> for ParseResult<To>
+where
+    // * 📝↓此处`for<'s>`保证「解析状态」是一个比`'a`小的生命周期
+    //   * 📌隐含限定：「引用的生命周期」's必须在「结构本身的生命周期」'a之内
+    ParseResult<To>: for<'s> FromParse<(), &'s mut ParseState<'a>>,
+{
+    /// 主解析函数
+    fn from_parse(input: &'a str, parser: &'a NarseseFormat<&'a str>) -> Self {
+        parser
+            // 构造解析状态
+            .build_parse_state(input)
+            // 让状态进行解析
+            .parse()
+        // ! 随后丢弃状态，但解析出来的结果仍然存活（隐含`'s: 'a`）
+    }
 }
-
-from_parse_to_types! {
-    // 主解析函数
-    // * 🎯解析通常的Narsese：词项/语句/任务
-    Narsese
-    // 中间结果
-    // * 🎯用于「自定义提取值」的行为
-    MidParseResult
-    // 解析到预算值
-    // * 🎯【2024-03-20 14:38:24】最初用于「词法折叠」单独解析出预算值
-    Budget
-    // 解析到真值
-    // * 🎯【2024-03-20 14:38:24】最初用于「词法折叠」单独解析出真值
-    Truth
-    // 解析到标点
-    // * 🎯【2024-03-20 14:38:24】最初用于「词法折叠」单独解析出标点
-    Punctuation
-    // 解析到时间戳
-    // * 🎯【2024-03-20 14:38:24】最初用于「词法折叠」单独解析出时间戳
-    Stamp
-}
-
-// impl<'a, 'result, To> FromParse<&'a str, &'a NarseseFormat<&'a str>> for ParseResult<To>
-// where
-//     ParseResult<To>: FromParse<(), &'a mut ParseState<'a>>,
-// {
-//     /// 主解析函数
-//     fn from_parse(input: &'a str, parser: &'a NarseseFormat<&'a str>) -> Self {
-//         let result;
-//         {
-//             // 构造解析状态
-//             let mut state = parser.build_parse_state(input);
-//             // 用状态进行解析
-//             // result = ParseResult::from_parse((), &mut state);
-//             result = state.parse();
-//             // 借用检查器以为`result`还（有可能）在借用`state`，因此报错
-//             // ❓如何声明`result`的生命周期长于`state`呢
-//         }
-//         // ! 随后丢弃状态
-//         result
-//     }
-// }
-
 /// 单元测试
 #[cfg(test)]
 mod tests_parse {
