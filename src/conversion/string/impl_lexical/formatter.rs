@@ -114,7 +114,6 @@ impl NarseseFormat {
         join_to(out, budget.iter(), &self.task.budget_separator);
         // 右括弧
         out.push_str(&self.task.budget_brackets.1);
-        dbg!(out);
     }
 
     /// 格式化函数/预算值
@@ -131,7 +130,7 @@ impl NarseseFormat {
         self._format_budget(out, task.get_budget());
         // 语句
         self._format_sentence(&mut buffer, task.get_sentence());
-        add_space_if_necessary_and_flush_buffer(dbg!(out), &mut buffer, &self.space.format_items);
+        add_space_if_necessary_and_flush_buffer(out, &mut buffer, &self.space.format_items);
     }
 
     /// 格式化函数/任务
