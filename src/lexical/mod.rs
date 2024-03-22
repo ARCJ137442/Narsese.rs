@@ -82,7 +82,7 @@ pub(crate) mod tests {
         );
 
         // 构造语句
-        let truth = "%1.0; 0.9%";
+        let truth = truth!["1.0" "0.9"];
         let stamp = ":!-1:";
         let punctuation = ".";
         // let sentence = sentence!(
@@ -90,14 +90,15 @@ pub(crate) mod tests {
         // ); // ! 此处无需构建；直接构建任务
 
         // 构造任务并返回
-        let budget = "$0.5; 0.75; 0.4$";
+        let budget = budget!["0.5", "0.75", "0.4"];
         task!(budget term.clone() punctuation stamp truth) // * 📝【2024-03-09 10:48:31】Clippy推荐直接返回构造之后的值
     }
 
     /// 使用ASCII格式构造「样本任务」的最初版本
     pub(crate) fn _sample_task_ascii_0() -> Task {
         task![
-            "$0.5; 0.5; 0.5$" compound![
+            budget!["0.5", "0.5", "0.5"]
+            compound![
                 "复合词项连接词";
                 atom!("word term")
                 atom!("^", "操作")
@@ -113,7 +114,7 @@ pub(crate) mod tests {
                         "["; atom!("word1"), atom!("word2"); "]"
                     ]
                 ]
-            ] "." ":|:" "%1.0; 0.9%"
+            ] "." ":|:" truth!["1.0" "0.9"]
         ]
     }
 

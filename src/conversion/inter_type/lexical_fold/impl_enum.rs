@@ -3,13 +3,13 @@
 
 use super::*;
 use crate::{
-    api::{FromParse, IntPrecision, UIntPrecision},
+    api::{FloatPrecision, FromParse, IntPrecision, UIntPrecision},
     conversion::string::impl_enum::NarseseFormat as EnumNarseseFormat,
     enum_narsese::{
-        Budget, Narsese as EnumNarsese, Punctuation, Sentence as EnumSentence, Stamp,
-        Task as EnumTask, Term as EnumTerm, Truth,
+        Budget as EnumBudget, Narsese as EnumNarsese, Punctuation, Sentence as EnumSentence, Stamp,
+        Task as EnumTask, Term as EnumTerm, Truth as EnumTruth,
     },
-    lexical::{Narsese, Sentence, Task, Term},
+    lexical::{Budget, Narsese, Sentence, Task, Term, Truth},
 };
 use util::*;
 
@@ -256,6 +256,51 @@ fn fold_atom(
     })
 }
 
+/// 工具函数/尝试折叠一个「数值数组」到「浮点数组」
+/// * 📌验证「0-1范围」在构建时进行
+fn try_fold_float_vec(values: &[impl AsStrRef]) -> FoldResult<Vec<FloatPrecision>> {
+    // 逐个解析
+    let mut result = vec![];
+    for v_str in values {
+        // 尝试解析
+        result.push(
+            v_str
+                .as_str_ref()
+                .parse::<FloatPrecision>()
+                .transform_err(FoldError::from)?,
+        );
+    }
+    Ok(result)
+}
+
+/// 实现/真值
+/// * 📌【2024-03-22 22:41:25】目前尚未有「兼容除0-9外其它数值」的想法
+impl<'a> TryFoldInto<'a, EnumTruth, FoldError> for Truth {
+    /// 统一使用「枚举Narsese格式」提供信息
+    type Folder = EnumNarseseFormat<&'a str>;
+
+    fn try_fold_into(self, _folder: &'a Self::Folder) -> FoldResult<EnumTruth> {
+        // 先逐个解析浮点数
+        let floats = try_fold_float_vec(&self)?;
+        // 然后从浮点数序列构造真值
+        EnumTruth::try_from_floats(floats.into_iter()).transform_err(FoldError::from)
+    }
+}
+
+/// 实现/预算值
+/// * 📌【2024-03-22 22:41:25】目前尚未有「兼容除0-9外其它数值」的想法
+impl<'a> TryFoldInto<'a, EnumBudget, FoldError> for Budget {
+    /// 统一使用「枚举Narsese格式」提供信息
+    type Folder = EnumNarseseFormat<&'a str>;
+
+    fn try_fold_into(self, _folder: &'a Self::Folder) -> FoldResult<EnumBudget> {
+        // 先逐个解析浮点数
+        let floats = try_fold_float_vec(&self)?;
+        // 然后从浮点数序列构造真值
+        EnumBudget::try_from_floats(floats.into_iter()).transform_err(FoldError::from)
+    }
+}
+
 /// 实现/语句
 impl<'a> TryFoldInto<'a, EnumSentence, FoldError> for Sentence {
     /// 统一使用「枚举Narsese格式」提供信息
@@ -265,11 +310,7 @@ impl<'a> TryFoldInto<'a, EnumSentence, FoldError> for Sentence {
         // 先解析出词项
         let term = self.term.try_fold_into(folder)?;
         // 随后解析出真值
-        let truth = folder
-            // 解析
-            .parse::<Truth>(&self.truth)
-            // 尝试解包
-            .transform_err(FoldError::from)?;
+        let truth = self.truth.try_fold_into(folder)?;
         // 再解析出时间戳
         let stamp = folder
             .parse::<Stamp>(&self.stamp)
@@ -292,11 +333,7 @@ impl<'a> TryFoldInto<'a, EnumTask, FoldError> for Task {
 
     fn try_fold_into(self, folder: &'a Self::Folder) -> FoldResult<EnumTask> {
         // 先解析出预算
-        let budget = folder
-            // 解析
-            .parse::<Budget>(self.budget.as_str())
-            // 尝试解包
-            .transform_err(FoldError::from)?;
+        let budget = self.budget.try_fold_into(folder)?;
         // 组装语句
         let sentence = self.sentence.try_fold_into(folder)?;
         // 返回

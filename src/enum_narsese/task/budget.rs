@@ -29,17 +29,43 @@ impl Budget {
 
     /// 构造「单预算」
     pub fn new_single(p: FloatPrecision) -> Self {
-        Budget::Single(p.validate_01())
+        Budget::Single(*p.validate_01())
     }
 
     /// 构造「双预算」
     pub fn new_double(p: FloatPrecision, d: FloatPrecision) -> Self {
-        Budget::Double(p.validate_01(), d.validate_01())
+        Budget::Double(*p.validate_01(), *d.validate_01())
     }
 
     /// 构造「三预算」
     pub fn new_triple(p: FloatPrecision, d: FloatPrecision, q: FloatPrecision) -> Self {
-        Budget::Triple(p.validate_01(), d.validate_01(), q.validate_01())
+        Budget::Triple(*p.validate_01(), *d.validate_01(), *q.validate_01())
+    }
+
+    /// 尝试从「浮点数迭代器」中提取预算值
+    /// * 🚩多余的值会被忽略
+    /// * 🚩无效的值会被上报（作为字符串提示）
+    /// * 📌边声明边提取边检验，空间基本最小开销：按需分配浮点数空间
+    pub fn try_from_floats(
+        mut floats: impl Iterator<Item = FloatPrecision>,
+    ) -> Result<Budget, String> {
+        // 尝试提取第一个，提取不了⇒空 | 边提取边检查范围
+        let p = match floats.next() {
+            Some(v) => *v.try_validate_01()?,
+            None => return Ok(Self::new_empty()),
+        };
+        // 尝试提取第二个，提取不了⇒单 | 边提取边检查范围
+        let d = match floats.next() {
+            Some(v) => *v.try_validate_01()?,
+            None => return Ok(Self::new_single(p)),
+        };
+        // 尝试提取第三个，提取不了⇒双 | 边提取边检查范围
+        let q = match floats.next() {
+            Some(v) => *v.try_validate_01()?,
+            None => return Ok(Self::new_double(p, d)),
+        };
+        // 三个都存在⇒三
+        Ok(Self::new_triple(p, d, q))
     }
 }
 
@@ -142,6 +168,19 @@ mod tests_budget {
         // assert_eq!(single.q(), q);
         // assert_eq!(double.q(), q);
         assert_eq!(triple.q(), q);
+    }
+
+    /// from_floats
+    #[test]
+    fn test_from_floats() {
+        let (p, d, q) = (0.5, 0.5, 0.5);
+        let (empty, single, double, triple) = new_examples(p, d, q);
+        asserts! {
+            empty => Budget::try_from_floats([].into_iter()).unwrap()
+            single => Budget::try_from_floats([p].into_iter()).unwrap()
+            double => Budget::try_from_floats([p,d].into_iter()).unwrap()
+            triple => Budget::try_from_floats([p,d,q].into_iter()).unwrap()
+        }
     }
 
     // invalid //

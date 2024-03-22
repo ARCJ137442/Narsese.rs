@@ -3,7 +3,7 @@
 use super::structs::*;
 use crate::api::{GetTerm, UIntPrecision};
 use std::{any::type_name, error::Error, hash::Hash, io::ErrorKind};
-use util::ResultTransform;
+use util::ResultBoost;
 
 // 实现 //
 

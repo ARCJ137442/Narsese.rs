@@ -1,6 +1,11 @@
 //! Narsese格式化中的「字符串格式模板」函数
 //! * 📌重在**纯字符串**处理：与「具体实现的NarseseFormat」格式无关
 //! * 🎯统一提取出通用的「字符串格式化模板」模块
+//! 
+//! ! ❌【2024-03-22 21:28:33】这里实际上没有引入[`util::AsStrRef`]的必要
+//! * 🚩目前将转换限制在调用方为好
+//! * 📌主要出于「可读性」的考虑
+//!   * `impl AsStrRef`和`as_str_ref`实在是太长了
 
 use util::{join_lest_multiple_separators, push_str};
 

@@ -32,13 +32,40 @@ impl Truth {
     }
 
     /// 构造「单真值」
+    ///
+    /// # Panics
+    /// ! 若其中的值不符合范围，会发生panic
     pub fn new_single(f: FloatPrecision) -> Self {
-        Truth::Single(f.validate_01())
+        Truth::Single(*f.validate_01())
     }
 
     /// 构造「双真值」
+    ///
+    /// # Panics
+    /// ! 若其中的值不符合范围，会发生panic
     pub fn new_double(f: FloatPrecision, c: FloatPrecision) -> Self {
-        Truth::Double(f.validate_01(), c.validate_01())
+        Truth::Double(*f.validate_01(), *c.validate_01())
+    }
+
+    /// 尝试从「浮点数迭代器」中提取真值
+    /// * 🚩多余的值会被忽略
+    /// * 🚩无效的值会被上报（作为字符串提示）
+    /// * 📌边声明边提取边检验，空间基本最小开销：按需分配浮点数空间
+    pub fn try_from_floats(
+        mut floats: impl Iterator<Item = FloatPrecision>,
+    ) -> Result<Truth, String> {
+        // 尝试提取第一个，提取不了⇒空 | 边提取边检查范围
+        let f = match floats.next() {
+            Some(v) => *v.try_validate_01()?,
+            None => return Ok(Self::new_empty()),
+        };
+        // 尝试提取第二个，提取不了⇒单 | 边提取边检查范围
+        let c = match floats.next() {
+            Some(v) => *v.try_validate_01()?,
+            None => return Ok(Self::new_single(f)),
+        };
+        // 两个都存在⇒双
+        Ok(Self::new_double(f, c))
     }
 }
 
@@ -74,9 +101,8 @@ impl Truth {
 /// 单元测试/真值
 #[cfg(test)]
 mod tests_truth {
-    use util::fail_tests;
-
     use super::*;
+    use util::fail_tests;
 
     /// 辅助构造示例
     #[inline(always)]

@@ -35,7 +35,7 @@
 use super::NarseseFormat;
 use crate::{
     api::UIntPrecision,
-    lexical::{Narsese, Sentence, Task, Term},
+    lexical::{Budget, Narsese, Sentence, Task, Term, Truth},
 };
 use std::{collections::HashSet, error::Error, fmt::Display};
 use util::{PrefixMatch, StartsWithStr, SuffixMatch};
@@ -43,6 +43,8 @@ use util::{PrefixMatch, StartsWithStr, SuffixMatch};
 /// 词法解析 辅助结构对象
 /// * 🚩放在一个独立的模块内，以便折叠
 pub mod structs {
+
+    use crate::lexical::{Budget, Punctuation, Stamp, Truth};
 
     use super::*;
 
@@ -69,15 +71,15 @@ pub mod structs {
     #[derive(Debug, Clone)]
     pub struct MidParseResult {
         /// 预算值
-        pub budget: Option<String>,
+        pub budget: Option<Budget>,
         /// 词项
         pub term: Option<Term>,
         /// 标点
-        pub punctuation: Option<String>,
+        pub punctuation: Option<Punctuation>,
         /// 时间戳
-        pub stamp: Option<String>,
+        pub stamp: Option<Stamp>,
         /// 真值
-        pub truth: Option<String>,
+        pub truth: Option<Truth>,
     }
 
     impl MidParseResult {
@@ -100,8 +102,8 @@ pub mod structs {
                     sentence: Sentence {
                         term,
                         punctuation,
-                        stamp: stamp.unwrap_or("".into()),
-                        truth: truth.unwrap_or("".into()),
+                        stamp: stamp.unwrap_or(Stamp::new()),
+                        truth: truth.unwrap_or(Truth::new()),
                     },
                 })),
                 // 语句：词项+标点
@@ -114,8 +116,8 @@ pub mod structs {
                 } => Some(Narsese::Sentence(Sentence {
                     term,
                     punctuation,
-                    stamp: stamp.unwrap_or("".into()),
-                    truth: truth.unwrap_or("".into()),
+                    stamp: stamp.unwrap_or(Stamp::new()),
+                    truth: truth.unwrap_or(Truth::new()),
                 })),
                 // 词项
                 MidParseResult {
@@ -557,13 +559,27 @@ impl<'a> ParseState<'a> {
     ///     * 🎯返回并直接使用「词项部分」的开头索引，同时也无需做「-1」偏移
     /// * 📄匹配的环境如：`$0.5;0.5;0.5$<A-->B>.%1.0;0.9%`
     /// * 📄匹配的结果如：`Some(("$0.5;0.5;0.5$", 12))` | `12` 对应第二个`$`
-    fn segment_budget(&self, env: ParseEnv<'a>) -> Option<(String, ParseIndex)> {
+    fn segment_budget(&self, env: ParseEnv<'a>) -> Option<(Budget, ParseIndex)> {
+        // * 📌至于「解析出『vec![".9"]』和『vec!["0.9"]』之后，如何能判等」的问题：不应该以这里的「词法Narsese」作为判等依据
         // 尝试前缀匹配
-        self.segment_brackets_prefix(
+        let (budget_string, right_border) = self.segment_brackets_prefix(
             env,
             &self.format.task.budget_brackets,
             &self.format.task.is_budget_content,
-        )
+        )?;
+        // 截去头尾俩括弧
+        let budget_string = budget_string
+            .trim_start_matches(&self.format.task.budget_brackets.0)
+            .trim_end_matches(&self.format.task.budget_brackets.1);
+        // 然后使用「预算分隔符」进行分割
+        // * 🚩【2024-03-22 20:13:04】目前专注上层，不再细写字串分割逻辑了
+        Some((
+            budget_string
+                .split(&self.format.task.budget_separator)
+                .map(str::to_owned)
+                .collect::<Budget>(),
+            right_border,
+        ))
     }
 
     /// 后缀截取真值
@@ -573,13 +589,28 @@ impl<'a> ParseState<'a> {
     ///   * 📌要么返回「匹配到的完整真值，以及其在『解析环境』中的开头位置（用于切分时间戳）」
     /// * 📄匹配的环境如：`$0.5;0.5;0.5$<A-->B>.%1.0;0.9%`
     /// * 📄匹配的结果如：`Some(("$0.5;0.5;0.5$", 21))` | `21` 对应第一个`%`
-    fn segment_truth(&self, env: ParseEnv<'a>) -> Option<(String, ParseIndex)> {
+    fn segment_truth(&self, env: ParseEnv<'a>) -> Option<(Truth, ParseIndex)> {
         // 尝试后缀匹配
-        self.segment_brackets_suffix(
+        let (truth_string, right_border) = self.segment_brackets_suffix(
             env,
             &self.format.sentence.truth_brackets,
             &self.format.sentence.is_truth_content,
-        )
+        )?;
+        // 截去头尾俩括弧
+        let truth_string = truth_string
+            .trim_start_matches(&self.format.sentence.truth_brackets.0)
+            .trim_end_matches(&self.format.sentence.truth_brackets.1);
+        // 然后直接使用「预算分隔符」进行分割
+        // * 🚩【2024-03-22 20:13:04】目前专注上层，不再细写字串分割逻辑了
+        Some((
+            // 不要括弧！
+            truth_string
+                // 拆分
+                .split(&self.format.sentence.truth_separator)
+                .map(str::to_owned)
+                .collect::<Budget>(),
+            right_border,
+        ))
     }
 
     /// 向前截取时间戳
@@ -893,8 +924,7 @@ impl NarseseFormat {
 mod test {
     #![allow(unused)]
 
-    use super::super::format_instances::*;
-    use super::*;
+    use super::{super::format_instances::*, *};
     use crate::lexical::shortcut::*;
     use util::*;
 
@@ -926,10 +956,10 @@ mod test {
                 // 构造环境并解析出结果
                 let result = test_segment!(@PARSE $format, $state, $f; $env_str);
                 // 解构（成功的）结果
-                let (truth, last_index) = result.expect(&format!("「{}」解析失败！", $env_str));
+                let (result, last_index) = result.expect(&format!("「{:?}」解析失败！", $env_str));
                 // 断言
                 asserts! {
-                    truth => $item,
+                    result => $item,
                     last_index => $index
                 }
             )+
@@ -963,9 +993,10 @@ mod test {
         }
 
         // 成功case
-        let expected_str = "$0.5;0.5;0.5$";
+        let expected = budget!["0.5" "0.5" "0.5"];
+        let idealized = "$0.5;0.5;0.5$"; // 去掉空格
         test_budget! {
-            "$0.5; 0.5; 0.5$" => (expected_str, expected_str.chars().count())
+            "$0.5; 0.5; 0.5$" => (expected, idealized.chars().count())
         }
 
         // 所有的失败case
@@ -1002,13 +1033,15 @@ mod test {
         }
 
         // 成功cases
+        let expected = vec!["1.0", "0.9"];
+        let idealized = "%1.0;0.9%";
         test_truth! {
             "%1.0; 0.9%" => (
-                "%1.0;0.9%", // 过滤掉了空格
+                expected, // 过滤掉了空格
                 0, // 是「潜在的时间戳」的右边界
             )
             "<A --> B>.\n:|:\t%1.0; 0.9%" => (
-                "%1.0;0.9%", // 过滤掉了空格
+                expected, // 过滤掉了空格
                 // ! 理想化之后变成 "<A-->B>.:|:%1.0;0.9%"
                 // * 时间戳的右边界 第一个'%'
                 "<A-->B>.:|:%1.0;0.9%".find('%').unwrap(),

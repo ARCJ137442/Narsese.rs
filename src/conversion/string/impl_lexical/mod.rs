@@ -207,12 +207,7 @@ mod tests_with_enum_narsese {
         );
 
         // 构造语句
-        let truth = &truth!(
-            format.sentence.truth_brackets.0;
-            format.sentence.truth_separator; // * 没有装饰性空格
-            "1.0" "0.9";
-            format.sentence.truth_brackets.1;
-        );
+        let truth = truth!["1.0" "0.9"];
         let stamp = &stamp!(
             format.sentence.stamp_brackets.0;
             format.sentence.stamp_fixed;
@@ -225,12 +220,7 @@ mod tests_with_enum_narsese {
         // ); // ! 此处无需构建；直接构建任务
 
         // 构造任务并返回
-        let budget = &budget!(
-            format.task.budget_brackets.0;
-            format.task.budget_separator; // * 没有装饰性空格
-            "0.5" "0.75" "0.4";
-            format.task.budget_brackets.1
-        );
+        let budget = budget!["0.5" "0.75" "0.4"];
         task!(budget term.clone() punctuation stamp truth) // * 📝【2024-03-09 10:48:31】Clippy推荐直接返回构造之后的值
     }
 }

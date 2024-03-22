@@ -4,6 +4,7 @@
         "nyxiative.rust-and-friends",
         "statiolake.vscode-rustfmt",
         "swellaby.vscode-rust-test-adapter",
-        "itsyaasir.rust-feature-toggler"
+        "itsyaasir.rust-feature-toggler",
+        "aaron-bond.better-comments"
     ]
 }

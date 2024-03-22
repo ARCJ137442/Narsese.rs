@@ -201,11 +201,14 @@ pub fn create_format_ascii() -> NarseseFormat {
             is_stamp_content: Box::new(|c: char| matches!(c, '0'..='9' | '+' | '-')), // regex:`[0-9+\-]`
             // 真值 | 内容已不包含空格
             truth_brackets: s!("%", "%"),
+            truth_separator: s!(";"),
+            // ! 【2024-03-22 20:23:39】↓虽说此时使用分隔符，但在「截取」阶段仍然需要将分隔符作为「内容」
             is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | ';')),
         },
         task: NarseseFormatTask {
             // 预算 | 内容已不包含空格
             budget_brackets: s!("$", "$"),
+            budget_separator: s!(";"),
             is_budget_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | ';')),
         },
     }
@@ -319,11 +322,13 @@ pub fn create_format_latex() -> NarseseFormat {
             is_stamp_content: Box::new(|c: char| matches!(c, '0'..='9' | '+' | '-')), // regex:`[0-9+\-]`
             // 真值
             truth_brackets: s!(r"\langle{}", r"\rangle{}"),
+            truth_separator: s!(","), // ! LaTeX格式使用`,`作为真值分隔符
             is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | ',')), // ! LaTeX使用逗号而非分号
         },
         task: NarseseFormatTask {
             // 预算
             budget_brackets: s!(r"\$", r"\$"),
+            budget_separator: s!(";"),
             is_budget_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | ';')),
         },
     }
@@ -337,6 +342,7 @@ pub fn create_format_han() -> NarseseFormat {
             is_for_parse: Box::new(|c| c.is_whitespace()), // ! 解析时忽略空格
             format_terms: s!(""),  // 格式化时，词项间无需分隔（避免太过松散）
             format_items: s!(" "), // 格式化时，条目间需要分隔（避免太过密集）
+            // ! ❌【2024-03-22 23:25:40】暂时不能支持全角空格：枚举Narsese处只能有一种空格
             remove_spaces_before_parse: true, // 漢文亦空格无关
         },
         atom: NarseseFormatAtom {
@@ -416,11 +422,13 @@ pub fn create_format_han() -> NarseseFormat {
             is_stamp_content: Box::new(|c: char| matches!(c, '0'..='9' | '+' | '-')), // regex:`[0-9+\-]`
             // 真值
             truth_brackets: s!("真", "值"), // 大改：兼容单真值、空真值
+            truth_separator: s!("、"),
             is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | '、')), // 此处有特别的分隔符「、」
         },
         task: NarseseFormatTask {
             // 预算
             budget_brackets: s!("预", "算"),
+            budget_separator: s!("、"),
             is_budget_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | '、')), // 此处有特别的分隔符「、」
         },
     }

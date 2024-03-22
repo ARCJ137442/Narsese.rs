@@ -8,7 +8,15 @@ pub trait GetTerm<Term> {
 }
 
 /// 用于统一获取「真值」
-/// * 🎯可能不一定有：for「问题/请求」
+/// * 🎯不一定有：for「问题/请求」
+///
+/// ! ❌【2024-03-22 21:35:43】尝试「将『不一定有』的功能交给具体实现」**失败**
+///   * 🎯用法`impl GetTruth<Option<真值类型>> for ...`
+///   * 📌原因：引用挂在了[`Option`]外，还能自动放里边不成？
+///     * 0 需求：在同一个特征的实现中，同时支持返回`&Truth`或`Option<&Truth>`
+///     * 1 若直接实现`GetTruth<Option<Truth>>`，则`get_truth`将返回`&Option<Truth>`而非`Option<&Truth>`
+///     * 2 若改变函数签名`-> Option<&Truth>`为`-> Truth`然后实现`GetTruth<Option<&Truth>>`，
+///       * 则需要一堆生命周期标注（被实现的类型现在带上了引用，需要引入生命周期参数）
 pub trait GetTruth<Truth> {
     /// 获取「真值」
     fn get_truth(&self) -> Option<&Truth>;

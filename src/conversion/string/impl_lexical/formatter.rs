@@ -1,10 +1,12 @@
 //! 实现/格式化器
 
+use util::join_to;
+
 use super::NarseseFormat;
 use crate::{
     api::{GetBudget, GetTerm},
     conversion::string::common_narsese_templates::*,
-    lexical::{Narsese, Sentence, Task, Term},
+    lexical::{Budget, Narsese, Sentence, Task, Term, Truth},
     util::{add_space_if_necessary_and_flush_buffer, catch_flow},
 };
 
@@ -59,52 +61,87 @@ impl NarseseFormat {
 
     /// 格式化函数/词项
     /// * 返回一个新字符串
+    #[inline(always)]
     pub fn format_term(&self, term: &Term) -> String {
         catch_flow!(self._format_term; term)
     }
 
-    /// 格式化函数/语句
-    /// * 返回一个新字符串
-    pub fn format_sentence(&self, sentence: &Sentence) -> String {
-        catch_flow!(self._format_sentence; sentence)
+    /// 格式化函数/真值
+    /// * 🚩【2024-03-22 23:19:22】返回的是**紧凑**形式，没有额外空白符！
+    fn _format_truth(&self, out: &mut String, truth: &Truth) {
+        // 左括弧
+        out.push_str(&self.sentence.truth_brackets.0);
+        // 中间内容
+        join_to(out, truth.iter(), &self.sentence.truth_separator);
+        // 右括弧
+        out.push_str(&self.sentence.truth_brackets.1);
     }
 
-    /// 总格式化函数/语句
+    /// 格式化函数/真值
+    /// * 返回一个新字符串
+    pub fn format_truth(&self, truth: &Truth) -> String {
+        catch_flow!(self._format_truth; truth)
+    }
+
+    /// 格式化函数/语句
     fn _format_sentence(&self, out: &mut String, sentence: &Sentence) {
         template_sentence(
             out,
             &self.format_term(sentence.get_term()),
             &sentence.punctuation,
             &sentence.stamp,
-            &sentence.truth,
+            &self.format_truth(&sentence.truth),
+            // ! ↑此处不用`.get_truth`，因为「可能没有」
+            // * 并且「语义明确」失败：无法兼顾地让`get_truth`同时支持返回`Option<&Truth>`与`&Truth`
+            // * 📄参考：[`GetTruth`]
             &self.space.format_items,
         )
     }
 
+    /// 格式化函数/语句
+    /// * 返回一个新字符串
+    #[inline(always)]
+    pub fn format_sentence(&self, sentence: &Sentence) -> String {
+        catch_flow!(self._format_sentence; sentence)
+    }
+
+    /// 格式化函数/预算值
+    /// * 🚩【2024-03-22 23:19:22】返回的是**紧凑**形式，没有额外空白符！
+    fn _format_budget(&self, out: &mut String, budget: &Budget) {
+        // 左括弧
+        out.push_str(&self.task.budget_brackets.0);
+        // 中间内容
+        join_to(out, budget.iter(), &self.task.budget_separator);
+        // 右括弧
+        out.push_str(&self.task.budget_brackets.1);
+        dbg!(out);
+    }
+
+    /// 格式化函数/预算值
+    /// * 返回一个新字符串
+    pub fn format_budget(&self, budget: &Budget) -> String {
+        catch_flow!(self._format_budget; budget)
+    }
+
+    /// 格式化函数/任务
+    fn _format_task(&self, out: &mut String, task: &Task) {
+        // 临时缓冲区 | 用于「有内容⇒添加空格」的逻辑
+        let mut buffer = String::new();
+        // 预算值 | 第一个直接添加
+        self._format_budget(out, task.get_budget());
+        // 语句
+        self._format_sentence(&mut buffer, task.get_sentence());
+        add_space_if_necessary_and_flush_buffer(dbg!(out), &mut buffer, &self.space.format_items);
+    }
+
     /// 格式化函数/任务
     /// * 返回一个新字符串
+    #[inline(always)]
     pub fn format_task(&self, task: &Task) -> String {
         catch_flow!(self._format_task; task)
     }
 
-    /// 总格式化函数/任务
-    fn _format_task(&self, out: &mut String, task: &Task) {
-        // 临时缓冲区 | 用于「有内容⇒添加空格」的逻辑
-        let mut buffer = String::new();
-        // 预算值
-        out.push_str(task.get_budget());
-        // 语句
-        self._format_sentence(&mut buffer, task.get_sentence());
-        add_space_if_necessary_and_flush_buffer(out, &mut buffer, &self.space.format_items);
-    }
-
     /// 格式化函数/Narsese
-    /// * 🚩自动分派
-    pub fn format_narsese(&self, narsese: &Narsese) -> String {
-        catch_flow!(self._format_narsese; narsese)
-    }
-
-    /// 总格式化函数/Narsese
     fn _format_narsese(&self, out: &mut String, narsese: &Narsese) {
         match narsese {
             // 词项
@@ -114,6 +151,12 @@ impl NarseseFormat {
             // 任务
             Narsese::Task(task) => self._format_task(out, task),
         }
+    }
+
+    /// 格式化函数/Narsese
+    /// * 🚩自动分派
+    pub fn format_narsese(&self, narsese: &Narsese) -> String {
+        catch_flow!(self._format_narsese; narsese)
     }
 }
 
@@ -153,10 +196,12 @@ mod tests {
             _test;
             // ! 注意：此处是「用ASCII的值套对应的本地格式」
             //   ! 不受影响的词项元素有：复合词项连接词、集合词项左右括弧、陈述系词等
-            // ! 词法格式对「真值」「预算值」「时间戳」保留原状不解析
-            &FORMAT_ASCII "ascii"   "$0.5; 0.75; 0.4$ <(&/, <ball {-] left>, <(*, {SELF}, $any, #some) --> ^do>) ==> <SELF {-] good>>. :!-1: %1.0; 0.9%";
-            &FORMAT_LATEX "latex" r#"$0.5; 0.75; 0.4$ \left<\left(&/\; \left<ball {-] left\right>\; \left<\left(*\; {SELF}\; $any\; #some\right) --> ^do\right>\right) ==> \left<SELF {-] good\right>\right>. :!-1: %1.0; 0.9%"#;
-            &FORMAT_HAN   "漢"      "$0.5; 0.75; 0.4$ 「（&/，「ball{-]left」，「（*，{SELF}，$any，#some）-->^do」）==>「SELF{-]good」」. :!-1: %1.0; 0.9%";
+            // ! 词法格式对「时间戳」保留原状不解析
+            //   ! 【2024-03-22 23:23:01】现在对「真值」「预算值」能应用相应格式了
+            // ! 🚩【2024-03-22 23:21:19】对于「真值」「预算值」一律采用「紧凑模式」
+            &FORMAT_ASCII "ascii"   "$0.5;0.75;0.4$ <(&/, <ball {-] left>, <(*, {SELF}, $any, #some) --> ^do>) ==> <SELF {-] good>>. :!-1: %1.0;0.9%";
+            &FORMAT_LATEX "latex" r#"\$0.5;0.75;0.4\$ \left<\left(&/\; \left<ball {-] left\right>\; \left<\left(*\; {SELF}\; $any\; #some\right) --> ^do\right>\right) ==> \left<SELF {-] good\right>\right>. :!-1: \langle{}1.0,0.9\rangle{}"#;
+            &FORMAT_HAN   "漢"      "预0.5、0.75、0.4算 「（&/，「ball{-]left」，「（*，{SELF}，$any，#some）-->^do」）==>「SELF{-]good」」. :!-1: 真1.0、0.9值";
         ];
     }
 }
