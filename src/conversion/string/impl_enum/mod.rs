@@ -24,13 +24,20 @@ pub mod format_instances;
 // 实用宏
 mod macros;
 
+/// 快捷方式
+pub mod shortcuts {
+    pub use crate::{
+        enum_nse as nse, enum_nse_sentence as nse_sentence, enum_nse_task as nse_task,
+        enum_nse_term as nse_term,
+    };
+}
+
 /// 集成测试@枚举Narsese/字符串解析&格式化
 #[cfg(test)]
 mod tests {
 
     use self::parser::NarseseResult;
-    use super::format_instances::*;
-    use super::*;
+    use super::{format_instances::*, *};
     use crate::enum_narsese::{Budget, Sentence, Stamp, Task, Term, Truth};
     use util::{f_tensor, show};
 

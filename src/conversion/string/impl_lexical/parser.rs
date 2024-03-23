@@ -573,9 +573,11 @@ impl<'a> ParseState<'a> {
             .trim_end_matches(&self.format.task.budget_brackets.1);
         // 然后使用「预算分隔符」进行分割
         // * 🚩【2024-03-22 20:13:04】目前专注上层，不再细写字串分割逻辑了
+        // * 🚩【2024-03-24 02:57:17】此处的空字串必须被过滤掉，以便让`$$`等价于`[]`而非`[""]`
         Some((
             budget_string
                 .split(&self.format.task.budget_separator)
+                .filter(|s| !s.is_empty())
                 .map(str::to_owned)
                 .collect::<Budget>(),
             right_border,
@@ -602,13 +604,15 @@ impl<'a> ParseState<'a> {
             .trim_end_matches(&self.format.sentence.truth_brackets.1);
         // 然后直接使用「预算分隔符」进行分割
         // * 🚩【2024-03-22 20:13:04】目前专注上层，不再细写字串分割逻辑了
+        // * 🚩【2024-03-24 02:57:17】此处的空字串必须被过滤掉，以便让`$$`等价于`[]`而非`[""]`
         Some((
             // 不要括弧！
             truth_string
                 // 拆分
                 .split(&self.format.sentence.truth_separator)
                 .map(str::to_owned)
-                .collect::<Budget>(),
+                .filter(|s| !s.is_empty())
+                .collect::<Truth>(),
             right_border,
         ))
     }
@@ -925,7 +929,7 @@ mod test {
     #![allow(unused)]
 
     use super::{super::format_instances::*, *};
-    use crate::lexical::shortcut::*;
+    use crate::lexical::shortcuts::*;
     use util::*;
 
     /// 通通用测试/尝试解析并返回错误

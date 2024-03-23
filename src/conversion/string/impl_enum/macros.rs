@@ -64,13 +64,45 @@ macro_rules! enum_nse {
     };
 }
 
+/// 专用/内联的Narsese词项
+/// * 🚩在调用[`enum_nse`]解析后，调用`try_into_term`并随即`unwrap`
+/// * ⚠️若解析或转换失败，将发生运行时panic
+#[macro_export]
+macro_rules! enum_nse_term {
+    ($($t:tt)*) => {
+        $crate::enum_nse!($($t)*).try_into_term().unwrap()
+    };
+}
+
+/// 专用/内联的Narsese语句
+/// * 🚩在调用[`enum_nse`]解析后，调用`try_into_sentence`并随即`unwrap`
+/// * ⚠️若解析或转换失败，将发生运行时panic
+#[macro_export]
+macro_rules! enum_nse_sentence {
+    ($($t:tt)*) => {
+        $crate::enum_nse!($($t)*).try_into_sentence().unwrap()
+    };
+}
+
+/// 专用/内联的Narsese任务
+/// * 🚩在调用[`enum_nse`]解析后，调用`try_into_task_compatible`并随即`unwrap`
+///   * ✨即便解析出来的是「语句」类型，也会进行自动转换
+/// * ⚠️若解析或转换失败，将发生运行时panic
+#[macro_export]
+macro_rules! enum_nse_task {
+    ($($t:tt)*) => {
+        $crate::enum_nse!($($t)*).try_into_task_compatible().unwrap()
+    };
+}
+
 /// 单元测试
 #[cfg(test)]
 mod tests {
     use crate::{
         conversion::string::impl_enum::format_instances::*,
-        enum_narsese::{Narsese, Sentence, Term},
-        enum_nse as nse,
+        enum_narsese::{Narsese, Sentence, Task, Term},
+        enum_nse as nse, enum_nse_sentence as nse_sentence, enum_nse_task as nse_task,
+        enum_nse_term as nse_term,
     };
     use util::*;
 
@@ -97,6 +129,26 @@ mod tests {
             // 测试是否等效
             dbg!(&nse) => &FORMAT_ASCII.parse(nse_str).unwrap(),
             dbg!(&nse_s) => &nse,
+        }
+    }
+
+    /// 测试/专用化
+    #[test]
+    fn test_specialize() {
+        asserts! {
+            // 词项
+            nse_term!(<A --> B>) => @ Term::Inheritance(..),
+            // 语句
+            nse_sentence!(<A --> B>.) => @ Sentence::Judgement(..),
+            // 任务
+            nse_task!(<A --> B>. :!-1: %1.0;0.9%) => @ Task(..),
+        }
+
+        // 兼容模式
+        asserts! {
+            // 语句→任务的隐式转换
+            nse_task!(<A --> B>.) => nse_task!($$ <A --> B>.),
+            nse_task!(<A --> B>.) => @ Task(..),
         }
     }
 }

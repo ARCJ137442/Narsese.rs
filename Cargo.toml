@@ -1,6 +1,6 @@
 [package]
 name = "narsese"
-version = "0.7.2"
+version = "0.8.0"
 edition = "2021"
 
 [dependencies]
@@ -16,6 +16,8 @@ optional = true
 # 【2024-03-13 21:17:55】实用库现在独立为`nar_dev_utils`
 # version = "0.1.0" # ! 本地依赖可以不添加版本
 path = "../NAR-dev-util"
+# git = "https://github.com/ARCJ137442/NAR-dev-util"
+# ! 【2024-03-23 19:19:01】似乎Rust-Analyzer无法获取私有仓库数据
 features = ["bundled"]
 
 [features]

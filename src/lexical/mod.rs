@@ -33,13 +33,19 @@ pub use task::*;
 pub type Narsese = NarseseValue<Term, Sentence, Task>;
 
 /// 快捷方式：用于快速构建「词法Narsese」
-/// * ⚠️不建议直接导出其中的符号，而是通过`lexical::shortcut`引入
-pub mod shortcut {
+/// * ⚠️不建议直接导出其中的符号，而是通过`lexical::shortcuts`引入
+pub mod shortcuts {
     // 自动去掉其中的所有`lexical_`前缀
     pub use crate::{
-        lexical_atom as atom, lexical_budget as budget, lexical_compound as compound,
-        lexical_nse as nse, lexical_sentence as sentence, lexical_set as set,
-        lexical_stamp as stamp, lexical_statement as statement, lexical_task as task,
+        // ! 这里不适合放「解析/格式化」中的`lexical_nse`
+        lexical_atom as atom,
+        lexical_budget as budget,
+        lexical_compound as compound,
+        lexical_sentence as sentence,
+        lexical_set as set,
+        lexical_stamp as stamp,
+        lexical_statement as statement,
+        lexical_task as task,
         lexical_truth as truth,
     };
 }
@@ -50,7 +56,7 @@ pub mod shortcut {
 #[allow(unused)]
 pub(crate) mod tests {
     use super::*;
-    use crate::lexical::shortcut::*;
+    use crate::lexical::shortcuts::*;
     use util::*;
 
     /// （通用）构造一个格式化样本（ASCII字面量版本）

@@ -15,20 +15,29 @@ pub use budget::*;
 
 // 任务 //
 
-use crate::api::{GetBudget, GetPunctuation, GetStamp, GetTerm, GetTruth};
+use crate::api::{CastToTask, GetBudget, GetPunctuation, GetStamp, GetTerm, GetTruth};
 use crate::enum_narsese::sentence::{Punctuation, Sentence, Stamp, Truth};
 use crate::enum_narsese::term::Term;
 
 /// 直接用元组结构体定义「任务」
 /// * 📌包含关系足够简单
+/// * 🚩【2024-03-24 02:27:18】现在同[`Sentence`]，所有字段均开放
 #[derive(Debug, Clone, PartialEq)]
-pub struct Task(Sentence, Budget);
+pub struct Task(pub Sentence, pub Budget);
 
-// 实现/构造
+/// 实现/构造
 impl Task {
     /// 构造函数
     pub fn new(sentence: Sentence, budget: Budget) -> Self {
         Task(sentence, budget)
+    }
+}
+
+/// 实现/转换
+impl CastToTask<Task> for Sentence {
+    /// 转换：默认加上空预算
+    fn cast_to_task(self) -> Task {
+        Task::new(self, Budget::Empty)
     }
 }
 

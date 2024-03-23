@@ -1,5 +1,5 @@
 use super::{Punctuation, Sentence, Stamp, Term, Truth};
-use crate::api::{GetBudget, GetPunctuation, GetStamp, GetTerm, GetTruth};
+use crate::api::{CastToTask, GetBudget, GetPunctuation, GetStamp, GetTerm, GetTruth};
 
 /// 独立出来的「预算值」类型
 /// * 🚩实际上是「字符串数组」的别名
@@ -92,7 +92,18 @@ macro_rules! lexical_budget {
     };
 }
 
-// 实现
+/// 实现/转换
+impl CastToTask<Task> for Sentence {
+    /// 转换：默认加上空预算
+    fn cast_to_task(self) -> Task {
+        Task {
+            budget: lexical_budget![],
+            sentence: self,
+        }
+    }
+}
+
+// 实现/属性 //
 impl GetTerm<Term> for Task {
     /// 获取内部词项
     fn get_term(&self) -> &Term {

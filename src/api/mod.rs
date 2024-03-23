@@ -15,4 +15,6 @@ util::pub_mod_and_pub_use! {
     get_inner
     // API「抽象Narsese值」
     narsese_value
+    // 语句转换 | 语句-任务 兼容
+    sentence_cast
 }

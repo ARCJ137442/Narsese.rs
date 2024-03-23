@@ -23,6 +23,14 @@ pub mod format_instances;
 // 实用宏
 mod macros;
 
+/// 快捷方式
+pub mod shortcuts {
+    pub use crate::{
+        lexical_nse as nse, lexical_nse_sentence as nse_sentence, lexical_nse_task as nse_task,
+        lexical_nse_term as nse_term,
+    };
+}
+
 /// 集成测试@词法Narsese/字符串解析&格式化
 #[cfg(test)]
 mod tests {
@@ -167,7 +175,7 @@ mod tests {
 #[cfg(feature = "enum_narsese")]
 mod tests_with_enum_narsese {
     use super::super::impl_enum::NarseseFormat as EnumNarseseFormat;
-    use crate::lexical::{shortcut::*, Task};
+    use crate::lexical::{shortcuts::*, Task};
 
     /// （通用）构造一个格式化样本
     /// * 基本涵盖其所属模块的全部内容

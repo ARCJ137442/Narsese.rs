@@ -3,6 +3,8 @@
 
 use std::io::ErrorKind;
 
+use super::CastToTask;
+
 /// 定义「CommonNarsese值」类型
 /// * 🎯用于存储「词项/语句/任务」三者其一
 ///   * 词项
@@ -49,6 +51,8 @@ impl<Term, Sentence, Task> NarseseValue<Term, Sentence, Task> {
     }
 
     /// 尝试转换到词项
+    /// * 🚩判断是否为其中的「词项」变体，然后向下转换
+    ///   * 若否，则返回错误
     pub fn try_into_term(self) -> Result<Term, std::io::Error> {
         match self {
             NarseseValue::Term(term) => Ok(term),
@@ -60,6 +64,8 @@ impl<Term, Sentence, Task> NarseseValue<Term, Sentence, Task> {
     }
 
     /// 尝试转换到语句
+    /// * 🚩判断是否为其中的「语句」变体，然后向下转换
+    ///   * 若否，则返回错误
     pub fn try_into_sentence(self) -> Result<Sentence, std::io::Error> {
         match self {
             NarseseValue::Sentence(sentence) => Ok(sentence),
@@ -71,9 +77,30 @@ impl<Term, Sentence, Task> NarseseValue<Term, Sentence, Task> {
     }
 
     /// 尝试转换到任务
+    /// * 🚩判断是否为其中的「任务」变体，然后向下转换
+    ///   * 若否，则返回错误
     pub fn try_into_task(self) -> Result<Task, std::io::Error> {
         match self {
             NarseseValue::Task(task) => Ok(task),
+            _ => Err(std::io::Error::new(
+                ErrorKind::InvalidData,
+                format!("类型「{}」不匹配，无法转换为任务", self.type_name()),
+            )),
+        }
+    }
+
+    /// 尝试转换到任务（兼容语句）
+    /// * 🚩类似`try_into_task`，但若语句类型实现了[`CastToTask`]，则可进行自动转换
+    pub fn try_into_task_compatible(self) -> Result<Task, std::io::Error>
+    where
+        Sentence: CastToTask<Task>,
+    {
+        match self {
+            // 一般的「任务」：直接解包
+            NarseseValue::Task(task) => Ok(task),
+            // 语句：自动转换成任务
+            NarseseValue::Sentence(sentence) => Ok(sentence.cast_to_task()),
+            // 其他类型：报错
             _ => Err(std::io::Error::new(
                 ErrorKind::InvalidData,
                 format!("类型「{}」不匹配，无法转换为任务", self.type_name()),
