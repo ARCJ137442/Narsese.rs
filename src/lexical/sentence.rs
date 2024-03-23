@@ -48,9 +48,24 @@ impl Sentence {
 }
 
 /// 快捷构造宏
+/// * 🎯允许更灵活地构造语句，尽可能像直接输入Narsese那样简单
+/// * ✨只要保证「词项, 标点, 时间戳, 真值」的顺序，可以选择性缺省时间戳、真值
 #[macro_export]
 macro_rules! lexical_sentence {
-    [$($arg:expr)*] => {
+    // 词项, 标点
+    ($term:expr, $punctuation:expr $(,)?) => {
+        $crate::lexical_sentence![$term, $punctuation, ""]
+    };
+    // 词项, 标点, 时间戳
+    ($term:expr, $punctuation:expr, $stamp:expr $(,)?) => {
+        $crate::lexical_sentence![$term, $punctuation, $stamp, lexical_truth![]]
+    };
+    // 一般转发，允许不写逗号 | 表达式字面量
+    [$($arg:expr $(,)?)*] => {
+        $crate::lexical_sentence![@NEW $( ($arg) )*]
+    };
+    // ! 使用内部括号包裹，以防「函数调用」歧义
+    [@NEW $( ($arg:expr) )*] => {
         // * 📝引入`$crate::lexical`作为绝对路径
         $crate::lexical::Sentence::new($($arg),*)
     };
@@ -130,10 +145,35 @@ mod tests {
 
     #[test]
     fn main() {
+        // 词项
         let term = lexical_atom!("word in sentence");
+
+        // 完整形式
         let sentence = lexical_sentence![
-            term "." ":|:" lexical_truth!["1.0", "0.9%"]
+            term.clone() "." ":|:" lexical_truth!["1.0", "0.9"]
         ];
-        show!(sentence);
+        show!(&sentence);
+        asserts! {
+            sentence.get_term() => &term, // 词项
+            sentence.get_punctuation() => ".", // 标点
+            sentence.get_stamp() => ":|:", // 时间戳
+            sentence.get_truth().unwrap() => &["1.0", "0.9"], // 真值
+        }
+
+        // 缺省形式：只有词项与标点
+        let sentence = lexical_sentence![term.clone(), "."];
+        show!(&sentence);
+        asserts! {
+            sentence.get_stamp() => "", // 无时间戳
+            sentence.get_truth().unwrap().is_empty(), // 空真值
+        }
+
+        // 缺省形式：只有词项、标点和时间戳
+        let sentence = lexical_sentence![term.clone(), ".", ":|:"];
+        show!(&sentence);
+        asserts! {
+            sentence.get_stamp() => ":|:", // 有时间戳
+            sentence.get_truth().unwrap().is_empty(), // 空真值
+        }
     }
 }

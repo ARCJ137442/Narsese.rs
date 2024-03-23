@@ -411,7 +411,7 @@ macro_rules! first_method_ok {
 /// 2. 构建「中间解析结果」
 /// 3. 根据内容填充「中间解析结果」
 /// 4. 转换「中间解析结果」为最终结果
-impl<'a> ParseState<'a, &str> {
+impl<'a> ParseState<'a, &'a str> {
     // 构造 | 入口 //
 
     /// 构造解析环境
@@ -422,13 +422,14 @@ impl<'a> ParseState<'a, &str> {
 
     /// 根据格式构造parser
     /// * 🚩方法：默认状态+重定向
-    pub fn new(
-        format: &'a NarseseFormat<&str>,
-        input: &'a str,
-        head: ParseIndex,
-    ) -> ParseState<'a, &'a str> {
-        // 生成解析环境
-        let env = ParseState::_build_env(input);
+    #[inline(always)]
+    pub fn new(format: &'a NarseseFormat<&str>, input: &'a str, head: ParseIndex) -> Self {
+        Self::from_env(format, Self::_build_env(input), head)
+    }
+
+    /// 从指定的「解析环境」构造parser
+    /// * 🚩方法：默认状态+重定向
+    pub fn from_env(format: &'a NarseseFormat<&str>, env: ParseEnv, head: ParseIndex) -> Self {
         // 生成环境长度 // ! 直接插入会有「同时引用」的所有权问题
         let len_env = env.len();
         // 构造结构体
@@ -1642,8 +1643,7 @@ where
 /// 单元测试
 #[cfg(test)]
 mod tests_parse {
-    use super::super::format_instances::*;
-    use super::*;
+    use super::{super::format_instances::*, *};
     use util::{f_tensor, fail_tests, show};
 
     /// 通通用测试/尝试解析并返回错误

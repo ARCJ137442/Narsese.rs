@@ -20,6 +20,9 @@ mod formatter;
 pub mod format_instances;
 // pub use format_instances as instances;
 
+// 实用宏
+mod macros;
+
 /// 集成测试@词法Narsese/字符串解析&格式化
 #[cfg(test)]
 mod tests {

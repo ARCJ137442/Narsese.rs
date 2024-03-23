@@ -14,7 +14,7 @@ version = "0.14.0"
 
 [[package]]
 name = "narsese"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "lazy_static",
  "nar_dev_utils",

@@ -82,6 +82,8 @@ pub enum Term {
     // !回顾性等价 | 可以被等价到「预测性等价」中
     // EquivalenceRetrospective(TermRefType, TermRefType),
 }
+// 直接导出内部所有
+pub use Term::*;
 
 /// 词项类别
 /// * 🎯用于对词项快速分类
@@ -112,6 +114,3 @@ pub enum TermCapacity {
     /// （多元）集合
     Set,
 }
-
-// 直接导出内部所有
-pub use Term::*;

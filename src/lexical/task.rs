@@ -46,9 +46,34 @@ impl Task {
 /// 快捷构造宏
 #[macro_export]
 macro_rules! lexical_task {
-    [$($arg:expr)*] => {
+    // 预算; 其它
+    ($budget:expr; $($other:expr $(;)?)+) => {
+        $crate::lexical_task![
+            @NEW
+            $budget;
+            // * 🚩全部转发给语句 | 使用逗号分隔，避免歧义
+            $crate::lexical_sentence![$($other),+]
+        ]
+    };
+    // 无预算版本
+    ($(;)? $(other:expr $(,)?)+) => {
+        $crate::lexical_task![lexical_budget![]; $($punctuation)+]
+    };
+    // 一般转发，允许不写逗号 | 表达式字面量
+    [$($arg:expr $(,)?)*] => {
+        $crate::lexical_task![$( $arg );*]
+    };
+    // ! 使用内部括号包裹，以防「函数调用」歧义
+    // [@NEW $( ($arg:expr) )*] => {
+    //     // * 📝引入`$crate::lexical`作为绝对路径
+    //     $crate::lexical::Task::new($($arg),*)
+    // };
+    [@NEW $budget:expr; $sentence:expr] => {
         // * 📝引入`$crate::lexical`作为绝对路径
-        $crate::lexical::Task::new($($arg),*)
+        $crate::lexical::Task{
+            budget: $budget,
+            sentence: $sentence,
+        }
     };
 }
 
@@ -112,10 +137,35 @@ mod tests {
 
     #[test]
     fn main() {
-        let term = lexical_atom!("word in sentence");
+        // 词项
+        let term = lexical_atom!("word in task");
+
+        // 完整形式
         let task = lexical_task![
-            lexical_budget!["0.5" "0.5" "0.5"] term "." ":|:" lexical_truth!["1.0" "0.9"]
+            lexical_budget!["0.5" "0.5" "0.5"]
+            term.clone() "." ":|:" lexical_truth!["1.0" "0.9"]
         ];
-        show!(task);
+        show!(&task);
+        asserts! {
+            task.get_term() => &term, // 词项
+            task.get_punctuation() => ".", // 标点
+            task.get_stamp() => ":|:", // 时间戳
+            task.get_budget() => &["0.5", "0.5", "0.5"], // 预算值
+            task.get_truth().unwrap() => &["1.0", "0.9"], // 真值
+        }
+
+        // 像语句那样缺省
+        let task = lexical_task![
+            lexical_budget!["0.5" "0.5" "0.5"]
+            term.clone() "."
+        ];
+        show!(&task);
+        asserts! {
+            task.get_budget() => &["0.5", "0.5", "0.5"], // 预算值
+            task.get_term() => &term, // 词项
+            task.get_punctuation() => ".", // 标点
+            task.get_stamp() => "", // 时间戳（空）
+            task.get_truth().unwrap().is_empty(), // 真值（空）
+        }
     }
 }
