@@ -41,7 +41,7 @@ macro_rules! lexical_nse {
             // 直接调用模块内部的解析方法
             // 🚩【2024-03-23 17:25:58】没有性能trick
             // ✅无需指定目标类型：根目录已经指定了`ParseResult`
-            $crate::conversion::string::impl_lexical::parser::parse(
+            $crate::conversion::string::impl_lexical::parse(
                 // 格式的引用
                 &$format,
                 // 要解析的Narsese
