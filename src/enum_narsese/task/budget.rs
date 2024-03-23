@@ -71,6 +71,12 @@ impl Budget {
 
 /// 实现/属性
 impl Budget {
+    /// 是否为「空预算」
+    /// * 🎯用于「任务（无损）转换为语句」的转换过程
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Budget::Empty)
+    }
+
     /// 获取「优先级」
     pub fn priority(&self) -> FloatPrecision {
         match self {

@@ -1,9 +1,8 @@
 //! 定义集成「词项/语句/任务」的通用Narsese枚举
 //! * 🎯提供「与具体实现无关」的Narsese数据结构表征
 
+use super::{CastToTask, TryCastToSentence};
 use std::io::ErrorKind;
-
-use super::CastToTask;
 
 /// 定义「CommonNarsese值」类型
 /// * 🎯用于存储「词项/语句/任务」三者其一
@@ -130,5 +129,30 @@ impl<Term, Sentence, Task> NarseseValue<Term, Sentence, Task> {
     /// * 🚩直接打包
     pub fn from_task(value: Task) -> Self {
         NarseseValue::Task(value)
+    }
+}
+
+/// 对所有「其中的『任务』类型实现了『尝试转换到语句』特征」的「Narsese值」实现「尝试转换（其中的）任务到语句」
+impl<Term, Sentence, Task> TryCastToSentence<NarseseValue<Term, Sentence, Task>>
+    for NarseseValue<Term, Sentence, Task>
+where
+    Task: TryCastToSentence<Sentence>,
+{
+    fn try_cast_to_sentence(
+        self,
+    ) -> Result<NarseseValue<Term, Sentence, Task>, NarseseValue<Term, Sentence, Task>> {
+        match self {
+            // 词项⇒总是失败
+            NarseseValue::Term(..) => Err(self),
+            // 语句⇒总是成功
+            NarseseValue::Sentence(..) => Ok(self),
+            // 任务⇒尝试单独转换
+            NarseseValue::Task(task) => match task.try_cast_to_sentence() {
+                // 单独转换成功⇒作为语句封装
+                Ok(sentence) => Ok(NarseseValue::Sentence(sentence)),
+                // 单独转换失败⇒原样返回
+                Err(task) => Err(NarseseValue::Task(task)),
+            },
+        }
     }
 }

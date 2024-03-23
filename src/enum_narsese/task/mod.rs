@@ -15,7 +15,9 @@ pub use budget::*;
 
 // 任务 //
 
-use crate::api::{CastToTask, GetBudget, GetPunctuation, GetStamp, GetTerm, GetTruth};
+use crate::api::{
+    CastToTask, GetBudget, GetPunctuation, GetStamp, GetTerm, GetTruth, TryCastToSentence,
+};
 use crate::enum_narsese::sentence::{Punctuation, Sentence, Stamp, Truth};
 use crate::enum_narsese::term::Term;
 
@@ -33,11 +35,23 @@ impl Task {
     }
 }
 
-/// 实现/转换
+// 实现/转换 //
 impl CastToTask<Task> for Sentence {
     /// 转换：默认加上空预算
     fn cast_to_task(self) -> Task {
         Task::new(self, Budget::Empty)
+    }
+}
+
+impl TryCastToSentence<Sentence> for Task {
+    /// 尝试（无损）转换为语句
+    fn try_cast_to_sentence(self) -> Result<Sentence, Self> {
+        match self.1.is_empty() {
+            // 空预算⇒可无损转换
+            true => Ok(self.0),
+            // 其它⇒无法转换
+            false => Err(self),
+        }
     }
 }
 
