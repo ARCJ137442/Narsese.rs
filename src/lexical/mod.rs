@@ -38,8 +38,9 @@ pub mod shortcut {
     // 自动去掉其中的所有`lexical_`前缀
     pub use crate::{
         lexical_atom as atom, lexical_budget as budget, lexical_compound as compound,
-        lexical_set as set, lexical_stamp as stamp, lexical_statement as statement,
-        lexical_task as task, lexical_truth as truth,
+        lexical_nse as nse, lexical_sentence as sentence, lexical_set as set,
+        lexical_stamp as stamp, lexical_statement as statement, lexical_task as task,
+        lexical_truth as truth,
     };
 }
 
