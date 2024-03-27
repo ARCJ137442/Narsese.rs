@@ -9,7 +9,7 @@ use util::*;
 ///   * 单预算
 ///   * 双预算
 ///   * 三预算
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Budget {
     /// 空预算
     Empty,

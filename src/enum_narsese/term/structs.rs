@@ -14,6 +14,8 @@ pub type TermVecType = Vec<Term>;
 
 /// 统一定义「词项」
 /// * 自动实现[`Debug`]、[`Clone`]
+///
+/// ! ❌【2024-03-27 21:03:26】[`HashSet`]不支持[`PartialOrd`]特征
 #[derive(Debug, Clone)]
 pub enum Term {
     // 原子词项 //
@@ -87,7 +89,7 @@ pub use Term::*;
 
 /// 词项类别
 /// * 🎯用于对词项快速分类
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TermCategory {
     /// 原子词项
     Atom,
@@ -99,7 +101,7 @@ pub enum TermCategory {
 
 /// 词项容量
 /// * 🎯用于对词项快速分类
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TermCapacity {
     /// 原子
     Atom,

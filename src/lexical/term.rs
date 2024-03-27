@@ -7,7 +7,7 @@
 ///   * 如 `(\, _, R)` => `Compound { connecter: "/", terms: [Atom { prefix: "_", name: "" }, Atom { prefix: "", name: "R" }]}`
 /// * 🚩【2024-03-15 22:03:48】现在不再特别加上「Lexical」前缀，而是使用命名空间区分
 ///   * 实际上就是`lexical::Term`或`use crate::lexical::Term as LexicalTerm`的事儿
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Term {
     /// 原子词项：前缀+名称
     Atom { prefix: String, name: String },

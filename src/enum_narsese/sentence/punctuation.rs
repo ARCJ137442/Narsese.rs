@@ -10,7 +10,7 @@
 
 /// 基于枚举定义的「标点」
 /// * 有关转换交由[`super::Sentence`]实现
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Punctuation {
     /// 判断
     Judgement,

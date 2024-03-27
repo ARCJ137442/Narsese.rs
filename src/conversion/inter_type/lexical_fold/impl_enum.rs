@@ -14,7 +14,7 @@ use crate::{
 use util::*;
 
 /// 一个简单的「折叠错误」
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct FoldError(String);
 /// 简化的「折叠结果」
 type FoldResult<T> = Result<T, FoldError>;

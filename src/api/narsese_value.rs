@@ -14,7 +14,7 @@ use std::io::ErrorKind;
 ///   * 🔦允许**自定义其中的「词项」「语句」「任务」类型**
 ///   * ✨并在后续可使用「类型别名」达到与「分别定义一个『XXNarseseResult』struct」等价的效果
 /// * 🚩【2024-03-14 00:30:52】为方便外部调用，此处亦作派生处理
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum NarseseValue<Term, Sentence, Task> {
     Term(Term),
     Sentence(Sentence),

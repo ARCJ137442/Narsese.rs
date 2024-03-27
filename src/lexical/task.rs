@@ -15,7 +15,7 @@ pub type Budget = Vec<String>;
 /// * 🚩【2024-03-22 17:54:42】现在不再让「真值」「预算值」糊成一块（作为一个整体而不区分其内的部分）
 ///   * 改为使用「数值的字串形式」
 ///   * ✅对于「变成数值后还要决定浮点精度，但为通用性不应强制精度」的问题：使用字符串形式，交给「词法折叠」过程
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Task {
     /// 预算值（数值字串）
     pub budget: Vec<String>,

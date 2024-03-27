@@ -14,7 +14,9 @@ use util::ZeroOneFloat;
 ///   * 空真值
 ///   * 单真值
 ///   * 双真值
-#[derive(Debug, Clone, PartialEq)]
+///
+/// ! ❌【2024-03-27 20:54:19】浮点数[`f32`]、[`f64`]不支持[`Hash`]特征
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Truth {
     /// 空真值（默认）
     Empty,
