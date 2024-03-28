@@ -96,46 +96,49 @@ fn main() {
 可作为CommonNarsese词法解析器（同时用于下游NAVM、BabelNAR）的「标准ASCII词法」使用如下[PEG文法](https://zh.wikipedia.org/wiki/%E8%A7%A3%E6%9E%90%E8%A1%A8%E8%BE%BE%E6%96%87%E6%B3%95)定义：
 
 ```pest
-// 空白符 | 所有Unicode空白符
+/// 空白符 | 所有Unicode空白符，解析前忽略
 WHITESPACE = _{ WHITE_SPACE }
 
-// 总入口：词法Narsese
+/// 总入口：词法Narsese | 优先级：任务 > 语句 > 词项
 narsese = {
     task
   | sentence
   | term
 }
 
-// 任务：有预算的语句
+/// 任务：有预算的语句
 task = {
     budget ~ sentence
 }
 
-// 预算 | 不包括「空字串」隐含的「空预算」
-budget         = {
+/// 预算值 | 不包括「空字串」隐含的「空预算」
+budget = {
     "$" ~ budget_content ~ "$"
 }
+/// 预算值内容
 budget_content = {
     (truth_budget_term ~ (";" ~ truth_budget_term)* ~ ";"*)
   | "" // 空预算（但带括号）
 }
+/// 通用于真值、预算值的项 | 用作内部数值，不约束取值范围
 truth_budget_term = @{(ASCII_DIGIT|".")+}
 
-// 语句 = 词项 标点 时间戳? 真值?
+/// 语句 = 词项 标点 时间戳? 真值?
 sentence       = {
     term ~ punctuation ~ stamp? ~ truth?
 }
 
-// 词项 = 陈述 | 复合 | 原子
+/// 词项 = 陈述 | 复合 | 原子
 term = {
     statement | compound | atom
 }
 
-// 陈述 = <词项 系词 词项>
+/// 陈述 = <词项 系词 词项>
 statement = {
     "<" ~ term ~ copula ~ term ~ ">"
 }
 
+/// 陈述系词
 copula = @{
     (punct_sym ~ "-" ~ punct_sym) // 继承/相似/实例/属性/实例属性
   | (punct_sym ~ "=" ~ punct_sym) // 蕴含/等价
@@ -143,39 +146,42 @@ copula = @{
   | ("<" ~ punct_sym ~ ">") // 时序性等价
 }
 
+/// 标点符号 | 用于「原子词项前缀」「复合词项连接词」和「陈述系词」
 punct_sym = { (PUNCTUATION | SYMBOL) }
 
-// 复合 = (连接词, 词项...) | {外延集...} | [内涵集...]
+/// 复合 = (连接词, 词项...) | {外延集...} | [内涵集...]
 compound = {
       ("(" ~ connecter ~ "," ~ term ~ ("," ~ term)* ~ ")") // 基于连接词
     | ("{" ~ term ~ ("," ~ term)* ~ "}") // 外延集
     | ("[" ~ term ~ ("," ~ term)* ~ "]") // 内涵集
 }
 
+/// 复合词项连接词
 connecter = @{ punct_sym ~ (!"," ~ punct_sym)* }
 
-// 原子 = 前缀（可选） 内容
+/// 原子 = 前缀（可选） 内容
 atom = {
       "_"+ // 占位符
     | (atom_prefix ~ atom_content) // 变量/间隔/操作……
     | atom_content // 词语
 }
+/// 原子词项前缀
 atom_prefix = @{ punct_sym+ }
+/// 原子词项内容 | 已避免与「复合词项系词」相冲突
 atom_content = @{ atom_char ~ (!copula ~ atom_char)* }
+/// 能作为「原子词项内容」的字符
 atom_char = { LETTER | NUMBER | "_" | "-" }
 
-// 标点
+/// 标点
 punctuation = { (PUNCTUATION | SYMBOL) }
 
-// 时间戳
+/// 时间戳 | 空时间戳会直接在「语句」中缺省
 stamp = {
-    // 有内容 | 空时间戳会直接在「语句」中缺省
     ":" ~ (!":" ~ ANY)+ ~ ":"
 }
 
-// 真值
+/// 真值 | 空真值会直接在「语句」中缺省
 truth = {
-    // 有内容 | 空真值会直接在「语句」中缺省
   "%" ~ (truth_budget_term ~ (";" ~ truth_budget_term)* ~ ";"*) ~ "%"
 }
 ```
