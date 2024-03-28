@@ -215,14 +215,7 @@ pub fn create_format_ascii() -> NarseseFormat {
 }
 
 fn is_atom_identifier(c: char) -> bool {
-    c.is_alphanumeric() || c == '_'
-}
-
-#[test]
-fn t() {
-    use util::show;
-    show!(is_atom_identifier('a'));
-    show!(&FORMAT_ASCII.sentence.stamp_brackets);
+    c.is_alphanumeric() || c == '_' || c == '-'
 }
 
 /// LaTeX扩展
@@ -253,7 +246,7 @@ pub fn create_format_latex() -> NarseseFormat {
                 // 操作符
                 r"\Uparrow{}" // ! 此处即「后缀空参数」
             ),
-            is_identifier: Box::new(|c| c.is_alphanumeric() || c == '_'),
+            is_identifier: Box::new(is_atom_identifier),
         },
         compound: NarseseFormatCompound {
             // 左右括弧
@@ -358,7 +351,7 @@ pub fn create_format_han() -> NarseseFormat {
                 // 操作符
                 "操作"
             ),
-            is_identifier: Box::new(|c| c.is_alphanumeric() || c == '_'),
+            is_identifier: Box::new(is_atom_identifier),
         },
         compound: NarseseFormatCompound {
             brackets: s!("（", "）"),
@@ -437,9 +430,16 @@ pub fn create_format_han() -> NarseseFormat {
 /// 单元测试
 #[cfg(test)]
 mod tests_enum_narsese {
-
     use super::*;
     use crate::lexical::tests::_sample_task_ascii;
+
+    /// 测试/原子词项标识符
+    #[test]
+    fn test_is_atom_identifier() {
+        use util::show;
+        show!(is_atom_identifier('a'));
+        show!(&FORMAT_ASCII.sentence.stamp_brackets);
+    }
 
     fn test_format(label: &str, format: &NarseseFormat) {
         let task = _sample_task_ascii();

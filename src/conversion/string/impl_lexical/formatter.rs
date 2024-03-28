@@ -204,9 +204,9 @@ mod tests {
             // ! 词法格式对「时间戳」保留原状不解析
             //   ! 【2024-03-22 23:23:01】现在对「真值」「预算值」能应用相应格式了
             // ! 🚩【2024-03-22 23:21:19】对于「真值」「预算值」一律采用「紧凑模式」
-            &FORMAT_ASCII "ascii"   "$0.5;0.75;0.4$ <(&/, <ball {-] left>, <(*, {SELF}, $any, #some) --> ^do>) ==> <SELF {-] good>>. :!-1: %1.0;0.9%";
-            &FORMAT_LATEX "latex" r#"\$0.5;0.75;0.4\$ \left<\left(&/\; \left<ball {-] left\right>\; \left<\left(*\; {SELF}\; $any\; #some\right) --> ^do\right>\right) ==> \left<SELF {-] good\right>\right>. :!-1: \langle{}1.0,0.9\rangle{}"#;
-            &FORMAT_HAN   "漢"      "预0.5、0.75、0.4算 「（&/，「ball{-]left」，「（*，{SELF}，$any，#some）-->^do」）==>「SELF{-]good」」. :!-1: 真1.0、0.9值";
+            &FORMAT_ASCII "ascii"   "$0.5;0.75;0.4$ <(&/, <ball {-] left>, <(*, {SELF}, $any, #some) --> ^go-to>) ==> <SELF {-] good>>. :!-1: %1.0;0.9%";
+            &FORMAT_LATEX "latex" r#"\$0.5;0.75;0.4\$ \left<\left(&/\; \left<ball {-] left\right>\; \left<\left(*\; {SELF}\; $any\; #some\right) --> ^go-to\right>\right) ==> \left<SELF {-] good\right>\right>. :!-1: \langle{}1.0,0.9\rangle{}"#;
+            &FORMAT_HAN   "漢"      "预0.5、0.75、0.4算 「（&/，「ball{-]left」，「（*，{SELF}，$any，#some）-->^go-to」）==>「SELF{-]good」」. :!-1: 真1.0、0.9值";
         ];
     }
 }

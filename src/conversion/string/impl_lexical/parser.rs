@@ -37,16 +37,14 @@ use crate::{
     api::UIntPrecision,
     lexical::{Budget, Narsese, Sentence, Task, Term, Truth},
 };
-use std::{collections::HashSet, error::Error, fmt::Display};
+use std::{error::Error, fmt::Display};
 use util::{PrefixMatch, StartsWithStr, SuffixMatch};
 
 /// 词法解析 辅助结构对象
 /// * 🚩放在一个独立的模块内，以便折叠
 pub mod structs {
-
-    use crate::lexical::{Budget, Punctuation, Stamp, Truth};
-
     use super::*;
+    use crate::lexical::{Budget, Punctuation, Stamp, Truth};
 
     /// 定义「解析环境」：字符数组切片
     pub type ParseEnv<'a> = &'a [char];
@@ -391,12 +389,13 @@ impl<'a> ParseState<'a> {
     /// * 🎯对应PEG中的Any/Some逻辑
     /// * 🚩【2024-03-18 08:47:12】现在基本确立「延迟截取字符串」原则
     /// * 📄参考：[`Self::segment_some_prefix`]
+    /// * 🚩【2024-03-28 14:08:31】现在恢复「系词前缀匹配」规则
     #[inline(always)]
     fn collect_some_prefix(
         &self,
         env: ParseEnv<'a>,
         start: ParseIndex,
-        verify_char: impl Fn(char) -> bool,
+        verify: impl Fn(ParseIndex, char) -> bool,
     ) -> ParseIndex {
         // 从起始索引处开始
         // ! 🚩此处不能用迭代器：`env[start..].iter().position`索引是【相对切片】而非【相对开头】
@@ -404,7 +403,7 @@ impl<'a> ParseState<'a> {
         let len_env = env.len();
         while i < len_env {
             // 检测字符是否合法
-            match verify_char(env[i]) {
+            match verify(i, env[i]) {
                 true => i += 1,
                 false => return i,
             }
@@ -718,13 +717,7 @@ impl<'a> ParseState<'a> {
             .ok_or(self.parse_error(env, "未匹配到原子词项前缀"))?
             .to_owned();
         // 计算出所有系词的首字符 // ! 用于【统一】应对「分割陈述」时「原子词项做主词」的情况
-        let copula_heads = self
-            .format
-            .statement
-            .copulas
-            .iter_x_fixes()
-            .filter_map(|copula| copula.chars().next())
-            .collect::<HashSet<_>>();
+        let copulas = &self.format.statement.copulas;
         // 计算出起始索引
         let content_start = prefix.chars().count();
         // 朝后贪婪扫描字符
@@ -732,11 +725,12 @@ impl<'a> ParseState<'a> {
             env,
             content_start,
             // 检验
-            |c|
-            // 首先是合法字符
-            (self.format.atom.is_identifier)(c) &&
-            // 其次是「不能为任何系词的起始字符」
-            !copula_heads.contains(&c),
+            |i, c| {
+                // 首先是合法字符
+                (self.format.atom.is_identifier)(c) &&
+                // 其次是「不能以系词作为开头」（遇到系词⇒截止）
+                copulas.match_prefix_char_slice(&env[i..]).is_none()
+            },
         );
         // 检查非空
         // ! 不允许名称为空的原子词项
@@ -1259,7 +1253,11 @@ mod test {
             ""
             // 非法前缀
             "@A"
-            "-A"
+            "&A"
+            "*A"
+            "%A"
+            "!A"
+            // "-A" // ! ❌【2024-03-28 14:09:31】现在已被兼容
             // 非法字符 | ⚠️不允许名称为空
             "❗"
             "!"
@@ -1384,6 +1382,9 @@ mod test {
             "<<$1 --> (/,livingIn,_,{graz})> ==> <$1 --> murder>>.";
             "<sunglasses --> (&,[black],glasses)>.";
             "<{?who} --> murder>?";
+
+            "<(&&,<(*,{$1},{$2},$d) --> 方向>, <(*,{$1},$c) --> 格点状态>, <(*,{$2},无缺陷) --> 格点状态>) ==> <(*,$d,$c,{$1},{$2}) --> [同色连空]>>. %1.00;0.999%";
+            "<(*,{格点-4-5},缺陷1) --> 格点状态>. %1.00;0.999%";
         ];
         show!(&results);
         // for result in &results {

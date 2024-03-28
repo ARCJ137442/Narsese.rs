@@ -220,11 +220,7 @@ pub struct ParseState<'a, Content = &'a str> {
     head: ParseIndex,
     /// 「中间解析结果」
     mid_result: MidParseResult,
-    /// 「保留关键字」
-    /// * 🎯用于「关键字截断」机制
-    /// * 📌仅存储开头字符
-    /// * 📄具体参看[`super::format::NarseseFormat::enable_keyword_truncation`]
-    reserved_keywords: Vec<char>,
+    // * 🚩【2024-03-28 14:33:47】现弃用「关键字截断」机制，直接使用「系词前缀匹配」判断
 }
 
 /// 实现/通用：重置、生成
@@ -450,11 +446,6 @@ impl<'a> ParseState<'a, &'a str> {
             head,
             // 从空结果开始
             mid_result: MidParseResult::new(),
-            // 根据「是否启用关键字截断」选择性置入「保留关键字」
-            reserved_keywords: match format.enable_keyword_truncation {
-                true => format.generate_reserved_keywords(),
-                false => Vec::new(),
-            },
         }
     }
 
@@ -1294,12 +1285,27 @@ impl<'a> ParseState<'a, &'a str> {
     fn is_valid_atom_name(c: char) -> bool {
         match c {
             // 特殊：横杠/下划线
-            // ! ↓【2024-02-22 14:46:16】现因需兼顾`<主词-->谓词>`的结构（防止系词中的`-`被消耗），故不再兼容`-`
-            /* '-' |  */
-            '_' => true,
+            // //! ↓【2024-02-22 14:46:16】现因需兼顾`<主词-->谓词>`的结构（防止系词中的`-`被消耗），故不再兼容`-`
+            // * 🚩【2024-03-28 14:18:08】现在重新启用对`-`的「原子词项字符兼容」：使用新的「前缀failing匹配」方法
+            '-' | '_' => true,
             //  否则：判断是否为「字母/数字」
             _ => c.is_alphabetic() || c.is_numeric(),
         }
+    }
+
+    /// 判断环境位置是否以系词开头
+    /// * 🎯兼容 `^go-to` `坐标-5-6`
+    /// * 🎯避免`<外延-->内涵>`变成`外延--`、`>`、`内涵`
+    fn is_copula_starts_at_head(&self, start: usize) -> bool {
+        // 获取环境后缀切片
+        let env_slice = &self.env[start..];
+        // 开始遍历
+        self.format
+            // 所有系词
+            .copulas()
+            .into_iter()
+            // 是否有任意一个是「环境切片」的开头
+            .any(|copula| env_slice.starts_with_str(copula))
     }
 
     /// 消耗&置入/词项/原子
@@ -1335,7 +1341,9 @@ impl<'a> ParseState<'a, &'a str> {
             // 获取头部字符
             head_char = self.head_char();
             // 绕过关键字（如「可作为词项名的系词」等）
-            if self.reserved_keywords.iter().any(|&head| head == head_char) {
+            // * 🚩【2024-03-28 14:13:44】目前主要对「漢文」生效
+            // * ⚠️【2024-03-28 14:14:01】目前为兼容OpenNARS语法，未考虑`-`作原子词项后缀的情形
+            if self.is_copula_starts_at_head(self.head) {
                 break;
             }
             // 尝试解析
@@ -1724,8 +1732,9 @@ mod tests_parse {
             // 格式×输入
             &format_ascii;
             "word" "_" "$i_var" "#d_var" "?q_var" "+137" "^op"
-            // "^go-to" // * ←该操作符OpenNARS可解析，而ONA、PyNARS不能
-            // ! ↑【2024-02-22 14:46:16】现因需兼顾`<主词-->谓词>`的结构（防止系词中的`-`被消耗），故不再兼容
+            "^go-to" // * ←该操作符OpenNARS可解析，而ONA、PyNARS不能
+            // //! ↑【2024-02-22 14:46:16】现因需兼顾`<主词-->谓词>`的结构（防止系词中的`-`被消耗），故不再兼容
+            // * 🚩【2024-03-28 14:18:08】现在重新启用对`-`的「原子词项字符兼容」：使用新的「前缀failing匹配」方法
         ];
         show!(matrix);
     }
@@ -2075,58 +2084,61 @@ mod tests_parse {
     #[test]
     fn test_parse_integrated() {
         let matrix = f_tensor! [
-            // 应用的函数
-            _test_parse_common;
-            // 格式×输入
-            &FORMAT_ASCII;
-            // 变量测试1
-            "<(&&, <<$x-->A>==><$x-->B>>, <<$y-->C>==><$y-->D>>) ==> E>."
-            // `long_term_stability.nal`
-            "<{tim} --> (/,livingIn,_,{graz})>. %0%"
-            "<<(*,$1,sunglasses) --> own> ==> <$1 --> [aggressive]>>."
-            "<(*,{tom},sunglasses) --> own>."
-            "<<$1 --> [aggressive]> ==> <$1 --> murder>>."
-            "<<$1 --> (/,livingIn,_,{graz})> ==> <$1 --> murder>>."
-            "<{?who} --> murder>?"
-            "<{tim} --> (/,livingIn,_,{graz})>."
-            "<{tim} --> (/,livingIn,_,{graz})>. %0%"
-            "<<(*,$1,sunglasses) --> own> ==> <$1 --> [aggressive]>>."
-            "<(*,{tom},(&,[black],glasses)) --> own>."
-            "<<$1 --> [aggressive]> ==> <$1 --> murder>>."
-            "<<$1 --> (/,livingIn,_,{graz})> ==> <$1 --> murder>>."
-            "<sunglasses --> (&,[black],glasses)>."
-            "<{?who} --> murder>?"
-            "<(*,toothbrush,plastic) --> made_of>."
-            "<(&/,<(*,$1,plastic) --> made_of>,<(*,{SELF},$1) --> ^lighter>) =/> <$1 --> [heated]>>."
-            "<<$1 --> [heated]> =/> <$1 --> [melted]>>."
-            "<<$1 --> [melted]> <|> <$1 --> [pliable]>>."
-            "<(&/,<$1 --> [pliable]>,<(*,{SELF},$1) --> ^reshape>) =/> <$1 --> [hardened]>>."
-            "<<$1 --> [hardened]> =|> <$1 --> [unscrewing]>>."
-            "<toothbrush --> object>."
-            "(&&,<#1 --> object>,<#1 --> [unscrewing]>)!"
-            "<{SELF} --> [hurt]>! %0%"
-            "<{SELF} --> [hurt]>. :|: %0%"
-            "<(&/,<(*,{SELF},wolf) --> close_to>,+1000) =/> <{SELF} --> [hurt]>>."
-            "<(*,{SELF},wolf) --> close_to>. :|:"
-            "<(&|,<(*,{SELF},$1,FALSE) --> ^want>,<(*,{SELF},$1) --> ^anticipate>) =|> <(*,{SELF},$1) --> afraid_of>>."
-            "<(*,{SELF},?what) --> afraid_of>?"
-            "<a --> A>. :|: %1.00;0.90%"
-            "<b --> B>. :|: %1.00;0.90%"
-            "<c --> C>. :|: %1.00;0.90%"
-            "<a --> A>. :|: %1.00;0.90%"
-            "<b --> B>. :|: %1.00;0.90%"
-            "<?1 =/> <c --> C>>?"
-            "<(*,cup,plastic) --> made_of>."
-            "<cup --> object>."
-            "<cup --> [bendable]>."
-            "<toothbrush --> [bendable]>."
-            "<toothbrush --> object>."
-            "<(&/,<(*,$1,plastic) --> made_of>,<(*,{SELF},$1) --> ^lighter>) =/> <$1 --> [heated]>>."
-            "<<$1 --> [heated]> =/> <$1 --> [melted]>>."
-            "<<$1 --> [melted]> <|> <$1 --> [pliable]>>."
-            "<(&/,<$1 --> [pliable]>,<(*,{SELF},$1) --> ^reshape>) =/> <$1 --> [hardened]>>."
-            "<<$1 --> [hardened]> =|> <$1 --> [unscrewing]>>."
-            "(&&,<#1 --> object>,<#1 --> [unscrewing]>)!"
+                    // 应用的函数
+                    _test_parse_common;
+                    // 格式×输入
+                    &FORMAT_ASCII;
+                    // 变量测试1
+                    "<(&&, <<$x-->A>==><$x-->B>>, <<$y-->C>==><$y-->D>>) ==> E>."
+                    // `long_term_stability.nal`
+                    "<{tim} --> (/,livingIn,_,{graz})>. %0%"
+                    "<<(*,$1,sunglasses) --> own> ==> <$1 --> [aggressive]>>."
+                    "<(*,{tom},sunglasses) --> own>."
+                    "<<$1 --> [aggressive]> ==> <$1 --> murder>>."
+                    "<<$1 --> (/,livingIn,_,{graz})> ==> <$1 --> murder>>."
+                    "<{?who} --> murder>?"
+                    "<{tim} --> (/,livingIn,_,{graz})>."
+                    "<{tim} --> (/,livingIn,_,{graz})>. %0%"
+                    "<<(*,$1,sunglasses) --> own> ==> <$1 --> [aggressive]>>."
+                    "<(*,{tom},(&,[black],glasses)) --> own>."
+                    "<<$1 --> [aggressive]> ==> <$1 --> murder>>."
+                    "<<$1 --> (/,livingIn,_,{graz})> ==> <$1 --> murder>>."
+                    "<sunglasses --> (&,[black],glasses)>."
+                    "<{?who} --> murder>?"
+                    "<(*,toothbrush,plastic) --> made_of>."
+                    "<(&/,<(*,$1,plastic) --> made_of>,<(*,{SELF},$1) --> ^lighter>) =/> <$1 --> [heated]>>."
+                    "<<$1 --> [heated]> =/> <$1 --> [melted]>>."
+                    "<<$1 --> [melted]> <|> <$1 --> [pliable]>>."
+                    "<(&/,<$1 --> [pliable]>,<(*,{SELF},$1) --> ^reshape>) =/> <$1 --> [hardened]>>."
+                    "<<$1 --> [hardened]> =|> <$1 --> [unscrewing]>>."
+                    "<toothbrush --> object>."
+                    "(&&,<#1 --> object>,<#1 --> [unscrewing]>)!"
+                    "<{SELF} --> [hurt]>! %0%"
+                    "<{SELF} --> [hurt]>. :|: %0%"
+                    "<(&/,<(*,{SELF},wolf) --> close_to>,+1000) =/> <{SELF} --> [hurt]>>."
+                    "<(*,{SELF},wolf) --> close_to>. :|:"
+                    "<(&|,<(*,{SELF},$1,FALSE) --> ^want>,<(*,{SELF},$1) --> ^anticipate>) =|> <(*,{SELF},$1) --> afraid_of>>."
+                    "<(*,{SELF},?what) --> afraid_of>?"
+                    "<a --> A>. :|: %1.00;0.90%"
+                    "<b --> B>. :|: %1.00;0.90%"
+                    "<c --> C>. :|: %1.00;0.90%"
+                    "<a --> A>. :|: %1.00;0.90%"
+                    "<b --> B>. :|: %1.00;0.90%"
+                    "<?1 =/> <c --> C>>?"
+                    "<(*,cup,plastic) --> made_of>."
+                    "<cup --> object>."
+                    "<cup --> [bendable]>."
+                    "<toothbrush --> [bendable]>."
+                    "<toothbrush --> object>."
+                    "<(&/,<(*,$1,plastic) --> made_of>,<(*,{SELF},$1) --> ^lighter>) =/> <$1 --> [heated]>>."
+                    "<<$1 --> [heated]> =/> <$1 --> [melted]>>."
+                    "<<$1 --> [melted]> <|> <$1 --> [pliable]>>."
+                    "<(&/,<$1 --> [pliable]>,<(*,{SELF},$1) --> ^reshape>) =/> <$1 --> [hardened]>>."
+                    "<<$1 --> [hardened]> =|> <$1 --> [unscrewing]>>."
+                    "(&&,<#1 --> object>,<#1 --> [unscrewing]>)!"
+                    // nal8.1.7.nal
+                    "<(*,{t003}) --> ^go-to>. :|:"
+                    "<<(*,$1) --> ^go-to> =/> <(*,SELF,$1) --> at>>."
         ];
         show!(matrix);
     }
