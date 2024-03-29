@@ -38,9 +38,10 @@ impl TermCapacity {
 }
 
 /// 实现/偏序关系 | 通过「基数」比较
+/// * 🚩基于[`Ord::cmp`]实现[`PartialOrd::partial_cmp`]
 impl PartialOrd for TermCapacity {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.base_num().cmp(&other.base_num()))
+        Some(self.cmp(other))
     }
 }
 /// 实现/全序关系 | 通过「基数」比较
