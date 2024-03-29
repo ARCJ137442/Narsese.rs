@@ -1,3 +1,7 @@
+//! 词法Narsese的「词项」数据结构
+
+use crate::api::ExtractTerms;
+
 /// 词法上的「词项」
 /// * 📌只在词法（字符串语法）上表征词项
 /// * 📌所有最终字段都是字符串
@@ -131,6 +135,22 @@ macro_rules! lexical_statement {
     };
 }
 
+/// 实现/提取内部元素
+impl ExtractTerms for Term {
+    type Term = Term;
+
+    fn extract_terms(self) -> impl Iterator<Item = Term> {
+        match self {
+            Term::Atom { .. } => vec![self],
+            Term::Compound { terms, .. } | Term::Set { terms, .. } => terms,
+            Term::Statement {
+                subject, predicate, ..
+            } => vec![*subject, *predicate],
+        }
+        .into_iter()
+    }
+}
+
 /// 单元测试@词项
 #[cfg(test)]
 #[allow(unused)]
@@ -138,8 +158,64 @@ mod tests {
     use super::*;
     use util::show;
 
+    /// 【通用】生成一个「词项测试集」
+    /// * 所有类型的词项均生成一遍
+    pub fn generate_term_testset() -> Vec<Term> {
+        // 这俩用来做复合词项组分
+        let a = lexical_atom!("A");
+        let b = lexical_atom!("B");
+        let placeholder = lexical_atom!("_" "");
+        // 快捷宏
+        macro_rules! c {
+            ($x:expr) => {
+                $x.clone()
+            };
+        }
+        // 直接返回一个数组
+        vec![
+            // 原子词项
+            lexical_atom!("word"),
+            lexical_atom!("_", ""),
+            lexical_atom!("$" "i_var"),
+            lexical_atom!("#" "d_var"),
+            lexical_atom!("?" "q_var"),
+            lexical_atom!("+" "1"),
+            lexical_atom!("^" "op"),
+            // 复合词项
+            lexical_set!("{"; c!(a), c!(b); "}"),
+            lexical_set!("["; c!(a), c!(b); "]"),
+            lexical_compound!("&"; c!(a) c!(b)),
+            lexical_compound!("|"; c!(a) c!(b)),
+            lexical_compound!("-"; c!(a) c!(b)),
+            lexical_compound!("~"; c!(a) c!(b)),
+            lexical_compound!("*"; c!(a) c!(b)),
+            lexical_compound!(r"/"; c!(a) c!(placeholder) c!(b)),
+            lexical_compound!(r"\"; c!(placeholder) c!(a) c!(b)),
+            lexical_compound!("&&"; c!(a) c!(b)),
+            lexical_compound!("||"; c!(a) c!(b)),
+            lexical_compound!("--"; c!(a)),
+            lexical_compound!("&/"; c!(a)),
+            lexical_compound!("&|"; c!(a)),
+            // 陈述
+            lexical_statement!(c!(a) "-->" c!(b)),
+            lexical_statement!(c!(a) "<->" c!(b)),
+            lexical_statement!(c!(a) "==>" c!(b)),
+            lexical_statement!(c!(a) "<=>" c!(b)),
+            lexical_statement!(c!(a) "{--" c!(b)),
+            lexical_statement!(c!(a) "--]" c!(b)),
+            lexical_statement!(c!(a) "{-]" c!(b)),
+            lexical_statement!(c!(a) r"=/>" c!(b)),
+            lexical_statement!(c!(a) r"=|>" c!(b)),
+            lexical_statement!(c!(a) r"=\>" c!(b)),
+            lexical_statement!(c!(a) r"</>" c!(b)),
+            lexical_statement!(c!(a) r"<|>" c!(b)),
+            lexical_statement!(c!(a) r"<\>" c!(b)),
+        ]
+    }
+
     #[test]
     fn main() {
+        let _ = generate_term_testset();
         lexical_atom!("^" "op");
         let lex_c = lexical_compound![
             "&&";
@@ -154,5 +230,30 @@ mod tests {
             lexical_statement![lexical_atom!("$" "A") "=/>" lexical_atom!("#" "B")]
         ];
         show!(lex_c);
+    }
+
+    /// 元素提取测试
+    #[test]
+    fn test_extract_terms() {
+        // 生成测试集
+        let testset = generate_term_testset();
+        for term in testset {
+            // 拷贝 | 手写逻辑
+            let components_cloned = match &term {
+                Term::Atom { .. } => vec![term.clone()],
+                Term::Compound { terms, .. } | Term::Set { terms, .. } => terms.clone(),
+                Term::Statement {
+                    subject, predicate, ..
+                } => vec![*subject.clone(), *predicate.clone()],
+            };
+            let components_len = components_cloned.len();
+            // 提取 | ✅词法Narsese没有对「像」的特别处理
+            let terms = term.extract_terms_to_vec();
+            // 检验 | 元素一致
+            assert_eq!(terms.len(), components_len);
+            for i in 0..components_len {
+                assert_eq!(terms[i], components_cloned[i])
+            }
+        }
     }
 }

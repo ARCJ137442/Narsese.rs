@@ -1,7 +1,7 @@
 //! 统一定义词项实现
 
 use super::structs::*;
-use crate::api::{GetTerm, UIntPrecision};
+use crate::api::{ExtractTerms, GetTerm, UIntPrecision};
 use std::{any::type_name, error::Error, hash::Hash, io::ErrorKind};
 use util::ResultBoost;
 
@@ -562,6 +562,13 @@ impl Term {
         self.get_category() == TermCategory::Compound
     }
 
+    /// 判型/像
+    /// * 4 外延像
+    /// * 4 内涵像
+    pub fn is_image(&self) -> bool {
+        matches!(self, ImageExtension(..) | ImageIntension(..))
+    }
+
     /// 判型/陈述
     /// * 1 继承
     /// * 2 相似
@@ -637,6 +644,7 @@ impl Term {
     }
 
     /// 获取词项作为复合词项的「所有词项」
+    /// * 📌均返回不可变引用
     /// * 📌原子词项⇒返回自身
     /// * 📌陈述⇒返回主谓词
     /// * 📝Rust会自动根据返回类型，为变量加引用/解引用
@@ -896,6 +904,7 @@ impl GetTerm<Term> for Term {
 /// * 🎯初次用于统一「复合词项の迭代」与「像の迭代」：自动迭代出「占位符」
 /// * 🎯也用于迭代「像」词项（词法上迭代出「占位符」）
 /// * 📝此中使用泛型参数，将类型变得更通用更宽泛
+/// * 📌迭代出各类复合词项的**不可变引用**
 pub struct ImageIterator<'a, I: Iterator<Item = &'a Term>> {
     raw_components: I,
     now_index: UIntPrecision,
@@ -940,12 +949,67 @@ where
     }
 }
 
+/// 实现/提取内部元素
+impl ExtractTerms for Term {
+    type Term = Term;
+
+    fn extract_terms(self) -> impl Iterator<Item = Term> {
+        match self {
+            // 原子词项⇒返回自身
+            Word(..)
+            | Placeholder
+            | VariableIndependent(..)
+            | VariableDependent(..)
+            | VariableQuery(..)
+            | Interval(..)
+            | Operator(..) => vec![self].into_iter(),
+
+            // 一元容器⇒返回包装后的容器
+            Negation(term) => vec![*term].into_iter(),
+
+            // 二元容器⇒返回包装后的容器
+            DifferenceExtension(term1, term2)
+            | DifferenceIntension(term1, term2)
+            | Inheritance(term1, term2)
+            | Similarity(term1, term2)
+            | Implication(term1, term2)
+            | Equivalence(term1, term2)
+            | ImplicationPredictive(term1, term2)
+            | ImplicationConcurrent(term1, term2)
+            | ImplicationRetrospective(term1, term2)
+            | EquivalencePredictive(term1, term2)
+            | EquivalenceConcurrent(term1, term2) => vec![*term1, *term2].into_iter(),
+
+            // 有序容器⇒返回拷贝后的容器
+            Product(vec)
+            | ConjunctionSequential(vec) => vec.into_iter(),
+
+            // 像⇒包括像占位符
+             ImageExtension(placeholder_index, mut vec)
+            | ImageIntension(placeholder_index, mut vec) => {
+                // 先插入「像占位符」
+                vec.insert(placeholder_index, Placeholder);
+                // 再转换为迭代器
+                vec.into_iter()
+            },
+
+            // 集合容器⇒返回收集后的容器
+            SetExtension(set)
+            | SetIntension(set)
+            | IntersectionExtension(set)
+            | IntersectionIntension(set)
+            | Conjunction(set)
+            | Disjunction(set) // ! 🚩【2024-03-29 20:54:19】↓此处必须统一成数组
+            | ConjunctionParallel(set) => set.into_iter().collect::<Vec<_>>().into_iter(),
+        }
+    }
+}
+
 /// 单元测试 | 构造
 #[cfg(test)]
 mod tests {
-    use util::*;
-
     use super::*;
+    use util::*;
 
     /// 【通用】生成一个「词项测试集」
     /// * 所有类型的词项均生成一遍
@@ -1061,6 +1125,47 @@ mod tests {
                 TermCategory::Atom => _test_atom(term),
                 TermCategory::Compound => _test_compound(term),
                 TermCategory::Statement => _test_statement(term),
+            }
+        }
+    }
+
+    /// 元素提取测试
+    #[test]
+    fn test_extract_terms() {
+        // 生成测试集
+        let testset = generate_term_testset();
+        for term in testset {
+            // 拷贝
+            let components = term.get_components();
+            let components_len = components.len();
+            let components_cloned = components.into_iter().cloned().collect::<Vec<_>>();
+            // 提取
+            let is_image = term.is_image();
+            let image_index = match &term {
+                ImageExtension(index, _) => *index,
+                ImageIntension(index, _) => *index,
+                _ => usize::MAX, // ! 不会用到
+            };
+            let terms = term.extract_terms_to_vec();
+            // 检验
+            if is_image {
+                // 在「占位符位置」加进了占位符
+                assert!(terms.contains(&Placeholder));
+                assert_eq!(terms[image_index], Placeholder);
+                assert_eq!(terms.len(), components_len + 1);
+                for i in 0..image_index {
+                    assert_eq!(terms[i], components_cloned[i])
+                }
+                // 加进占位符后，有所偏移
+                for i in image_index..components_len {
+                    assert_eq!(terms[i + 1], components_cloned[i])
+                }
+            } else {
+                // 元素一致
+                assert_eq!(terms.len(), components_len);
+                for i in 0..components_len {
+                    assert_eq!(terms[i], components_cloned[i])
+                }
             }
         }
     }

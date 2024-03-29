@@ -13,7 +13,8 @@
     ],
     "conventionalCommits.scopes": [
         "解析器&格式化",
-        "词法"
+        "词法",
+        "API"
     ],
     "editor.formatOnSave": true,
     "rust-analyzer.cargo.features": "all"

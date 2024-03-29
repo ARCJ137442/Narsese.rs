@@ -17,4 +17,6 @@ util::pub_mod_and_pub_use! {
     narsese_value
     // 语句转换 | 语句-任务 兼容
     sentence_cast
+    // API「提取词项中的元素」
+    extract_terms
 }
