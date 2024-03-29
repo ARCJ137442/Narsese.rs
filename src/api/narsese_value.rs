@@ -1,7 +1,7 @@
 //! 定义集成「词项/语句/任务」的通用Narsese枚举
 //! * 🎯提供「与具体实现无关」的Narsese数据结构表征
 
-use super::{CastToTask, TryCastToSentence};
+use super::{CastToTask, GetTerm, TryCastToSentence};
 use std::io::ErrorKind;
 
 /// 定义「CommonNarsese值」类型
@@ -153,6 +153,25 @@ where
                 // 单独转换失败⇒原样返回
                 Err(task) => Err(NarseseValue::Task(task)),
             },
+        }
+    }
+}
+
+/// 对所有「实现了『获取内部词项』特征的Narsese值」实现「获取内部词项」
+/// * 📌原理：不论是「词项」「语句」还是「任务」，都实现了「获取内部词项」
+impl<Term, Sentence, Task> GetTerm<Term> for NarseseValue<Term, Sentence, Task>
+where
+    Sentence: GetTerm<Term>,
+    Task: GetTerm<Term>,
+{
+    fn get_term(&self) -> &Term {
+        match self {
+            // 词项⇒总是失败
+            NarseseValue::Term(term) => term,
+            // 语句⇒总是成功
+            NarseseValue::Sentence(sentence) => sentence.get_term(),
+            // 任务⇒尝试单独转换
+            NarseseValue::Task(task) => task.get_term(),
         }
     }
 }
