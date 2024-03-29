@@ -1,6 +1,6 @@
 //! 词法Narsese的「词项」数据结构
 
-use crate::api::ExtractTerms;
+use crate::api::{ExtractTerms, GetCapacity, GetCategory, TermCapacity, TermCategory};
 
 /// 词法上的「词项」
 /// * 📌只在词法（字符串语法）上表征词项
@@ -135,6 +135,33 @@ macro_rules! lexical_statement {
     };
 }
 
+/// 实现/判型/词项类别
+impl GetCategory for Term {
+    fn get_category(&self) -> TermCategory {
+        // ! 「集合」在类别上也属于「复合」
+        match self {
+            Atom { .. } => TermCategory::Atom,
+            Compound { .. } | Set { .. } => TermCategory::Compound,
+            Statement { .. } => TermCategory::Statement,
+        }
+    }
+}
+
+/// 实现/判型/词项容量
+impl GetCapacity for Term {
+    fn get_capacity(&self) -> TermCapacity {
+        // ! 「集合」在类别上也属于「复合」
+        match self {
+            // 原子还是原子
+            Atom { .. } => TermCapacity::Atom,
+            // * 🚩不论是「复合」还是「集合」，在存取上都是「（多元）序列」
+            Compound { .. } | Set { .. } => TermCapacity::Vec,
+            // * 🚩不论系词是什么，在存取上都是「二元序列」
+            Statement { .. } => TermCapacity::BinaryVec,
+        }
+    }
+}
+
 /// 实现/提取内部元素
 impl ExtractTerms for Term {
     type Term = Term;
@@ -154,9 +181,17 @@ impl ExtractTerms for Term {
 /// 单元测试@词项
 #[cfg(test)]
 #[allow(unused)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
-    use util::show;
+    use util::{asserts, show};
+
+    /// 快捷宏
+    /// * 🎯减少冗余的`.clone()`
+    macro_rules! c {
+        ($x:expr) => {
+            $x.clone()
+        };
+    }
 
     /// 【通用】生成一个「词项测试集」
     /// * 所有类型的词项均生成一遍
@@ -165,12 +200,6 @@ mod tests {
         let a = lexical_atom!("A");
         let b = lexical_atom!("B");
         let placeholder = lexical_atom!("_" "");
-        // 快捷宏
-        macro_rules! c {
-            ($x:expr) => {
-                $x.clone()
-            };
-        }
         // 直接返回一个数组
         vec![
             // 原子词项
@@ -213,6 +242,7 @@ mod tests {
         ]
     }
 
+    /// 测试/构造
     #[test]
     fn main() {
         let _ = generate_term_testset();
@@ -232,7 +262,7 @@ mod tests {
         show!(lex_c);
     }
 
-    /// 元素提取测试
+    /// 测试/元素提取
     #[test]
     fn test_extract_terms() {
         // 生成测试集
@@ -254,6 +284,32 @@ mod tests {
             for i in 0..components_len {
                 assert_eq!(terms[i], components_cloned[i])
             }
+        }
+    }
+
+    /// 测试/元素类别
+    #[test]
+    fn test_category() {
+        let a = lexical_atom!("A");
+        let b = lexical_atom!("B");
+        asserts! {
+            lexical_atom!("word").get_category() => TermCategory::Atom
+            lexical_set!("{"; c!(a), c!(b); "}").get_category() => TermCategory::Compound
+            lexical_compound!("&"; c!(a) c!(b)).get_category() => TermCategory::Compound
+            lexical_statement!(c!(a) "-->" c!(b)).get_category() => TermCategory::Statement
+        }
+    }
+
+    /// 测试/元素容量
+    #[test]
+    fn test_capacity() {
+        let a = lexical_atom!("A");
+        let b = lexical_atom!("B");
+        asserts! {
+            lexical_atom!("word").get_capacity() => TermCapacity::Atom
+            lexical_set!("{"; c!(a), c!(b); "}").get_capacity() => TermCapacity::Vec
+            lexical_compound!("&"; c!(a) c!(b)).get_capacity() => TermCapacity::Vec
+            lexical_statement!(c!(a) "-->" c!(b)).get_capacity() => TermCapacity::BinaryVec
         }
     }
 }

@@ -1,12 +1,12 @@
 [package]
 name = "narsese"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2021"
 
 [dependencies]
 
 # 用于实现「静态闭包常量」
-# 🔗：https://stackoverflow.com/questions/73260997/rust-boxed-closure-in-global-variable
+# 🔗<https://stackoverflow.com/questions/73260997/rust-boxed-closure-in-global-variable>
 # once_cell = "1.19.0" # * 暂时不用
 [dependencies.lazy_static]
 version = "1.4.0"

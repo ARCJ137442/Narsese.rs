@@ -1,7 +1,9 @@
 //! 统一定义词项实现
 
 use super::structs::*;
-use crate::api::{ExtractTerms, GetTerm, UIntPrecision};
+use crate::api::{
+    ExtractTerms, GetCapacity, GetCategory, GetTerm, TermCapacity, TermCategory, UIntPrecision,
+};
 use std::{any::type_name, error::Error, hash::Hash, io::ErrorKind};
 use util::ResultBoost;
 
@@ -443,20 +445,17 @@ mod test_new {
     }
 }
 
-/// 类型判断相关
-impl Term {
-    // 通用 //
-
-    /// 获取类型名称
-    /// * 📝Rust使用[`std::any`]实现类似「获取类型名」的反射代码
-    pub fn type_name(&self) -> &str {
-        type_name::<Self>()
-    }
-
+/// 判型/词项类别
+impl GetCategory for Term {
     /// 获取词项类别
-    pub fn get_category(&self) -> TermCategory {
+    fn get_category(&self) -> TermCategory {
         match self {
             // 原子词项
+            // * 1 词语
+            // * 6 独立变量
+            // * 6 非独变量
+            // * 6 查询变量
+            // * 7 间隔
             Word(..)
             | Placeholder
             | VariableIndependent(..)
@@ -465,6 +464,20 @@ impl Term {
             | Interval(..)
             | Operator(..) => TermCategory::Atom,
             // 复合词项
+            // * 3 外延集
+            // * 3 内涵集
+            // * 3 外延交
+            // * 3 内涵交
+            // * 3 外延差
+            // * 3 内涵差
+            // * 4 乘积
+            // * 4 外延像
+            // * 4 内涵像
+            // * 5 合取
+            // * 5 析取
+            // * 5 否定
+            // * 7 顺序合取
+            // * 7 平行合取
             SetExtension(..)
             | SetIntension(..)
             | IntersectionExtension(..)
@@ -480,6 +493,16 @@ impl Term {
             | ConjunctionSequential(..)
             | ConjunctionParallel(..) => TermCategory::Compound,
             // 陈述
+            // * 1 继承
+            // * 2 相似
+            // * 5 蕴含
+            // * 5 等价
+            // * 7 预测性蕴含
+            // * 7 并发性蕴含
+            // * 7 回顾性蕴含
+            // * 7 预测性等价
+            // * 7 并发性等价
+            // // 7 回顾性等价
             Inheritance(..)
             | Similarity(..)
             | Implication(..)
@@ -491,9 +514,12 @@ impl Term {
             | EquivalenceConcurrent(..) => TermCategory::Statement,
         }
     }
+}
 
+/// 判型/词项容量
+impl GetCapacity for Term {
     /// 获取词项容量
-    pub fn get_capacity(&self) -> TermCapacity {
+    fn get_capacity(&self) -> TermCapacity {
         match self {
             // 原子词项
             Word(..)
@@ -530,52 +556,25 @@ impl Term {
             | ConjunctionParallel(..) => TermCapacity::Set,
         }
     }
+}
+
+/// 其它类型判断相关
+impl Term {
+    // 通用 //
+
+    /// 获取类型名称
+    /// * 📝Rust使用[`std::any`]实现类似「获取类型名」的反射代码
+    pub fn type_name(&self) -> &str {
+        type_name::<Self>()
+    }
 
     // 专用 //
-
-    /// 判型/原子词项
-    /// * 1 词语
-    /// * 6 独立变量
-    /// * 6 非独变量
-    /// * 6 查询变量
-    /// * 7 间隔
-    pub fn is_atom(&self) -> bool {
-        self.get_category() == TermCategory::Atom
-    }
-
-    /// 判型/复合词项
-    /// * 3 外延集
-    /// * 3 内涵集
-    /// * 3 外延交
-    /// * 3 内涵交
-    /// * 3 外延差
-    /// * 3 内涵差
-    /// * 4 乘积
-    /// * 4 外延像
-    /// * 4 内涵像
-    /// * 5 合取
-    /// * 5 析取
-    /// * 5 否定
-    /// * 7 顺序合取
-    /// * 7 平行合取
-    pub fn is_compound(&self) -> bool {
-        self.get_category() == TermCategory::Compound
-    }
 
     /// 判型/像
     /// * 4 外延像
     /// * 4 内涵像
     pub fn is_image(&self) -> bool {
         matches!(self, ImageExtension(..) | ImageIntension(..))
-    }
-
-    /// 判型/陈述
-    /// * 1 继承
-    /// * 2 相似
-    /// * 5 蕴含
-    /// * 5 等价
-    pub fn is_statement(&self) -> bool {
-        self.get_category() == TermCategory::Statement
     }
 
     /// 获取词项作为原子词项的字符串名
