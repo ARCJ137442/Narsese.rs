@@ -1517,8 +1517,12 @@ impl<'s> FromParse<(), &'s mut ParseState<'_>> for ParseResult<Stamp> {
     /// * 🎯用于单独解析时间戳
     ///   * 📄【2024-03-20 14:14:51】最初case: 词法折叠
     /// * 🚩直接消耗一个时间戳，然后返回
-    /// * 📄case: `:|:`
+    /// * 📄case: `:|:` ``
     fn from_parse(_: (), parser: &'s mut ParseState) -> Self {
+        // 空字串⇒时间戳「永恒」 | 中间结果折叠 也是直接硬编码
+        if_return! {
+            parser.env.is_empty() => ParseResult::Ok(Stamp::Eternal)
+        }
         // 尝试消耗一个时间戳
         // ! 不能「消耗条目，然后默认条目」：还是原子词项的问题（LaTeX/漢文 情况）
         // * ✅【2024-03-21 00:26:05】安全：有进行长度检验

@@ -14,10 +14,11 @@ use crate::{
 use util::*;
 
 /// 一个简单的「折叠错误」
+/// * 🚩【2024-03-29 22:54:17】公开可见：外界需要用「折叠结果」作对比
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-struct FoldError(String);
+pub struct FoldError(String);
 /// 简化的「折叠结果」
-type FoldResult<T> = Result<T, FoldError>;
+pub type FoldResult<T> = Result<T, FoldError>;
 
 /// 批量实现「任何其它（错误）类型⇒自身类型」
 /// * 🎯用于和[`Result::transform_err`]联动：`result.transform_err(FoldError::from)`
@@ -325,6 +326,33 @@ impl<'a> TryFoldInto<'a, EnumSentence, FoldError> for Sentence {
         Ok(sentence)
     }
 }
+
+// /// 实现/时间戳
+// /// * 📌实际上是对字符串实现
+// /// * 🚩【2024-03-29 23:14:31】需要特别处理「空时间戳」的情况
+// impl<'a> TryFoldInto<'a, EnumSentence, FoldError> for Sentence {
+//     /// 统一使用「枚举Narsese格式」提供信息
+//     type Folder = EnumNarseseFormat<&'a str>;
+
+//     fn try_fold_into(self, folder: &'a Self::Folder) -> FoldResult<EnumSentence> {
+//         // 先解析出词项
+//         let term = self.term.try_fold_into(folder)?;
+//         // 随后解析出真值
+//         let truth = self.truth.try_fold_into(folder)?;
+//         // 再解析出时间戳
+//         let stamp = folder
+//             .parse::<Stamp>(&self.stamp)
+//             .transform_err(FoldError::from)?;
+//         // 解析标点
+//         let punctuation = folder
+//             .parse::<Punctuation>(&self.punctuation)
+//             .transform_err(FoldError::from)?;
+//         // 通过标点构造语句
+//         let sentence = EnumSentence::from_punctuation(term, punctuation, stamp, truth);
+//         // 返回
+//         Ok(sentence)
+//     }
+// }
 
 /// 实现/任务
 impl<'a> TryFoldInto<'a, EnumTask, FoldError> for Task {
