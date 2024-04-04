@@ -10,7 +10,7 @@ Rust support for Narsese
 """
 
 readme = "README.md"
-keywords = ["NARS", "Narsese", "Non-Axiomatic Logic"]
+keywords = ["NARS", "Narsese", "Non-Axiomatic-Logic"]
 
 license = "MIT OR Apache-2.0"
 categories = [
