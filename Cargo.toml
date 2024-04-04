@@ -2,6 +2,19 @@
 name = "narsese"
 version = "0.12.2"
 edition = "2021"
+description = """
+Rust support for Narsese
+"""
+
+readme = "README.md"
+keywords = ["NARS", "Narsese", "Non-Axiomatic Logic"]
+
+license = "MIT OR Apache-2.0"
+categories = [
+    "data-structures", # 数据结构（Narsese相关）
+    "parser-implementations", # 解析器实现
+] # 🔗<https://crates.io/category_slugs>
+repository = "https://github.com/ARCJ137442/Narsese.rs"
 
 [dependencies]
 

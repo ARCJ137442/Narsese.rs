@@ -1,5 +1,9 @@
 # Narsese.rs
 
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-2.0.0-%23FE5196?logo=conventionalcommits&logoColor=white)](https://conventionalcommits.org)
+
+该项目使用[语义化版本 2.0.0](https://semver.org/)进行版本号管理。
+
 **Narsese**的[**Rust**](https://www.rust-lang.org)实现
 
 - ✨基于枚举`enum`类型实现的[**枚举Narsese**](#枚举narsese)
