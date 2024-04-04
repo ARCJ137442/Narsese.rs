@@ -4,6 +4,7 @@
 
 - ✨基于枚举`enum`类型实现的[**枚举Narsese**](#枚举narsese)
 - ✨基于「嵌套字串词法树」实现的[**词法Narsese**](#词法narsese)
+- 🚧一个可用于在Rust中开发NARS的**Narsese API**（WIP）
 
 ## 安装
 
@@ -68,6 +69,10 @@ fn main() {
 
 🚧【2024-03-29 00:43:13】WIP：更具体的用例
 
+## 使用/Narsese API
+
+🚧【2024-04-05 00:09:03】WIP：基础功能
+
 ## 概念
 
 ### 枚举Narsese
@@ -91,9 +96,30 @@ fn main() {
   - 可扩展：通过「词法折叠」机制，允许向特定、专用数据结构的进一步转换
     - ✅已对[枚举Narsese](#枚举narsese)提供词法折叠了机制
 
+### NarseseAPI
+
+（最后更新：2024-04-05）
+
+- 🎯可扩展性
+  - 通过`trait`s，统一表述并定义「具体结构无关」的抽象特征
+- 🎯兼容性
+  - 📌基于CommonNarsese特性：在「原子/复合/陈述」的模型中，抽取出有关CommonNarsese所必备的**语义**特征
+  - 📄如：Narsese值、词项类别、词项容量、内部词项获取 等概念
+
 #### 标准ASCII词法
 
-可作为CommonNarsese词法解析器（同时用于下游NAVM、BabelNAR）的「标准ASCII词法」使用如下[PEG文法](https://zh.wikipedia.org/wiki/%E8%A7%A3%E6%9E%90%E8%A1%A8%E8%BE%BE%E6%96%87%E6%B3%95)定义：
+（最后更新：2024-04-05）
+
+可作为CommonNarsese词法解析器（同时用于下游NAVM、BabelNAR）的「标准ASCII词法」
+
+该定义兼容[OpenNARS wiki的Narsese语法](https://github.com/opennars/opennars/wiki/Narsese-Grammar-(Input-Output-Format))，
+一些不同之处与设计原则在于：
+
+- 📌**一种形式只有一种表达方法**：语义相同的词项，必定有相同的表示形式（重点在对「复合词项」表示形式的限定上）
+- 📌不是「内容特定」的：「ASCII词法Narsese」通过「不特定做枚举」给自定义词项（原子/复合/陈述）留足了空间
+- 📌任务→语句 单义性：对「缺省预算值的任务」，预算值的缺省总会导致解析器识别成「语句」，不产生任何歧义
+
+使用如下[PEG文法](https://zh.wikipedia.org/wiki/%E8%A7%A3%E6%9E%90%E8%A1%A8%E8%BE%BE%E6%96%87%E6%B3%95)定义：
 
 ```pest
 /// 空白符 | 所有Unicode空白符，解析前忽略
@@ -186,16 +212,9 @@ truth = {
 }
 ```
 
-该定义兼容[OpenNARS wiki的Narsese语法](https://github.com/opennars/opennars/wiki/Narsese-Grammar-(Input-Output-Format))，一些不同之处在于：
-
-- 📌**一种形式只有一种表达方法**：语义相同的词项，必定有相同的表示形式（重点在对「复合词项」表示形式的限定上）
-- 📌不是「内容特定」的：「ASCII词法Narsese」通过「不特定做枚举」给自定义词项（原子/复合/陈述）留足了空间
-- 📌任务→语句 单义性：对「缺省预算值的任务」，预算值的缺省总会导致解析器识别成「语句」，不产生任何歧义
-
 🔗其它另请参考[**JuNarsese.jl**](https://github.com/ARCJ137442/JuNarsese.jl#commonnarsese)中有关「CommonNarsese」的小节。
 
 该定义可直接通过Rust库[**pest.rs**](https://pest.rs/)加载，并已在BabelNAR中用于NARS方言解析
-（最后更新：2024-03-29）
 
 ## 开源许可
 
