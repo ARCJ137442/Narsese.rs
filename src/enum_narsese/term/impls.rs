@@ -4,7 +4,12 @@ use super::structs::*;
 use crate::api::{
     ExtractTerms, GetCapacity, GetCategory, GetTerm, TermCapacity, TermCategory, UIntPrecision,
 };
-use std::{any::type_name, error::Error, hash::Hash, io::ErrorKind};
+use std::{
+    any::type_name,
+    error::Error,
+    hash::Hash,
+    io::{Error as IoError, ErrorKind as IoErrorKind},
+};
 use util::ResultBoost;
 
 // 实现 //
@@ -245,27 +250,27 @@ impl Term {
 
     /// 预测性蕴含 | A =/> C
     pub fn new_implication_predictive(antecedent: Term, consequent: Term) -> Self {
-        Term::ImplicationPredictive(new_term_ref_type(antecedent), new_term_ref_type(consequent))
+        ImplicationPredictive(new_term_ref_type(antecedent), new_term_ref_type(consequent))
     }
 
     /// 并发性蕴含 | A =|> C
     pub fn new_implication_concurrent(antecedent: Term, consequent: Term) -> Self {
-        Term::ImplicationConcurrent(new_term_ref_type(antecedent), new_term_ref_type(consequent))
+        ImplicationConcurrent(new_term_ref_type(antecedent), new_term_ref_type(consequent))
     }
 
     /// 回顾性蕴含 | A =\> C
     pub fn new_implication_retrospective(antecedent: Term, consequent: Term) -> Self {
-        Term::ImplicationRetrospective(new_term_ref_type(antecedent), new_term_ref_type(consequent))
+        ImplicationRetrospective(new_term_ref_type(antecedent), new_term_ref_type(consequent))
     }
 
     /// 预测性等价 | A </> C
     pub fn new_equivalence_predictive(antecedent: Term, consequent: Term) -> Self {
-        Term::EquivalencePredictive(new_term_ref_type(antecedent), new_term_ref_type(consequent))
+        EquivalencePredictive(new_term_ref_type(antecedent), new_term_ref_type(consequent))
     }
 
     /// 并发性等价 | A <|> C
     pub fn new_equivalence_concurrent(antecedent: Term, consequent: Term) -> Self {
-        Term::EquivalenceConcurrent(new_term_ref_type(antecedent), new_term_ref_type(consequent))
+        EquivalenceConcurrent(new_term_ref_type(antecedent), new_term_ref_type(consequent))
     }
 
     /// 回顾性等价 | A <\> C
@@ -278,7 +283,7 @@ impl Term {
     // 特殊初始化 //
 
     /// 工具函数/像：伴随占位符的初始化
-    /// * �找到并消耗第一个占位符，并将其用作「占位符位置」
+    /// * 🚩找到并消耗第一个占位符，并将其用作「占位符位置」
     /// * 📝特征[`IntoIterator`]不直接支持`enumerate`方法
     ///   * 需要先使用[`IntoIterator::into_iter`]进行转换
     ///   * 或使用[`Iterator`]规避所有权问题（若需对自身进行处理）
@@ -330,125 +335,13 @@ impl Term {
     }
 }
 
-/// 单元测试/构造
-#[cfg(test)]
-mod test_new {
-    use std::vec;
-
-    use super::*;
-
-    /// 辅助函数：传入构造好的词项，并打印
-    fn _universal(term: &Term) {
-        println!("term: {term:?}");
-    }
-
-    #[test]
-    fn atoms() {
-        _universal(&Term::new_word("word"));
-        _universal(&Term::new_variable_independent("independent"));
-        _universal(&Term::new_variable_dependent("dependent"));
-        _universal(&Term::new_variable_query("query"));
-        _universal(&Term::new_interval(42));
-        _universal(&Term::new_operator("op"));
-    }
-
-    #[test]
-    fn compound() {
-        let a = Term::new_word("A");
-        let b: Term = Term::new_word("B");
-        let ab = vec![a.clone(), b.clone()];
-        let a_c = || a.clone();
-        let b_c = || b.clone();
-        let ab_c = || ab.clone();
-
-        // 外延集
-        _universal(&Term::new_set_extension(ab_c()));
-        // 内涵集
-        _universal(&Term::new_set_intension(ab_c()));
-        // 外延交
-        _universal(&Term::new_intersection_extension(ab_c()));
-        // 内涵交
-        _universal(&Term::new_intersection_intension(ab_c()));
-        // 外延差
-        _universal(&Term::new_difference_extension(a_c(), b_c()));
-        // 内涵差
-        _universal(&Term::new_difference_intension(a_c(), b_c()));
-        // 积
-        _universal(&Term::new_product(ab_c()));
-        // 外延像
-        _universal(&Term::new_image_extension(0, ab_c()));
-        // 内涵像
-        _universal(&Term::new_image_intension(2, ab_c()));
-        // 合取
-        _universal(&Term::new_conjunction(ab_c()));
-        // 析取
-        _universal(&Term::new_disjunction(ab_c()));
-        // 否定
-        _universal(&Term::new_negation(a_c()));
-        // 顺序合取
-        _universal(&Term::new_conjunction_sequential(ab_c()));
-        // 平行合取
-        _universal(&Term::new_conjunction_parallel(ab_c()));
-    }
-
-    #[test]
-    fn statement() {
-        let a = Term::new_word("A");
-        let b: Term = Term::new_word("B");
-        let a_c = || a.clone();
-        let b_c = || b.clone();
-
-        // 继承
-        _universal(&Term::new_inheritance(a_c(), b_c()));
-        // 相似
-        _universal(&Term::new_inheritance(a_c(), b_c()));
-        // 蕴含
-        _universal(&Term::new_similarity(a_c(), b_c()));
-        // 等价
-        _universal(&Term::new_equivalence(a_c(), b_c()));
-    }
-
-    /// 测试合法的占位符位置
-    /// * 复杂度：O(N²)
-    #[test]
-    fn valid_image() {
-        let x = Term::new_word("");
-        // 在一个基础的长度中测试
-        const N: UIntPrecision = 10000;
-        for len in 1..(N + 1) {
-            // 构造一个长度为L的词项数组
-            let mut vec: TermVecType = vec![];
-            // 添加L个元素
-            for _ in 0..len {
-                vec.push(x.clone());
-            }
-            assert_eq!(vec.len(), len);
-            // 测试所有位置的占位符
-            for i in 0..(len + 1) {
-                test_term_vec_for_image(i, &vec);
-            }
-        }
-    }
-
-    #[test]
-    #[should_panic]
-    fn invalid_image_1() {
-        // 均超过索引
-        new_term_vec_for_image(1, vec![]);
-    }
-
-    #[test]
-    #[should_panic]
-    fn invalid_image_2() {
-        // 均超过索引
-        new_term_vec_for_image(2, vec![Term::new_word("")]);
-    }
-}
-
 /// 判型/词项类别
 impl GetCategory for Term {
     /// 获取词项类别
     fn get_category(&self) -> TermCategory {
+        // 预先使用以简化
+        use TermCategory::*;
+        // 模式匹配
         match self {
             // 原子词项
             // * 1 词语
@@ -462,7 +355,7 @@ impl GetCategory for Term {
             | VariableDependent(..)
             | VariableQuery(..)
             | Interval(..)
-            | Operator(..) => TermCategory::Atom,
+            | Operator(..) => Atom,
             // 复合词项
             // * 3 外延集
             // * 3 内涵集
@@ -491,7 +384,7 @@ impl GetCategory for Term {
             | Disjunction(..)
             | Negation(..)
             | ConjunctionSequential(..)
-            | ConjunctionParallel(..) => TermCategory::Compound,
+            | ConjunctionParallel(..) => Compound,
             // 陈述
             // * 1 继承
             // * 2 相似
@@ -511,7 +404,7 @@ impl GetCategory for Term {
             | ImplicationConcurrent(..)
             | ImplicationRetrospective(..)
             | EquivalencePredictive(..)
-            | EquivalenceConcurrent(..) => TermCategory::Statement,
+            | EquivalenceConcurrent(..) => Statement,
         }
     }
 }
@@ -520,6 +413,9 @@ impl GetCategory for Term {
 impl GetCapacity for Term {
     /// 获取词项容量
     fn get_capacity(&self) -> TermCapacity {
+        // 预先使用以简化
+        use TermCapacity::*;
+        // 模式匹配
         match self {
             // 原子词项
             Word(..)
@@ -528,9 +424,9 @@ impl GetCapacity for Term {
             | VariableDependent(..)
             | VariableQuery(..)
             | Interval(..)
-            | Operator(..) => TermCapacity::Atom,
+            | Operator(..) => Atom,
             // 一元
-            Negation(..) => TermCapacity::Unary,
+            Negation(..) => Unary,
             // 二元序列
             DifferenceExtension(..)
             | DifferenceIntension(..)
@@ -539,12 +435,12 @@ impl GetCapacity for Term {
             | ImplicationPredictive(..)
             | ImplicationConcurrent(..)
             | ImplicationRetrospective(..)
-            | EquivalencePredictive(..) => TermCapacity::BinaryVec,
+            | EquivalencePredictive(..) => BinaryVec,
             // 二元集合
-            Similarity(..) | Equivalence(..) | EquivalenceConcurrent(..) => TermCapacity::BinarySet,
+            Similarity(..) | Equivalence(..) | EquivalenceConcurrent(..) => BinarySet,
             // 序列
             Product(..) | ImageExtension(..) | ImageIntension(..) | ConjunctionSequential(..) => {
-                TermCapacity::Vec
+                Vec
             }
             // 集合
             SetExtension(..)
@@ -553,7 +449,7 @@ impl GetCapacity for Term {
             | IntersectionIntension(..)
             | Conjunction(..)
             | Disjunction(..)
-            | ConjunctionParallel(..) => TermCapacity::Set,
+            | ConjunctionParallel(..) => Set,
         }
     }
 }
@@ -632,11 +528,11 @@ impl Term {
                 |new_interval| {
                     *interval = new_interval // * ↓隐式返回Ok(())
                 },
-                |_| std::io::Error::new(ErrorKind::InvalidInput, "尝试在间隔中设置无效的数值"),
+                |_| IoError::new(IoErrorKind::InvalidInput, "尝试在间隔中设置无效的数值"),
             ),
             // 其它情况：静默失败
-            _ => Err(std::io::Error::new(
-                ErrorKind::InvalidData,
+            _ => Err(IoError::new(
+                IoErrorKind::InvalidData,
                 "尝试在非原子词项中设置词项名",
             )),
         }
@@ -713,21 +609,24 @@ impl Term {
     pub fn push_components(
         &mut self,
         terms: impl IntoIterator<Item = Term>,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), impl Error> {
+        // 预先使用以简化
+        use TermCapacity::*;
+        // 模式匹配
         match self.get_capacity() {
             // 原子|一元|二元⇒失败
-            TermCapacity::Atom|
+            Atom|
             // ⇒失败
-            TermCapacity::Unary|
+            Unary|
             // 二元序列
-            TermCapacity::BinaryVec|
+            BinaryVec|
             // 二元集合
-            TermCapacity::BinarySet=>Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
+            BinarySet=>Err(IoError::new(
+                IoErrorKind::InvalidData,
                 "尝试为容量固定的词项添加词项",
             )),
-            // 多元词项
-            _ =>match  self {
+            // 多元词项 ⇒ 具体类型具体分析
+            _ => match self {
                 // 序列 | 忽略「像」的占位符位置
                 Product(vec) | ImageExtension(_,vec) | ImageIntension(_,vec) | ConjunctionSequential(vec) => {
                     // 持续追加
@@ -746,8 +645,8 @@ impl Term {
                     Ok(())
                 },
                 // 其它⇒未知类型报错
-                _ => Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
+                _ => Err(IoError::new(
+                    IoErrorKind::InvalidData,
                     "未定义的多元复合词项",
                 ))
             },
@@ -755,6 +654,7 @@ impl Term {
     }
 }
 
+/// 测试/组分
 #[test]
 fn test_components() {
     let set = Term::new_set_extension(vec![Term::new_word("a"), Term::new_word("b")]);
@@ -847,40 +747,50 @@ impl PartialEq for Term {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             // 原子词项 //
-            (Word(word), Word(other_word)) => word == other_word,
+            // 单元结构
             (Placeholder, Placeholder) => true,
-            (VariableIndependent(name), VariableIndependent(other_name)) => name == other_name,
-            (VariableDependent(name), VariableDependent(other_name)) => name == other_name,
-            (VariableQuery(name), VariableQuery(other_name)) => name == other_name,
+            // 数值
             (Interval(i1), Interval(i2)) => i1 == i2,
-            (Operator(name), Operator(other_name)) => name == other_name,
+            // 名称字符串
+            (Word(name1), Word(name2))
+            | (VariableIndependent(name1), VariableIndependent(name2))
+            | (VariableDependent(name1), VariableDependent(name2))
+            | (VariableQuery(name1), VariableQuery(name2))
+            | (Operator(name1), Operator(name2)) => name1 == name2,
             // 复合词项 //
-            (SetExtension(s1), SetExtension(s2)) => s1 == s2,
-            (SetIntension(s1), SetIntension(s2)) => s1 == s2,
-            (IntersectionExtension(s1), IntersectionExtension(s2)) => s1 == s2,
-            (IntersectionIntension(s1), IntersectionIntension(s2)) => s1 == s2,
-            (DifferenceExtension(t1, t2), DifferenceExtension(u1, u2)) => t1 == u1 && t2 == u2,
-            (DifferenceIntension(t1, t2), DifferenceIntension(u1, u2)) => t1 == u1 && t2 == u2,
-            (Product(terms1), Product(terms2)) => terms1 == terms2,
-            (ImageExtension(i1, terms1), ImageExtension(i2, terms2)) => {
-                i1 == i2 && terms1 == terms2
+            // 集合
+            (SetExtension(s1), SetExtension(s2))
+            | (SetIntension(s1), SetIntension(s2))
+            | (IntersectionExtension(s1), IntersectionExtension(s2))
+            | (IntersectionIntension(s1), IntersectionIntension(s2))
+            | (Conjunction(s1), Conjunction(s2))
+            | (Disjunction(s1), Disjunction(s2))
+            | (ConjunctionParallel(s1), ConjunctionParallel(s2)) => s1 == s2,
+            // 二元有序`Box`
+            (DifferenceExtension(t1, t2), DifferenceExtension(u1, u2))
+            | (DifferenceIntension(t1, t2), DifferenceIntension(u1, u2)) => t1 == u1 && t2 == u2,
+            // 数组+数值
+            (ImageExtension(i1, v1), ImageExtension(i2, v2))
+            | (ImageIntension(i1, v1), ImageIntension(i2, v2)) => i1 == i2 && v1 == v2,
+            // 数组
+            (Product(v1), Product(v2)) | (ConjunctionSequential(v1), ConjunctionSequential(v2)) => {
+                v1 == v2
             }
-            (ImageIntension(i1, terms1), ImageIntension(i2, terms2)) => {
-                i1 == i2 && terms1 == terms2
-            }
-            (Conjunction(set1), Conjunction(set2)) => set1 == set2,
-            (Disjunction(set1), Disjunction(set2)) => set1 == set2,
+            // 一元`Box`
             (Negation(t1), Negation(t2)) => t1 == t2,
-            (ConjunctionSequential(terms1), ConjunctionSequential(terms2)) => terms1 == terms2,
-            (ConjunctionParallel(set1), ConjunctionParallel(set2)) => set1 == set2,
             // 陈述
-            (Inheritance(t1, t2), Inheritance(u1, u2)) => t1 == u1 && t2 == u2,
-            (Similarity(t1, t2), Similarity(u1, u2)) => {
-                // 📌对称：反过来也相等
-                (t1 == u1 && t2 == u2) || (t1 == u2 && t2 == u1)
+            (Inheritance(t1, t2), Inheritance(u1, u2))
+            | (Implication(t1, t2), Implication(u1, u2))
+            | (ImplicationPredictive(t1, t2), ImplicationPredictive(u1, u2))
+            | (ImplicationConcurrent(t1, t2), ImplicationConcurrent(u1, u2))
+            | (ImplicationRetrospective(t1, t2), ImplicationRetrospective(u1, u2))
+            | (EquivalencePredictive(t1, t2), EquivalencePredictive(u1, u2)) => {
+                t1 == u1 && t2 == u2
             }
-            (Implication(t1, t2), Implication(u1, u2)) => t1 == u1 && t2 == u2,
-            (Equivalence(t1, t2), Equivalence(u1, u2)) => {
+            // 二元无序`Box`
+            (Similarity(t1, t2), Similarity(u1, u2))
+            | (Equivalence(t1, t2), Equivalence(u1, u2))
+            | (EquivalenceConcurrent(t1, t2), EquivalenceConcurrent(u1, u2)) => {
                 // 📌对称：反过来也相等
                 (t1 == u1 && t2 == u2) || (t1 == u2 && t2 == u1)
             }
@@ -1004,11 +914,132 @@ impl ExtractTerms for Term {
     }
 }
 
-/// 单元测试 | 构造
+/// 单元测试 | 测试集、属性…
 #[cfg(test)]
 mod tests {
     use super::*;
     use util::*;
+    use TermCategory::*;
+
+    /// 辅助宏：快速生成样板词项
+    macro_rules! w {
+        (A) => { Term::new_word("A") };
+        (B) => { Term::new_word("B") };
+        [A, B] => { vec![w!(A), w!(B)] };
+    }
+
+    /// 辅助函数：传入构造好的词项，并打印
+    fn _universal(term: &Term) {
+        println!("term: {term:?}");
+    }
+
+    /// 批量生成测试代码
+    /// * 🎯简化重复代码
+    macro_rules! _universal_Term {
+        {$(
+            // 函数名(任意的参数..)
+            $new_name:ident ( $($arg:tt)* ) $(;)?
+        )*} => {$(
+            // 每个「函数名」对应一个函数调用
+            _universal(&Term::$new_name( $($arg)* ));
+        )*};
+    }
+
+    #[test]
+    fn atoms() {
+        _universal_Term! {
+            new_word("word")
+            new_variable_independent("independent")
+            new_variable_dependent("dependent")
+            new_variable_query("query")
+            new_interval(42)
+            new_operator("op")
+        }
+    }
+
+    #[test]
+    fn compound() {
+        _universal_Term! {
+            // 外延集
+            new_set_extension(w![A, B])
+            // 内涵集
+            new_set_intension(w![A, B])
+            // 外延交
+            new_intersection_extension(w![A, B])
+            // 内涵交
+            new_intersection_intension(w![A, B])
+            // 外延差
+            new_difference_extension(w!(A), w!(B))
+            // 内涵差
+            new_difference_intension(w!(A), w!(B))
+            // 积
+            new_product(w![A, B])
+            // 外延像
+            new_image_extension(0, w![A, B])
+            // 内涵像
+            new_image_intension(2, w![A, B])
+            // 合取
+            new_conjunction(w![A, B])
+            // 析取
+            new_disjunction(w![A, B])
+            // 否定
+            new_negation(w!(A))
+            // 顺序合取
+            new_conjunction_sequential(w![A, B])
+            // 平行合取
+            new_conjunction_parallel(w![A, B])
+        }
+    }
+
+    #[test]
+    fn statement() {
+        _universal_Term! {
+            // 继承
+            new_inheritance(w!(A), w!(B))
+            // 相似
+            new_inheritance(w!(A), w!(B))
+            // 蕴含
+            new_similarity(w!(A), w!(B))
+            // 等价
+            new_equivalence(w!(A), w!(B))
+        }
+    }
+
+    /// 测试合法的占位符位置
+    /// * 复杂度：O(N²)
+    #[test]
+    fn valid_image() {
+        let x = Term::new_word("");
+        // 在一个基础的长度中测试
+        const N: UIntPrecision = 10000;
+        for len in 1..(N + 1) {
+            // 构造一个长度为L的词项数组
+            let mut vec: TermVecType = vec![];
+            // 添加L个元素
+            for _ in 0..len {
+                vec.push(x.clone());
+            }
+            assert_eq!(vec.len(), len);
+            // 测试所有位置的占位符
+            for i in 0..(len + 1) {
+                test_term_vec_for_image(i, &vec);
+            }
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn invalid_image_1() {
+        // 均超过索引
+        new_term_vec_for_image(1, vec![]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn invalid_image_2() {
+        // 均超过索引
+        new_term_vec_for_image(2, vec![Term::new_word("")]);
+    }
 
     /// 【通用】生成一个「词项测试集」
     /// * 所有类型的词项均生成一遍
@@ -1060,56 +1091,63 @@ mod tests {
         // 类型详尽性
         assert!(term.is_atom() || term.is_compound() || term.is_statement());
         // 展示类别
-        show!(term.get_category());
+        dbg!(term.get_category());
         // 展示容量
-        show!(term.get_capacity());
+        dbg!(term.get_capacity());
     }
 
     /// 测试一个原子词项
     fn _test_atom(atom: Term) {
         // 首先得是一个词项
         _test_term(&atom);
-        // 确认是原子词项
-        assert!(atom.is_atom());
-        assert_eq!(atom.get_category(), TermCategory::Atom);
-        // 并非复合词项、陈述
-        assert!(!atom.is_compound());
-        assert!(!atom.is_statement());
-        // 获取（检查）名称
-        show!(atom.get_atom_name());
-        // 拷贝，并检查是否相等
-        assert_eq!(atom, atom.clone());
+        asserts! {
+            // 确认是原子词项
+            atom.is_atom(),
+            atom.get_category() => Atom,
+            // 并非复合词项、陈述
+            !atom.is_compound(),
+            !atom.is_statement(),
+            // 拷贝，并检查是否相等
+            atom => atom.clone(),
+            // 获取（检查）名称
+            dbg!(atom.get_atom_name()) => @ Some(..),
+        }
     }
 
     /// 测试一个复合词项
     fn _test_compound(compound: Term) {
         // 首先得是一个词项
         _test_term(&compound);
-        // 确认是原子词项
-        assert!(compound.is_compound());
-        assert_eq!(compound.get_category(), TermCategory::Compound);
-        // 并非原子词项、陈述
-        assert!(!compound.is_atom());
-        assert!(!compound.is_statement());
-        // 获取（检查）内容
-        show!(compound.get_compound_components());
-        // 拷贝，并检查是否相等
-        assert_eq!(compound, compound.clone());
+        asserts! {
+            // 确认是复合词项
+            compound.is_compound(),
+            compound.get_category() => Compound,
+            // 并非原子词项、陈述
+            !compound.is_atom(),
+            !compound.is_statement(),
+            // 拷贝，并检查是否相等
+            compound => compound.clone(),
+            // 获取（检查）内容
+            dbg!(compound.get_compound_components()) => @ Some(..),
+        }
     }
 
     /// 测试一个陈述
     fn _test_statement(statement: Term) {
         // 首先得是一个词项
         _test_term(&statement);
-        // 确认是陈述
-        assert!(statement.is_statement());
-        assert_eq!(statement.get_category(), TermCategory::Statement);
-        // 并非原子词项、复合词项
-        assert!(!statement.is_atom());
-        assert!(!statement.is_compound());
-        // 获取（检查）内容
-        show!(statement.get_components());
-        // 拷贝，并检查是否相等
+        asserts! {
+            // 确认是陈述
+            statement.is_statement(),
+            statement.get_category() => Statement,
+            // 并非原子词项、复合词项
+            !statement.is_atom(),
+            !statement.is_compound(),
+            // 拷贝，并检查是否相等
+            statement => statement.clone(),
+            // 获取（检查）内容 | 长度定为`2`
+            dbg!(statement.get_components().len()) => 2,
+        }
     }
 
     /// 有效性测试
@@ -1121,9 +1159,9 @@ mod tests {
         for term in testset {
             // 分类别测试
             match term.get_category() {
-                TermCategory::Atom => _test_atom(term),
-                TermCategory::Compound => _test_compound(term),
-                TermCategory::Statement => _test_statement(term),
+                Atom => _test_atom(term),
+                Compound => _test_compound(term),
+                Statement => _test_statement(term),
             }
         }
     }
@@ -1133,6 +1171,7 @@ mod tests {
     fn test_extract_terms() {
         // 生成测试集
         let testset = generate_term_testset();
+        // 遍历测试集
         for term in testset {
             // 拷贝
             let components = term.get_components();
@@ -1149,9 +1188,11 @@ mod tests {
             // 检验
             if is_image {
                 // 在「占位符位置」加进了占位符
-                assert!(terms.contains(&Placeholder));
-                assert_eq!(terms[image_index], Placeholder);
-                assert_eq!(terms.len(), components_len + 1);
+                asserts! {
+                    terms.contains(&Placeholder),
+                    terms[image_index] => Placeholder
+                    terms.len() => components_len + 1
+                }
                 for i in 0..image_index {
                     assert_eq!(terms[i], components_cloned[i])
                 }
