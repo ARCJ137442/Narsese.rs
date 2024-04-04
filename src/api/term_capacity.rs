@@ -4,7 +4,8 @@
 
 /// 词项容量
 /// * 🎯在「容纳性」（可包含的词项数目）上对词项快速分类
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// * 📌排序
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TermCapacity {
     /// 原子
     Atom,
@@ -34,20 +35,6 @@ impl TermCapacity {
             BinaryVec | BinarySet => 2,
             Vec | Set => 3,
         }
-    }
-}
-
-/// 实现/偏序关系 | 通过「基数」比较
-/// * 🚩基于[`Ord::cmp`]实现[`PartialOrd::partial_cmp`]
-impl PartialOrd for TermCapacity {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-/// 实现/全序关系 | 通过「基数」比较
-impl Ord for TermCapacity {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.base_num().cmp(&other.base_num())
     }
 }
 
@@ -103,10 +90,11 @@ pub trait GetCapacity {
 #[cfg(test)]
 mod test {
     use super::*;
-    use util::asserts;
+    use util::{asserts, for_in_ifs};
 
     /// 测试/全序关系
     /// * 仅仅是大体上的关系，并不能根据「大小」锁定
+    /// * 📌确保「基数小⇒整体小」
     #[test]
     fn test_ord() {
         // 基数
@@ -119,12 +107,23 @@ mod test {
             Vec.base_num() => 3
         }
         // 大小
+        // ! 不能直接使用运算符，特别指定`.base_num()`
         asserts! {
-            Atom == Unary // 1 = 1
-            Unary < BinarySet // 1 < 2
-            BinarySet == BinaryVec // 2 = 2
-            BinaryVec < Set // 2 < 3
-            Set == Vec // 3 = 3
+            Atom.base_num() == Unary.base_num() // 1 `=` 1
+            BinarySet.base_num() == BinaryVec.base_num() // 2 `=` 2
+            Set.base_num() == Vec.base_num() // 3 `=` 3
+            Unary.base_num() < BinarySet.base_num() // 1 < 2
+            BinaryVec.base_num() < Set.base_num() // 2 < 3
+        }
+
+        // 测试「保向性」：基数小⇒自身小
+        let types = [Atom, Unary, BinarySet, BinaryVec, Set, Vec];
+        // 用类似Python列表生成式的方式遍历测试用例
+        for_in_ifs! {
+            // 要么基数不小，要么自身小
+            {assert!(x.base_num() >= y.base_num() || x < y)}
+            for x in (types)
+            for y in (types)
         }
     }
 }

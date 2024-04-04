@@ -1,6 +1,9 @@
+# 📝【2024-04-05 00:34:02】crates.io中有过**用中文发布crate**的先例
+# * 🔗参考：<https://zhuanlan.zhihu.com/p/683100697>
+
 [package]
 name = "narsese"
-version = "0.12.2"
+version = "0.12.3"
 edition = "2021"
 description = """
 Rust support for Narsese
