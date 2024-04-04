@@ -2,18 +2,22 @@
 
 use super::NarseseFormat;
 use crate::{
-    api::{FloatPrecision, GetBudget, GetStamp, GetTerm, GetTruth, UIntPrecision},
+    api::{
+        FloatPrecision, FormatTo, GetBudget, GetPunctuation, GetStamp, GetTerm, GetTruth,
+        UIntPrecision,
+    },
     conversion::string::common_narsese_templates::*,
     enum_narsese::*,
 };
 use util::*;
 
 /// 实现：转换
+/// * 🚩【2024-04-05 01:47:08】目前保留方法调用上的兼容性
+///   * 📌类型特定的[`format_term`]等方法调用与`term.format_to`并存
+///   * 📌有利于代码组织紧凑性：相互调用的函数尽可能放在一起
 ///
 /// ! ℹ️单元测试在[`super::formats`]模块中定义
 ///
-/// TODO: ❓实际上可以通过类似[`str::parse`]的方式重构
-/// * 针对不同类型，压缩到一个函数[`format`]？
 impl NarseseFormat<&str> {
     // ! 🚩现在「纯字符串模板」已被提取到`common`模块
 
@@ -295,13 +299,14 @@ impl NarseseFormat<&str> {
 
     /// 总格式化函数/真值
     fn _format_truth(&self, out: &mut String, truth: &Truth) {
+        use Truth::*;
         match truth {
             // 空真值⇒直接为空
-            Truth::Empty => {}
+            Empty => {}
             // 单真值⇒单元素数组
-            Truth::Single(f) => self.format_floats_truth(out, &[*f]),
+            Single(f) => self.format_floats_truth(out, &[*f]),
             // 双真值⇒二元数组
-            Truth::Double(f, c) => self.format_floats_truth(out, &[*f, *c]),
+            Double(f, c) => self.format_floats_truth(out, &[*f, *c]),
         }
     }
 
@@ -321,28 +326,38 @@ impl NarseseFormat<&str> {
         // 括号开始
         out.push_str(self.sentence.stamp_brackets.0);
         // 添加内容
+        use Stamp::*;
         match stamp {
-            Stamp::Past => out.push_str(self.sentence.stamp_past),
-            Stamp::Present => out.push_str(self.sentence.stamp_present),
-            Stamp::Future => out.push_str(self.sentence.stamp_future),
-            Stamp::Fixed(time) => {
+            Past => out.push_str(self.sentence.stamp_past),
+            Present => out.push_str(self.sentence.stamp_present),
+            Future => out.push_str(self.sentence.stamp_future),
+            Fixed(time) => {
                 out.push_str(self.sentence.stamp_fixed);
                 out.push_str(&time.to_string());
             }
-            // * 这里实际上不可能出现
-            Stamp::Eternal => {}
+            // * 这里实际上无需处理：默认为 Eternal
+            Eternal => {}
         }
         // 括号结束
         out.push_str(self.sentence.stamp_brackets.1);
     }
 
+    /// 总格式化函数/标点
+    pub fn format_punctuation(&self, punctuation: &Punctuation) -> String {
+        manipulate!(
+            String::new()
+            => [self._format_punctuation](_, punctuation)
+        )
+    }
+
     /// 格式化函数/标点
-    fn format_punctuation(&self, out: &mut String, sentence: &Sentence) {
-        out.push_str(match sentence {
-            Judgement(..) => self.sentence.punctuation_judgement,
-            Goal(..) => self.sentence.punctuation_goal,
-            Question(..) => self.sentence.punctuation_question,
-            Quest(..) => self.sentence.punctuation_quest,
+    fn _format_punctuation(&self, out: &mut String, punctuation: &Punctuation) {
+        use Punctuation::*;
+        out.push_str(match punctuation {
+            Judgement => self.sentence.punctuation_judgement,
+            Goal => self.sentence.punctuation_goal,
+            Question => self.sentence.punctuation_question,
+            Quest => self.sentence.punctuation_quest,
         })
     }
 
@@ -360,7 +375,7 @@ impl NarseseFormat<&str> {
             // 词项
             &catch_flow!(self._format_term; &sentence.get_term()),
             // 标点
-            &catch_flow!(self.format_punctuation; &sentence),
+            &catch_flow!(self._format_punctuation; &sentence.get_punctuation()),
             // 时间戳
             &catch_flow!(self._format_stamp; &sentence.get_stamp()),
             // 真值 | 默认空真值（对「问题」「请求」而言）
@@ -377,15 +392,16 @@ impl NarseseFormat<&str> {
 
     /// 总格式化函数/预算值
     fn _format_budget(&self, out: &mut String, budget: &Budget) {
+        use Budget::*;
         match budget {
             // 空预算⇒空数组，仅含括弧 // ! 若无括弧，解析器将识别成语句
-            Budget::Empty => self.format_floats_budget(out, &[]),
+            Empty => self.format_floats_budget(out, &[]),
             // 单预算⇒单元素数组
-            Budget::Single(p) => self.format_floats_budget(out, &[*p]),
+            Single(p) => self.format_floats_budget(out, &[*p]),
             // 双预算⇒二元数组
-            Budget::Double(p, d) => self.format_floats_budget(out, &[*p, *d]),
+            Double(p, d) => self.format_floats_budget(out, &[*p, *d]),
             // 三预算⇒三元数组
-            Budget::Triple(p, d, q) => self.format_floats_budget(out, &[*p, *d, *q]),
+            Triple(p, d, q) => self.format_floats_budget(out, &[*p, *d, *q]),
         }
     }
 
@@ -423,7 +439,63 @@ impl NarseseFormat<&str> {
             Narsese::Task(task) => self._format_task(out, task),
         }
     }
+
+    /// 总格式化函数/基于[`FormatTo`]特征
+    pub fn format<'a>(&'a self, from: &impl FormatTo<&'a Self, String>) -> String {
+        from.format_to(self)
+    }
 }
+
+/// 词项的格式化接口
+impl FormatTo<&NarseseFormat<&str>, String> for Term {
+    fn format_to(&self, formatter: &NarseseFormat<&str>) -> String {
+        formatter.format_term(self)
+    }
+}
+
+/// 真值的格式化接口
+impl FormatTo<&NarseseFormat<&str>, String> for Truth {
+    fn format_to(&self, formatter: &NarseseFormat<&str>) -> String {
+        formatter.format_truth(self)
+    }
+}
+
+/// 时间戳的格式化接口
+impl FormatTo<&NarseseFormat<&str>, String> for Stamp {
+    fn format_to(&self, formatter: &NarseseFormat<&str>) -> String {
+        formatter.format_stamp(self)
+    }
+}
+
+/// 标点的格式化接口
+impl FormatTo<&NarseseFormat<&str>, String> for Punctuation {
+    fn format_to(&self, formatter: &NarseseFormat<&str>) -> String {
+        formatter.format_punctuation(self)
+    }
+}
+
+/// 语句的格式化接口
+impl FormatTo<&NarseseFormat<&str>, String> for Sentence {
+    fn format_to(&self, formatter: &NarseseFormat<&str>) -> String {
+        formatter.format_sentence(self)
+    }
+}
+
+/// 预算值的格式化接口
+impl FormatTo<&NarseseFormat<&str>, String> for Budget {
+    fn format_to(&self, formatter: &NarseseFormat<&str>) -> String {
+        formatter.format_budget(self)
+    }
+}
+
+/// 任务的格式化接口
+impl FormatTo<&NarseseFormat<&str>, String> for Task {
+    fn format_to(&self, formatter: &NarseseFormat<&str>) -> String {
+        formatter.format_task(self)
+    }
+}
+
+// * ✅Narsese的格式化接口已自动实现
 
 /// 单元测试
 #[cfg(test)]

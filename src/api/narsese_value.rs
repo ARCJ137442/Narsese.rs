@@ -1,7 +1,7 @@
 //! 定义集成「词项/语句/任务」的通用Narsese枚举
 //! * 🎯提供「与具体实现无关」的Narsese数据结构表征
 
-use super::{CastToTask, GetTerm, TryCastToSentence};
+use super::{CastToTask, FormatTo, GetTerm, TryCastToSentence};
 use std::io::ErrorKind;
 
 /// 定义「CommonNarsese值」类型
@@ -28,25 +28,25 @@ impl<Term, Sentence, Task> NarseseValue<Term, Sentence, Task> {
     /// 获取名称（简体中文）
     pub(crate) fn type_name(&self) -> &str {
         match self {
-            NarseseValue::Term(..) => "词项",
-            NarseseValue::Sentence(..) => "语句",
-            NarseseValue::Task(..) => "任务",
+            Self::Term(..) => "词项",
+            Self::Sentence(..) => "语句",
+            Self::Task(..) => "任务",
         }
     }
 
     /// 判断是否为词项
     pub fn is_term(&self) -> bool {
-        matches!(self, NarseseValue::Term(..))
+        matches!(self, Self::Term(..))
     }
 
     /// 判断是否为语句
     pub fn is_sentence(&self) -> bool {
-        matches!(self, NarseseValue::Sentence(..))
+        matches!(self, Self::Sentence(..))
     }
 
     /// 判断是否为任务
     pub fn is_task(&self) -> bool {
-        matches!(self, NarseseValue::Task(..))
+        matches!(self, Self::Task(..))
     }
 
     /// 尝试转换到词项
@@ -54,7 +54,7 @@ impl<Term, Sentence, Task> NarseseValue<Term, Sentence, Task> {
     ///   * 若否，则返回错误
     pub fn try_into_term(self) -> Result<Term, std::io::Error> {
         match self {
-            NarseseValue::Term(term) => Ok(term),
+            Self::Term(term) => Ok(term),
             _ => Err(std::io::Error::new(
                 ErrorKind::InvalidData,
                 format!("类型「{}」不匹配，无法转换为词项", self.type_name()),
@@ -67,7 +67,7 @@ impl<Term, Sentence, Task> NarseseValue<Term, Sentence, Task> {
     ///   * 若否，则返回错误
     pub fn try_into_sentence(self) -> Result<Sentence, std::io::Error> {
         match self {
-            NarseseValue::Sentence(sentence) => Ok(sentence),
+            Self::Sentence(sentence) => Ok(sentence),
             _ => Err(std::io::Error::new(
                 ErrorKind::InvalidData,
                 format!("类型「{}」不匹配，无法转换为语句", self.type_name()),
@@ -80,7 +80,7 @@ impl<Term, Sentence, Task> NarseseValue<Term, Sentence, Task> {
     ///   * 若否，则返回错误
     pub fn try_into_task(self) -> Result<Task, std::io::Error> {
         match self {
-            NarseseValue::Task(task) => Ok(task),
+            Self::Task(task) => Ok(task),
             _ => Err(std::io::Error::new(
                 ErrorKind::InvalidData,
                 format!("类型「{}」不匹配，无法转换为任务", self.type_name()),
@@ -96,9 +96,9 @@ impl<Term, Sentence, Task> NarseseValue<Term, Sentence, Task> {
     {
         match self {
             // 一般的「任务」：直接解包
-            NarseseValue::Task(task) => Ok(task),
+            Self::Task(task) => Ok(task),
             // 语句：自动转换成任务
-            NarseseValue::Sentence(sentence) => Ok(sentence.cast_to_task()),
+            Self::Sentence(sentence) => Ok(sentence.cast_to_task()),
             // 其他类型：报错
             _ => Err(std::io::Error::new(
                 ErrorKind::InvalidData,
@@ -116,19 +116,19 @@ impl<Term, Sentence, Task> NarseseValue<Term, Sentence, Task> {
     ///   * 📌编译器无法断定「词项」「语句」「任务」三者**一定不相同**
     ///   * ❌因此可能会有「重复实现」⇒报错「冲突的实现」
     pub fn from_term(value: Term) -> Self {
-        NarseseValue::Term(value)
+        Self::Term(value)
     }
 
     /// 从语句到Narsese值
     /// * 🚩直接打包
     pub fn from_sentence(value: Sentence) -> Self {
-        NarseseValue::Sentence(value)
+        Self::Sentence(value)
     }
 
     /// 从任务到Narsese值
     /// * 🚩直接打包
     pub fn from_task(value: Task) -> Self {
-        NarseseValue::Task(value)
+        Self::Task(value)
     }
 }
 
@@ -143,15 +143,15 @@ where
     ) -> Result<NarseseValue<Term, Sentence, Task>, NarseseValue<Term, Sentence, Task>> {
         match self {
             // 词项⇒总是失败
-            NarseseValue::Term(..) => Err(self),
+            Self::Term(..) => Err(self),
             // 语句⇒总是成功
-            NarseseValue::Sentence(..) => Ok(self),
+            Self::Sentence(..) => Ok(self),
             // 任务⇒尝试单独转换
-            NarseseValue::Task(task) => match task.try_cast_to_sentence() {
+            Self::Task(task) => match task.try_cast_to_sentence() {
                 // 单独转换成功⇒作为语句封装
-                Ok(sentence) => Ok(NarseseValue::Sentence(sentence)),
+                Ok(sentence) => Ok(Self::Sentence(sentence)),
                 // 单独转换失败⇒原样返回
-                Err(task) => Err(NarseseValue::Task(task)),
+                Err(task) => Err(Self::Task(task)),
             },
         }
     }
@@ -167,11 +167,39 @@ where
     fn get_term(&self) -> &Term {
         match self {
             // 词项⇒总是失败
-            NarseseValue::Term(term) => term,
+            Self::Term(term) => term,
             // 语句⇒总是成功
-            NarseseValue::Sentence(sentence) => sentence.get_term(),
+            Self::Sentence(sentence) => sentence.get_term(),
             // 任务⇒尝试单独转换
-            NarseseValue::Task(task) => task.get_term(),
+            Self::Task(task) => task.get_term(),
+        }
+    }
+}
+
+// ! ❌不适宜对`NarseseValue`实现`FromParse`特征
+// * 📌解析可能有多种结果，即便可以最后转换成Narsese值，最初也无法选择「向哪个子类型解析」
+// impl<'a, Term, Sentence, Task, Parser> FromParse<&'a str, Parser>
+// for NarseseValue<Term, Sentence, Task>
+// where
+//     Term: FromParse<&'a str, Parser>,
+//     Sentence: FromParse<&'a str, Parser>,
+//     Task: FromParse<&'a str, Parser>
+
+/// 为「三种子类都实现『格式化』」的「Narsese值」自动实现「格式化到」特征
+/// * 📝格式化可以通过「变种分派」的方式批量实现
+impl<Term, Sentence, Task, Formatter, Target> FormatTo<Formatter, Target>
+    for NarseseValue<Term, Sentence, Task>
+where
+    Term: FormatTo<Formatter, Target>,
+    Sentence: FormatTo<Formatter, Target>,
+    Task: FormatTo<Formatter, Target>,
+{
+    fn format_to(&self, formatter: Formatter) -> Target {
+        // 根据自身变种转发
+        match self {
+            Self::Term(term) => term.format_to(formatter),
+            Self::Sentence(sentence) => sentence.format_to(formatter),
+            Self::Task(task) => task.format_to(formatter),
         }
     }
 }

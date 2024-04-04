@@ -23,4 +23,6 @@ util::pub_mod_and_pub_use! {
     term_category
     // API「词项容量」
     term_capacity
+    // 格式化
+    format
 }

@@ -4,7 +4,7 @@ use util::join_to;
 
 use super::NarseseFormat;
 use crate::{
-    api::{GetBudget, GetTerm},
+    api::{FormatTo, GetBudget, GetTerm},
     conversion::string::common_narsese_templates::*,
     lexical::{Budget, Narsese, Sentence, Task, Term, Truth},
     util::{add_space_if_necessary_and_flush_buffer, catch_flow},
@@ -163,7 +163,52 @@ impl NarseseFormat {
     pub fn format_narsese(&self, narsese: &Narsese) -> String {
         catch_flow!(self._format_narsese; narsese)
     }
+
+    /// 总格式化函数/基于[`FormatTo`]特征
+    pub fn format<'a>(&'a self, from: &impl FormatTo<&'a Self, String>) -> String {
+        from.format_to(self)
+    }
 }
+
+/// 词项的格式化接口
+impl FormatTo<&NarseseFormat, String> for Term {
+    fn format_to(&self, formatter: &NarseseFormat) -> String {
+        formatter.format_term(self)
+    }
+}
+
+/// 真值的格式化接口
+/// * ⚠️【2024-04-05 02:29:09】目前实际上是「字符串数组」而非独立的类型
+impl FormatTo<&NarseseFormat, String> for Truth {
+    fn format_to(&self, formatter: &NarseseFormat) -> String {
+        formatter.format_truth(self)
+    }
+}
+
+/// 语句的格式化接口
+impl FormatTo<&NarseseFormat, String> for Sentence {
+    fn format_to(&self, formatter: &NarseseFormat) -> String {
+        formatter.format_sentence(self)
+    }
+}
+
+// /// 预算值的格式化接口
+// /// * ⚠️【2024-04-05 02:29:09】目前实际上是「字符串数组」
+// ///   * 🚩故与「真值」冲突，不再独立实现
+// impl FormatTo<&NarseseFormat, String> for Budget {
+//     fn format_to(&self, formatter: &NarseseFormat) -> String {
+//         formatter.format_budget(self)
+//     }
+// }
+
+/// 任务的格式化接口
+impl FormatTo<&NarseseFormat, String> for Task {
+    fn format_to(&self, formatter: &NarseseFormat) -> String {
+        formatter.format_task(self)
+    }
+}
+
+// * ✅Narsese的格式化接口已自动实现
 
 /// 单元测试
 #[cfg(test)]
