@@ -225,6 +225,7 @@ fn is_atom_identifier(c: char) -> bool {
 /// * 📌【2024-03-17 11:00:17】现在对「\【字母串】」形式的LaTeX文本**强制要求后缀**`{}`以便实现「空格无关」
 ///   * ⚠️这可能会影响到「LaTeX→Narsese」的语法，但**LaTeX Narsese语法本身就是【面向输出】而非【面向解析】的**
 ///   * ℹ️LaTeX扩展本身不会有多少「需要由此转换成Narsese」的场景
+/// * 🆕更新@2024-04-05：时序系词与时态由「前缀竖杠」变为「中缀竖杠」
 pub fn create_format_latex() -> NarseseFormat {
     NarseseFormat {
         space: NarseseFormatSpace {
@@ -286,9 +287,9 @@ pub fn create_format_latex() -> NarseseFormat {
                 r"\circ\!\!\!\rightarrow{}" // 实例
                 r"\rightarrow\!\!\!\circ{}" // 属性
                 r"\circ\!\!\!\rightarrow\!\!\!\circ{}" // 实例属性
-                r"/\!\!\!\Rightarrow{}" // 预测性蕴含
-                r"|\!\!\!\Rightarrow{}" // 并发性蕴含
-                r"\backslash\!\!\!\Rightarrow{}" // 回顾性蕴含
+                r"/\!\!\!\!\!\Rightarrow{}" // 预测性蕴含
+                r"|\!\!\!\!\!\Rightarrow{}" // 并发性蕴含
+                r"\backslash\!\!\!\!\!\Rightarrow{}" // 回顾性蕴含
                 r"/\!\!\!\Leftrightarrow{}" // 预测性等价
                 r"|\!\!\!\Leftrightarrow{}" // 并发性等价
                 r"\backslash\!\!\!\Leftrightarrow{}" // 回顾性等价
@@ -306,9 +307,9 @@ pub fn create_format_latex() -> NarseseFormat {
             // 时间戳
             stamp_brackets: suffix_match_dict_pair!(
                 // * 🚩空前缀匹配
-                "" => r"\backslash\!\!\!\Rightarrow{}" // 过去
-                "" => r"|\!\!\!\Rightarrow{}" // 现在
-                "" => r"/\!\!\!\Rightarrow{}" // 将来
+                "" => r"\backslash\!\!\!\!\!\Rightarrow{}" // 过去
+                "" => r"|\!\!\!\!\!\Rightarrow{}" // 现在
+                "" => r"/\!\!\!\!\!\Rightarrow{}" // 将来
                 // !【2024-03-17 10:07:16】没有后缀，只以前缀区分
                 "t=" => "", // ? LaTeX语法未知
             ),

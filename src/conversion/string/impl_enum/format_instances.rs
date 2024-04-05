@@ -9,6 +9,7 @@ use super::format::*;
 /// * 来源：文档 `NARS ASCII Input.pdf`
 /// * 另可参考：<https://github.com/opennars/opennars/wiki/Narsese-Grammar-(Input-Output-Format)>
 /// * 可用于打印Narsese的默认形式
+/// * 🆕更新@2024-04-05：时序系词与时态由「前缀竖杠」变为「中缀竖杠」
 pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
     space: NarseseFormatSpace {
         parse: " ",        // ! 解析时忽略空格
@@ -126,9 +127,9 @@ pub const FORMAT_LATEX: NarseseFormat<&str> = NarseseFormat {
         copula_instance: r"\circ\!\!\!\rightarrow{}",
         copula_property: r"\rightarrow\!\!\!\circ{}",
         copula_instance_property: r"\circ\!\!\!\rightarrow\!\!\!\circ{}",
-        copula_implication_predictive: r"/\!\!\!\Rightarrow{}",
-        copula_implication_concurrent: r"|\!\!\!\Rightarrow{}",
-        copula_implication_retrospective: r"\backslash\!\!\!\Rightarrow{}",
+        copula_implication_predictive: r"/\!\!\!\!\!\Rightarrow{}",
+        copula_implication_concurrent: r"|\!\!\!\!\!\Rightarrow{}",
+        copula_implication_retrospective: r"\backslash\!\!\!\!\!\Rightarrow{}",
         copula_equivalence_predictive: r"/\!\!\!\Leftrightarrow{}",
         copula_equivalence_concurrent: r"|\!\!\!\Leftrightarrow{}",
         copula_equivalence_retrospective: r"\backslash\!\!\!\Leftrightarrow{}",
@@ -139,9 +140,9 @@ pub const FORMAT_LATEX: NarseseFormat<&str> = NarseseFormat {
         punctuation_question: "?",
         punctuation_quest: "¿", // 【20230806 23:46:18】倒问号没有对应的LaTeX。。。
         stamp_brackets: ("", ""), // !【2024-02-25 16:31:38】此处时态没括号。。
-        stamp_past: r"\backslash\!\!\!\Rightarrow{}",
-        stamp_present: r"|\!\!\!\Rightarrow{}",
-        stamp_future: r"/\!\!\!\Rightarrow{}",
+        stamp_past: r"\backslash\!\!\!\!\!\Rightarrow{}",
+        stamp_present: r"|\!\!\!\!\!\Rightarrow{}",
+        stamp_future: r"/\!\!\!\!\!\Rightarrow{}",
         stamp_fixed: "t=",                            // ? LaTeX语法未知
         truth_brackets: (r"\langle{}", r"\rangle{}"), // ! 【2024-03-18 23:58:02】末尾使用空参数集分隔
         truth_separator: ",",

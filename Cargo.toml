@@ -3,7 +3,7 @@
 
 [package]
 name = "narsese"
-version = "0.13.0"
+version = "0.13.1"
 edition = "2021"
 description = """
 Rust support for Narsese
