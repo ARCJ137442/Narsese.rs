@@ -500,7 +500,6 @@ impl FormatTo<&NarseseFormat<&str>, String> for Task {
 /// 单元测试
 #[cfg(test)]
 mod test {
-
     use super::{
         super::{format_instances::*, tests::_sample_task},
         *,

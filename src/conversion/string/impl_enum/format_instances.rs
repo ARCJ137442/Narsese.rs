@@ -9,7 +9,6 @@ use super::format::*;
 /// * 来源：文档 `NARS ASCII Input.pdf`
 /// * 另可参考：<https://github.com/opennars/opennars/wiki/Narsese-Grammar-(Input-Output-Format)>
 /// * 可用于打印Narsese的默认形式
-/// * 🆕更新@2024-04-05：时序系词与时态由「前缀竖杠」变为「中缀竖杠」
 pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
     space: NarseseFormatSpace {
         parse: " ",        // ! 解析时忽略空格
@@ -83,6 +82,7 @@ pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
 /// * 来源：文档 `NARS ASCII Input.pdf`
 /// * 【20230809 10:22:34】注：暂未找到官方格式模板，此仅基于个人观察
 /// * 【20230811 0:26:55】不能很好地兼容「二元运算」表达（需要更专业者优化）
+/// * 🆕更新@2024-04-05：时序系词与时态由「前缀竖杠」变为「中缀竖杠」
 pub const FORMAT_LATEX: NarseseFormat<&str> = NarseseFormat {
     space: NarseseFormatSpace {
         parse: " ",        // ! 解析时可跳过空格
@@ -224,6 +224,8 @@ pub const FORMAT_HAN: NarseseFormat<&str> = NarseseFormat {
     },
     // * 🚩【2024-03-28 14:33:47】现弃用「关键字截断」机制，直接使用「系词前缀匹配」判断
 };
+
+// ! ❌有关Typst的尝试失败：其原子词项需要包括引号，但目前「词项前缀」的模型无法满足此要求
 
 /// 单元测试
 #[cfg(test)]

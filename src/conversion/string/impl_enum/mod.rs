@@ -34,8 +34,7 @@ pub mod shortcuts {
 
 /// 集成测试@枚举Narsese/字符串解析&格式化
 #[cfg(test)]
-mod tests {
-
+pub mod tests {
     use self::parser::NarseseResult;
     use super::{format_instances::*, *};
     use crate::enum_narsese::{Budget, Sentence, Stamp, Task, Term, Truth};

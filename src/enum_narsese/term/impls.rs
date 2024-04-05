@@ -916,7 +916,7 @@ impl ExtractTerms for Term {
 
 /// 单元测试 | 测试集、属性…
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use util::*;
     use TermCategory::*;
