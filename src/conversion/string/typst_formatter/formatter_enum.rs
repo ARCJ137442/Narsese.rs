@@ -5,8 +5,8 @@
 use super::definition::*;
 use crate::{
     api::{
-        ExtractTerms, FloatPrecision, FormatTo, GetBudget, GetCategory, GetPunctuation, GetStamp,
-        GetTerm, GetTruth, TermCategory,
+        FloatPrecision, FormatTo, GetBudget, GetCategory, GetPunctuation, GetStamp, GetTerm,
+        GetTruth, TermCategory,
     },
     conversion::string::{template_atom, template_components, template_statement},
     enum_narsese::{Budget, Punctuation, Sentence, Stamp, Task, Term, Truth},
@@ -140,7 +140,9 @@ impl FormatterTypst {
                 out,
                 brackets_str,
                 feature_str,
-                term.clone().extract_terms().map(|t| self.format(&t)),
+                term.get_components_including_placeholder()
+                    .into_iter()
+                    .map(|t| self.format(t)),
                 SEPARATOR_COMPOUND,
             ),
             // 陈述

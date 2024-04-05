@@ -543,6 +543,26 @@ impl Term {
     /// * 📌原子词项⇒返回自身
     /// * 📌陈述⇒返回主谓词
     /// * 📝Rust会自动根据返回类型，为变量加引用/解引用
+    /// * ⚠️**会**返回像的占位符
+    ///   * 🚩对「像」采用新的「像迭代器」，而对其它fallback到[`Self::get_components`]
+    pub fn get_components_including_placeholder(&self) -> Vec<&Term> {
+        match self {
+            // 像⇒返回带像占位符的「完整词项列表」
+            // * 🚩创建一个「像迭代器」然后立即消耗它
+            ImageExtension(i, vec) | ImageIntension(i, vec) => {
+                ImageIterator::new(vec.iter(), *i).collect::<Vec<_>>()
+            }
+            // 其它⇒与[`get_components`]结果相同
+            _ => self.get_components(),
+        }
+    }
+
+    /// 获取词项作为复合词项的「所有词项」
+    /// * 📌均返回不可变引用
+    /// * 📌原子词项⇒返回自身
+    /// * 📌陈述⇒返回主谓词
+    /// * 📝Rust会自动根据返回类型，为变量加引用/解引用
+    /// * ⚠️不会返回像的占位符
     pub fn get_components(&self) -> Vec<&Term> {
         match self {
             // 原子词项⇒返回自身
@@ -590,6 +610,7 @@ impl Term {
     /// 获取词项作为复合词项的「所有词项」
     /// * 📌仅对复合词项起效
     ///   * ⚠️其它情况返回[`None`]
+    #[inline]
     pub fn get_compound_components(&self) -> Option<Vec<&Term>> {
         match self.is_compound() {
             true => Some(self.get_components()),
@@ -601,7 +622,7 @@ impl Term {
 /// 实现/修改
 impl Term {
     /// 复合词项：向组分中追加词项
-    /// * �原子词项|陈述|一元复合词项|二元复合词项⇒失败
+    /// * 📌原子词项|陈述|一元复合词项|二元复合词项⇒失败
     /// * 📌陈述⇒返回主谓词
     /// * 📌复合词项⇒追加词项
     /// * ⚠️对「像」不做特殊处理
@@ -859,6 +880,8 @@ where
 }
 
 /// 实现/提取内部元素
+/// * 🚩获取自身所有权，并复用内部元素
+///   * ⚠️与[`Term::get_components_including_placeholder`]+`.into_iter().cloned()`有本质区别
 impl ExtractTerms for Term {
     type Term = Term;
 
@@ -1174,7 +1197,7 @@ pub mod tests {
         // 遍历测试集
         for term in testset {
             // 拷贝
-            let components = term.get_components();
+            let components = term.get_components_including_placeholder();
             let components_len = components.len();
             let components_cloned = components.into_iter().cloned().collect::<Vec<_>>();
             // 提取
@@ -1191,21 +1214,13 @@ pub mod tests {
                 asserts! {
                     terms.contains(&Placeholder),
                     terms[image_index] => Placeholder
-                    terms.len() => components_len + 1
+                    terms.len() => components_len
                 }
-                for i in 0..image_index {
-                    assert_eq!(terms[i], components_cloned[i])
-                }
-                // 加进占位符后，有所偏移
-                for i in image_index..components_len {
-                    assert_eq!(terms[i + 1], components_cloned[i])
-                }
-            } else {
-                // 元素一致
-                assert_eq!(terms.len(), components_len);
-                for i in 0..components_len {
-                    assert_eq!(terms[i], components_cloned[i])
-                }
+            }
+            // 元素一致
+            assert_eq!(terms.len(), components_len);
+            for i in 0..components_len {
+                assert_eq!(terms[i], components_cloned[i])
             }
         }
     }
