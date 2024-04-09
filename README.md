@@ -12,13 +12,13 @@
 
 ## 安装
 
-（最后更新：2024-03-29）
+（最后更新：2024-04-10）
 
-作为Rust库，目前可在`Cargo.toml`中添加依赖：
+作为已发布于[crates.io](https://crates.io/)的Rust库，可直接在`Cargo.toml`中添加依赖：
 
 ```toml
 [dependencies.narsese]
-git = "https://github.com/ARCJ137442/Narsese.rs"
+version = "0" # 请按需选择合适的最新版本，必要时参考crates.io的对应侧边栏
 features = ["bundled"] # 启用所有特性，包括「枚举Narsese」和「词法Narsese」
 ```
 
