@@ -5,7 +5,7 @@
 //! * 单真值
 //! * 双真值
 
-use crate::api::hyper_parameters::*;
+use crate::api::{hyper_parameters::*, EvidentValue, EvidentValueMut};
 use util::ZeroOneFloat;
 
 /// 使用枚举表示真值
@@ -71,10 +71,20 @@ impl Truth {
     }
 }
 
-/// 实现/属性
-impl Truth {
+/// 实现/证据值
+/// * 🚩用于统一「真值」与「欲望值」
+/// * 🎯为「[证据值](EvidenceValue)」作示范
+///
+/// # Panics
+///
+/// ! ⚠️若读取到「空真值」「单真值的信度」，会导致「尝试获取缺省的值」的panic
+/// * ❗故因此，不建议在具体NARS实现中使用
+impl EvidentValue<FloatPrecision> for Truth {
     /// 获取「频率」
-    pub fn frequency(&self) -> FloatPrecision {
+    ///
+    /// # Panics
+    /// ! ⚠️若读取到「空真值」会导致「尝试获取缺省的值」的panic
+    fn get_frequency(&self) -> FloatPrecision {
         match self {
             Truth::Single(frequency) | Truth::Double(frequency, _) => *frequency,
             _ => panic!("尝试获取缺省的值"),
@@ -82,13 +92,36 @@ impl Truth {
     }
 
     /// 获取「信度」
-    pub fn confidence(&self) -> FloatPrecision {
+    ///
+    /// # Panics
+    /// ! ⚠️若读取到「空真值」会导致「尝试获取缺省的值」的panic
+    fn get_confidence(&self) -> FloatPrecision {
         match self {
             Truth::Double(_, confidence) => *confidence,
             _ => panic!("尝试获取缺省的值"),
         }
     }
+}
 
+/// 实现/可变证据值
+impl EvidentValueMut<FloatPrecision> for Truth {
+    fn set_frequency(&mut self, new_f: &FloatPrecision) {
+        match self {
+            Truth::Single(frequency) | Truth::Double(frequency, _) => *frequency = *new_f,
+            _ => panic!("尝试获取缺省的值"),
+        }
+    }
+
+    fn set_confidence(&mut self, new_c: &FloatPrecision) {
+        match self {
+            Truth::Double(_, confidence) => *confidence = *new_c,
+            _ => panic!("尝试获取缺省的值"),
+        }
+    }
+}
+
+/// 实现/属性（短别名）
+impl Truth {
     /// 【辅助】用`f`快速获取「频率」
     pub fn f(&self) -> FloatPrecision {
         self.frequency()

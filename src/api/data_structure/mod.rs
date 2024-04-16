@@ -10,4 +10,6 @@ util::pub_mod_and_pub_use! {
     narsese_value
     // 词项
     term
+    // 证据值
+    evidence_value
 }
