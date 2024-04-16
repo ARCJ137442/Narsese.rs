@@ -9,20 +9,8 @@
 util::pub_mod_and_pub_use! {
     // 超参数
     hyper_parameters
-    // API「解析」
-    parse
-    // API「获取内部元素」
-    get_inner
-    // API「抽象Narsese值」
-    narsese_value
-    // 语句转换 | 语句-任务 兼容
-    sentence_cast
-    // API「提取词项中的元素」
-    extract_terms
-    // API「词项类别」
-    term_category
-    // API「词项容量」
-    term_capacity
-    // 格式化
-    format
+    // 数据结构
+    data_structure
+    // 转换
+    conversion
 }
