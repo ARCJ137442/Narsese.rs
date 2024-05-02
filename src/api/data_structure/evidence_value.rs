@@ -10,12 +10,22 @@ use std::ops::{Add, Div, Mul, Sub};
 /// * 🎯统一其作为「0-1值」的特征
 pub trait EvidentNumber:
     Sized
+    // ! ❌【2024-05-02 17:25:42】无法将`Rhs`类参定为`&Self`：引用生命周期问题
+    // * 🚩因此暂且直接使用值类型
     + Add<Output = Self>
     + Sub<Output = Self>
     + Mul<Output = Self>
     + Div<Output = Self>
-    + PartialEq
+    + PartialEq // 实现判等，但不是「完全相等」（兼容「浮点数」本身）
+    + Copy // * 🚩对上述四则运算的妥协：需要频繁采取「移动语义」并伴随着值赋值 | 这亦要求「尽可能让拷贝成本低」
+    /*  + TryFrom<Float, Error = Self::TryFromError> */ // ! ←↓❌【2024-05-02 17:31:34】无法统一精度，故不使用
 {
+    // /// * 📌此处对[`Error`](std::fmt::Error)的需求仅仅在于[`Result::unwrap`]需要`Error: Debug`
+    // /// * 🎯【2024-05-02 12:17:19】引入以兼容[`TryFrom`]的[`try_from`](TryFrom::try_from)
+    // type TryFromError: std::error::Error;
+
+    // 基础：合法性检查相关 //
+
     /// 判断其是否合法
     /// * 🎯用于验证是否具有「合法性」
     ///   * 📄一般的「频率」「信度」均处在 0≤x≤1 的范围
@@ -50,11 +60,32 @@ pub trait EvidentNumber:
         // * 📝这里直接使用`unwrap`即可：报错信息会写「called `Result::unwrap()` on an `Err` value: ...」
         self.try_validate().unwrap()
     }
+
+    // 基础：数值相关 //
+
+    /// 常数「0」
+    /// * 🎯用于各种「逻辑计算」的常量
+    ///   * 📄逻辑或「多项加和」的起始量
+    fn zero() -> Self;
+
+    /// 常数「1」
+    /// * 🎯用于各种「逻辑计算」的常量
+    ///   * 📄逻辑或「多项加和」的起始量
+    fn one() -> Self;
+
+    /// n次开根
+    /// * 🎯用于NAL的「几何均值」（n次开根）
+    fn root(self, n: usize) -> Self;
+
+    // ! ❌【2024-05-02 18:00:33】暂且不追加对「与NAL直接相关的数值运算」的实现要求，只涉及最基本的数学运算
+    // * 📄不直接要求「w2c」和「c2w」（c2w已超出范围）
 }
 
-/// 对浮点数提供默认实现
+/// 对「0-1浮点数」提供默认实现
+/// * ✅已解决「常量0、常量1无法自动提供」的问题：使用`From<FloatPrecision>`自动获取
 mod impl_num_float {
     use super::*;
+    use crate::api::FloatPrecision;
     use util::floats::ZeroOneFloat;
 
     /// 对所有「0-1 浮点数」批量实现「证据数值」
@@ -69,18 +100,41 @@ mod impl_num_float {
             + Sub<Output = Self>
             + Mul<Output = Self>
             + Div<Output = Self>
-            + PartialEq,
+            + PartialEq
+            + Copy
+            + PartialOrd<Self>
+            + From<FloatPrecision>
+            + Into<FloatPrecision>,
     {
+        #[inline(always)]
         fn is_valid(&self) -> bool {
             self.is_in_01()
         }
 
+        #[inline(always)]
         fn try_validate(&self) -> Result<&Self, &str> {
             self.try_validate_01()
         }
 
+        #[inline(always)]
         fn validate(&self) -> &Self {
             self.validate_01()
+        }
+
+        #[inline(always)]
+        fn zero() -> Self {
+            Self::from(0.0)
+        }
+
+        #[inline(always)]
+        fn one() -> Self {
+            Self::from(1.0)
+        }
+
+        #[inline(always)]
+        fn root(self, n: usize) -> Self {
+            // * 🚩通过「转换为标准浮点数」默认支持「n次开根」
+            Self::from(self.into().powf(1.0 / (n as FloatPrecision)))
         }
     }
 }
@@ -180,7 +234,7 @@ impl<V: EvidentNumber + Copy> EvidentValue<V> for (V, V) {
 #[cfg(test)]
 mod test {
     use super::*;
-    use util::{asserts, for_in_ifs, manipulate, pipe};
+    use util::{asserts, for_in_ifs, macro_once, manipulate, pipe};
 
     /// 统一的浮点数类型
     type V = f64;
@@ -236,33 +290,20 @@ mod test {
     /// * 🎯表示在[`EvidentValue`]之外的「w」「w⁺」「w⁻」
     /// * 🎯抽象、可扩展地表征诸如「w2c」的真值函数
     /// * 🚩【2024-04-17 11:29:11】添加[`Copy`]约束以避开所有权问题（所有权🆚简洁度）
-    trait ValueW: Sized + Add<Output = Self> + Div<Output = Self> + Copy {
-        /// 获取其「1」所对应的值
-        fn one() -> Self;
+    trait ValueW: Sized + Add<Output = Self> + Div<Output = Self> + Copy {}
 
-        /// 获取其「0」所对应的值
-        fn zero() -> Self;
-    }
-
-    /// 对浮点数实现「[W值](ValueW)」
-    macro_rules! impl_value_w_for_float {
-        { $($t:ty $(,)?)* } => {
+    macro_once! {
+        /// 对浮点数实现「[W值](ValueW)」
+        macro impl_value_w_for_float($($t:ty)*) {
             $(
                 impl ValueW for $t {
-                    #[inline(always)]
-                    fn one() -> Self {
-                        1.0
-                    }
-
-                    #[inline(always)]
-                    fn zero() -> Self {
-                        0.0
-                    }
                 }
             )*
         }
+        // 32位和64位浮点数
+        f32
+        f64
     }
-    impl_value_w_for_float! { f32, f64 }
 
     /// 测试/真值函数
     /// * 🚩仅用于「原地计算」不在其中创建任何新对象
