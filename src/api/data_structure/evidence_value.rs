@@ -73,6 +73,16 @@ pub trait EvidentNumber:
     ///   * 📄逻辑或「多项加和」的起始量
     fn one() -> Self;
 
+    // /// 常数「0」
+    // /// * 🎯用于各种「逻辑计算」的常量
+    // ///   * 📄逻辑或「多项加和」的起始量
+    // const ZERO: Self;
+
+    // /// 常数「1」
+    // /// * 🎯用于各种「逻辑计算」的常量
+    // ///   * 📄逻辑或「多项加和」的起始量
+    // const ONE: Self;
+
     /// n次开根
     /// * 🎯用于NAL的「几何均值」（n次开根）
     fn root(self, n: usize) -> Self;
@@ -130,6 +140,10 @@ mod impl_num_float {
         fn one() -> Self {
             Self::from(1.0)
         }
+
+        // ! ❌无法真正贯彻「关联常量」的报错：`cannot call non-const fn `<F as std::convert::From<f64>>::from` in constants`
+        // const ZERO: Self = Self::from(0.0);
+        // const ONE: Self = Self::from(1.0);
 
         #[inline(always)]
         fn root(self, n: usize) -> Self {
