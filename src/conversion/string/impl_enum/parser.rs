@@ -1279,20 +1279,6 @@ impl<'a> ParseState<'a, &'a str> {
         Self::ok(term)
     }
 
-    /// 工具函数/判断字符是否能作为「词项名」
-    /// * 🎯用于判断「合法词项名」
-    #[inline(always)]
-    fn is_valid_atom_name(c: char) -> bool {
-        match c {
-            // 特殊：横杠/下划线
-            // //! ↓【2024-02-22 14:46:16】现因需兼顾`<主词-->谓词>`的结构（防止系词中的`-`被消耗），故不再兼容`-`
-            // * 🚩【2024-03-28 14:18:08】现在重新启用对`-`的「原子词项字符兼容」：使用新的「前缀failing匹配」方法
-            '-' | '_' => true,
-            //  否则：判断是否为「字母/数字」
-            _ => c.is_alphabetic() || c.is_numeric(),
-        }
-    }
-
     /// 判断环境位置是否以系词开头
     /// * 🎯兼容 `^go-to` `坐标-5-6`
     /// * 🎯避免`<外延-->内涵>`变成`外延--`、`>`、`内涵`
@@ -1347,7 +1333,7 @@ impl<'a> ParseState<'a, &'a str> {
                 break;
             }
             // 尝试解析
-            match Self::is_valid_atom_name(head_char) {
+            match (self.format.is_valid_atom_name)(head_char) {
                 // 合法词项名字符⇒加入缓冲区&递进
                 true => {
                     // 加入缓冲区
@@ -1737,6 +1723,7 @@ mod tests_parse {
             &format_ascii;
             "word" "_" "$i_var" "#d_var" "?q_var" "+137" "^op"
             "^go-to" // * ←该操作符OpenNARS可解析，而ONA、PyNARS不能
+            "💥" "💭" "📝" "🔑" "🔒" "🤣"
             // //! ↑【2024-02-22 14:46:16】现因需兼顾`<主词-->谓词>`的结构（防止系词中的`-`被消耗），故不再兼容
             // * 🚩【2024-03-28 14:18:08】现在重新启用对`-`的「原子词项字符兼容」：使用新的「前缀failing匹配」方法
         ];

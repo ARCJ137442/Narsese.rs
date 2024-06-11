@@ -199,6 +199,11 @@ pub struct NarseseFormatSpace<Content> {
 ///   * ⚠️只用于存储数据，后续需要载入「解析器状态」
 #[derive(Debug)]
 pub struct NarseseFormat<Content> {
+    /// 判断是否可作为原子词项名称
+    /// * 🚩【2024-06-11 21:00:28】使用静态函数指针
+    ///   * ✅使整个结构体可作为常量，并且允许动态指定
+    pub is_valid_atom_name: &'static fn(char) -> bool,
+
     /// 空白符
     pub space: NarseseFormatSpace<Content>,
 

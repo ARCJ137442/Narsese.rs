@@ -214,8 +214,15 @@ pub fn create_format_ascii() -> NarseseFormat {
     }
 }
 
+/// 简单判断是否为原子词项
+/// * 🚩仅使用一个有限的范围
+/// * ⚠️若使用否定性匹配，一是影响性能，二是过于模糊（像是"wer#-12395%^#$"都会被匹配到）
+/// * 🚩【2024-06-11 20:39:43】对emoji只进行有限度的支持（常见表情符号）
+///   * 🔗参考：https://www.reddit.com/r/rust/comments/kohitu/how_to_check_if_a_char_is_emoji/
+///   * 💭部分表情如"❗"等不受支持；范围不明，可能还会继续扩大
+///   * 🔗另见：https://unicode.org/reports/tr51/index.html#emoji_data
 fn is_atom_identifier(c: char) -> bool {
-    c.is_alphanumeric() || c == '_' || c == '-'
+    c.is_alphanumeric() || c == '_' || c == '-' || c > '\u{1f2ff}' // 常见emoji兼容
 }
 
 /// LaTeX扩展
