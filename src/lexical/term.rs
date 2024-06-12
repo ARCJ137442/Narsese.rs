@@ -37,21 +37,25 @@ pub use Term::*;
 /// 实现
 impl Term {
     /// 位置参数新建原子词项
-    pub fn new_atom(prefix: &str, name: &str) -> Term {
+    pub fn new_atom(prefix: impl Into<String>, name: impl Into<String>) -> Term {
         Term::Atom {
             prefix: prefix.into(),
             name: name.into(),
         }
     }
     /// 位置参数新建复合词项
-    pub fn new_compound(connecter: &str, terms: Vec<Term>) -> Term {
+    pub fn new_compound(connecter: impl Into<String>, terms: Vec<Term>) -> Term {
         Term::Compound {
             connecter: connecter.into(),
             terms,
         }
     }
     /// 位置参数新建集合
-    pub fn new_set(left_bracket: &str, terms: Vec<Term>, right_bracket: &str) -> Term {
+    pub fn new_set(
+        left_bracket: impl Into<String>,
+        terms: Vec<Term>,
+        right_bracket: impl Into<String>,
+    ) -> Term {
         Term::Set {
             left_bracket: left_bracket.into(),
             terms,
@@ -59,7 +63,7 @@ impl Term {
         }
     }
     /// 位置参数新建陈述
-    pub fn new_statement(copula: &str, subject: Term, predicate: Term) -> Term {
+    pub fn new_statement(copula: impl Into<String>, subject: Term, predicate: Term) -> Term {
         Term::Statement {
             copula: copula.into(),
             subject: Box::new(subject),
@@ -67,7 +71,7 @@ impl Term {
         }
     }
     /// 位置参数新建陈述（中缀）
-    pub fn new_statement_infix(subject: Term, copula: &str, predicate: Term) -> Term {
+    pub fn new_statement_infix(subject: Term, copula: impl Into<String>, predicate: Term) -> Term {
         Term::new_statement(copula, subject, predicate)
     }
 }

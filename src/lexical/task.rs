@@ -29,8 +29,8 @@ impl Task {
     pub fn new(
         budget: impl Into<Budget>,
         term: Term,
-        punctuation: &str,
-        stamp: &str,
+        punctuation: impl Into<Punctuation>,
+        stamp: impl Into<Stamp>,
         truth: impl Into<Truth>,
     ) -> Self {
         Self {

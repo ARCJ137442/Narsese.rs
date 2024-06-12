@@ -16,7 +16,7 @@ checksum = "de2fad06f5a0f39772634d0f72d7d114bc31f33b089012692330e914e5f02bea"
 
 [[package]]
 name = "narsese"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "lazy_static",
  "nar_dev_utils",

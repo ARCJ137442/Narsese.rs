@@ -90,8 +90,8 @@ impl Term {
     // 原子词项 //
 
     /// 构造/词语
-    pub fn new_word(word: &str) -> Self {
-        Word(word.to_string())
+    pub fn new_word(word: impl Into<String>) -> Self {
+        Word(word.into())
     }
 
     /// 构造/占位符
@@ -100,18 +100,18 @@ impl Term {
     }
 
     /// 构造/独立变量
-    pub fn new_variable_independent(name: &str) -> Self {
-        VariableIndependent(name.to_string())
+    pub fn new_variable_independent(name: impl Into<String>) -> Self {
+        VariableIndependent(name.into())
     }
 
     /// 构造/非独变量
-    pub fn new_variable_dependent(name: &str) -> Self {
-        VariableDependent(name.to_string())
+    pub fn new_variable_dependent(name: impl Into<String>) -> Self {
+        VariableDependent(name.into())
     }
 
     /// 构造/查询变量
-    pub fn new_variable_query(name: &str) -> Self {
-        VariableQuery(name.to_string())
+    pub fn new_variable_query(name: impl Into<String>) -> Self {
+        VariableQuery(name.into())
     }
 
     /// 构造/间隔
@@ -120,8 +120,8 @@ impl Term {
     }
 
     /// 构造/操作符
-    pub fn new_operator(operator: &str) -> Self {
-        Operator(operator.to_string())
+    pub fn new_operator(operator: impl Into<String>) -> Self {
+        Operator(operator.into())
     }
 
     // 复合词项 //

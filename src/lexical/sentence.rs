@@ -37,7 +37,12 @@ pub struct Sentence {
 /// 自身方法
 impl Sentence {
     /// 从位置参数构造语句
-    pub fn new(term: Term, punctuation: &str, stamp: &str, truth: impl Into<Truth>) -> Self {
+    pub fn new(
+        term: Term,
+        punctuation: impl Into<Punctuation>,
+        stamp: impl Into<Stamp>,
+        truth: impl Into<Truth>,
+    ) -> Self {
         Self {
             term,
             punctuation: punctuation.into(),
