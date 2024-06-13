@@ -1,7 +1,7 @@
 //! 统一定义「预算值」
 
 use crate::api::hyper_parameters::*;
-use util::*;
+use nar_dev_utils::*;
 
 /// 使用枚举表示预算值
 /// * 📌兼容不同的缺省形式
@@ -122,7 +122,7 @@ impl Budget {
 /// 单元测试/预算值
 #[cfg(test)]
 mod tests_budget {
-    use util::fail_tests;
+    use nar_dev_utils::fail_tests;
 
     use super::*;
 

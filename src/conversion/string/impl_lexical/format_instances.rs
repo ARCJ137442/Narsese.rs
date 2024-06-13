@@ -9,7 +9,9 @@
 
 use super::format::*;
 use lazy_static::lazy_static;
-use util::{bi_fix_match_dict_pair, suffix_match_dict_pair, x_fix_match_dict, PrefixMatchDict};
+use nar_dev_utils::{
+    bi_fix_match_dict_pair, suffix_match_dict_pair, x_fix_match_dict, PrefixMatchDict,
+};
 
 /// 工具宏：减少一些`into`
 /// * 🎯元组⇒[`String`]，&str⇒[`String`]
@@ -60,7 +62,7 @@ macro_rules! s {
 // }
 // #[test]
 // fn t() {
-//     use util::show;
+//     use nar_dev_utils::show;
 //     show!(S.clone());
 //     let v = CLJ.get().unwrap();
 //     v();
@@ -475,7 +477,7 @@ mod tests_enum_narsese {
     /// 测试/原子词项标识符
     #[test]
     fn test_is_atom_identifier() {
-        use util::show;
+        use nar_dev_utils::show;
         show!(is_identifier('a'));
         show!(&FORMAT_ASCII.sentence.stamp_brackets);
     }

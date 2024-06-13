@@ -9,7 +9,7 @@ use crate::{
     conversion::string::common_narsese_templates::*,
     enum_narsese::*,
 };
-use util::*;
+use nar_dev_utils::*;
 
 /// 实现：转换
 /// * 🚩【2024-04-05 01:47:08】目前保留方法调用上的兼容性
@@ -504,7 +504,7 @@ mod test {
         super::{format_instances::*, tests::_sample_task},
         *,
     };
-    use util::{f_parallel, show};
+    use nar_dev_utils::{f_parallel, show};
 
     /// 测试其中一个格式
     fn _test(format: NarseseFormat<&str>, name: &str, expected: &str) {

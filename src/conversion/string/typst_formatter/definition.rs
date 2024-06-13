@@ -10,7 +10,7 @@
 //!   * 🎯除用于格式化「枚举Narsese」外，还可被其它 解析器/格式化器 用于更多目的
 
 use crate::api::FormatTo;
-use util::if_return;
+use nar_dev_utils::if_return;
 
 /// Typst格式化器
 /// * 仅作为一个「格式化对者」使用
@@ -181,7 +181,7 @@ pub fn post_process_whitespace(s: &mut String) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use util::{for_in_ifs, manipulate};
+    use nar_dev_utils::{for_in_ifs, manipulate};
 
     /// 单个字串的测试
     fn _test(s: &str) {

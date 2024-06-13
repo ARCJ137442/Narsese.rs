@@ -30,8 +30,8 @@ use crate::{
     api::{FloatPrecision, FromParse, IntPrecision, UIntPrecision},
     enum_narsese::*,
 };
+use nar_dev_utils::*;
 use std::{error::Error, fmt::Display, io::ErrorKind};
-use util::*;
 
 /// 特化「CommonNarsese结果」到「枚举Narsese」版本
 /// * 🎯用于存储「最终被解析出来的CommonNarsese对象」
@@ -1654,7 +1654,7 @@ where
 #[cfg(test)]
 mod tests_parse {
     use super::{super::format_instances::*, *};
-    use util::{f_tensor, fail_tests, show};
+    use nar_dev_utils::{f_tensor, fail_tests, show};
 
     /// 通通用测试/尝试解析并返回错误
     fn __test_parse(format: &NarseseFormat<&str>, input: &str) -> NarseseResult {

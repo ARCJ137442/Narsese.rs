@@ -1,6 +1,6 @@
 //! 词法Narsese
 
-util::mod_and_pub_use! {
+nar_dev_utils::mod_and_pub_use! {
     // 格式
     format
     // 解析器
@@ -39,7 +39,7 @@ mod tests {
         conversion::string::impl_lexical::format_instances::*,
         lexical::{tests::_sample_task_ascii, Narsese, Task},
     };
-    use util::*;
+    use nar_dev_utils::*;
 
     /// 构造一个格式化样本（LaTeX版本）
     /// * ⚠️其中有些部分可能会过时

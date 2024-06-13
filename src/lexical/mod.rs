@@ -10,7 +10,7 @@
 //! Statement("-->", Atom("+", "123"), Compound("\", Atom("_", ""), Atom("$", "1"), Set("{}", Atom("", "SELF"))))
 //! ```
 //!
-//! ! ⚠️【2024-03-20 02:13:50】注意：此模块导出了宏，故无法使用[`util::pub_mod_and_pub_use`]
+//! ! ⚠️【2024-03-20 02:13:50】注意：此模块导出了宏，故无法使用[`nar_dev_utils::pub_mod_and_pub_use`]
 
 use crate::api::NarseseValue;
 
@@ -57,7 +57,7 @@ pub mod shortcuts {
 pub(crate) mod tests {
     use super::*;
     use crate::lexical::shortcuts::*;
-    use util::*;
+    use nar_dev_utils::*;
 
     /// （通用）构造一个格式化样本（ASCII字面量版本）
     /// * 基本涵盖其所属模块的全部内容

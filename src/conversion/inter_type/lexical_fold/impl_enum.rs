@@ -11,7 +11,7 @@ use crate::{
     },
     lexical::{Budget, Narsese, Sentence, Task, Term, Truth},
 };
-use util::*;
+use nar_dev_utils::*;
 
 /// 一个简单的「折叠错误」
 /// * 🚩【2024-03-29 22:54:17】公开可见：外界需要用「折叠结果」作对比

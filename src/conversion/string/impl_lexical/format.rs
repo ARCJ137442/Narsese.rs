@@ -14,7 +14,7 @@
 //!     * 生命周期管理冗杂 | 💭允许牺牲一定性能，专注功能
 //!     * 前缀匹配字典不兼容 | 无法合并「动态字串前缀匹配」与「静态字串前缀匹配」
 
-use util::{
+use nar_dev_utils::{
     BiFixMatchDict, BiFixMatchDictPair, PrefixMatchDict, SuffixMatchDict, SuffixMatchDictPair,
 };
 

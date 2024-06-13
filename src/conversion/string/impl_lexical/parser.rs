@@ -37,8 +37,8 @@ use crate::{
     api::UIntPrecision,
     lexical::{Budget, Narsese, Sentence, Task, Term, Truth},
 };
+use nar_dev_utils::{PrefixMatch, StartsWithStr, SuffixMatch};
 use std::{error::Error, fmt::Display};
-use util::{PrefixMatch, StartsWithStr, SuffixMatch};
 
 /// 词法解析 辅助结构对象
 /// * 🚩放在一个独立的模块内，以便折叠
@@ -941,7 +941,7 @@ mod test {
 
     use super::{super::format_instances::*, *};
     use crate::lexical::shortcuts::*;
-    use util::*;
+    use nar_dev_utils::*;
 
     /// 通通用测试/尝试解析并返回错误
     fn __test_parse(format: &NarseseFormat, input: &str) -> Narsese {

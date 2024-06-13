@@ -7,6 +7,6 @@
 
 // 字符串格式化模板
 // * 进行重导出
-util::pub_mod_and_pub_use! {
+nar_dev_utils::pub_mod_and_pub_use! {
     common_narsese_templates
 }

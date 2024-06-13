@@ -103,7 +103,7 @@ mod tests {
         lexical_nse as nse, lexical_nse_sentence as nse_sentence, lexical_nse_task as nse_task,
         lexical_nse_term as nse_term,
     };
-    use util::*;
+    use nar_dev_utils::*;
 
     /// 测试：快捷构造
     #[test]

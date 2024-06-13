@@ -7,7 +7,7 @@
 use crate::api::NarseseValue;
 
 // 词项/语句/任务
-util::pub_mod_and_pub_use! {
+nar_dev_utils::pub_mod_and_pub_use! {
     // 词项
     term
     // 语句

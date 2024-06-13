@@ -102,7 +102,7 @@ pub trait GetCapacity {
 #[cfg(test)]
 mod test {
     use super::*;
-    use util::{asserts, for_in_ifs};
+    use nar_dev_utils::{asserts, for_in_ifs};
 
     /// 测试/全序关系
     /// * 仅仅是大体上的关系，并不能根据「大小」锁定

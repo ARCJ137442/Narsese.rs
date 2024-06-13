@@ -5,9 +5,8 @@ use crate::{
     api::{FormatTo, GetBudget, GetTerm},
     conversion::string::common_narsese_templates::*,
     lexical::{Budget, Narsese, Sentence, Task, Term, Truth},
-    util::{add_space_if_necessary_and_flush_buffer, catch_flow},
 };
-use util::join_to;
+use nar_dev_utils::{add_space_if_necessary_and_flush_buffer, catch_flow, join_to};
 
 /// 实现：转换
 ///
@@ -219,7 +218,7 @@ mod tests {
         conversion::string::impl_lexical::format_instances::*,
         lexical::tests::_sample_task_ascii as _sample_task,
     };
-    use util::f_parallel;
+    use nar_dev_utils::f_parallel;
 
     /// 测试其中一个格式
     fn _test(format: &NarseseFormat, name: &str, expected: &str) {
@@ -272,7 +271,7 @@ mod tests_with_enum_narsese {
         },
         impl_lexical::{format_instances::*, NarseseFormat},
     };
-    use util::f_parallel;
+    use nar_dev_utils::f_parallel;
 
     /// 测试其中一个格式
     fn _test(

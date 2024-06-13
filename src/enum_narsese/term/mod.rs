@@ -55,7 +55,7 @@
 //! * 扁平化：不使用任何「枚举套枚举」的举措
 //!   * 避免形如`Term::Atom(Atom::Word(/* ... */))`的繁杂
 
-util::mod_and_pub_use! {
+nar_dev_utils::mod_and_pub_use! {
     // 结构
     structs
     // 实现

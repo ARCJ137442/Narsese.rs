@@ -6,7 +6,7 @@
 //! * 双真值
 
 use crate::api::{hyper_parameters::*, EvidentValue, EvidentValueMut};
-use util::ZeroOneFloat;
+use nar_dev_utils::ZeroOneFloat;
 
 /// 使用枚举表示真值
 /// * 📌与目标使用的「预算值」同一
@@ -137,7 +137,7 @@ impl Truth {
 #[cfg(test)]
 mod tests_truth {
     use super::*;
-    use util::fail_tests;
+    use nar_dev_utils::fail_tests;
 
     /// 辅助构造示例
     #[inline(always)]

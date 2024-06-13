@@ -4,13 +4,13 @@ use super::structs::*;
 use crate::api::{
     ExtractTerms, GetCapacity, GetCategory, GetTerm, TermCapacity, TermCategory, UIntPrecision,
 };
+use nar_dev_utils::ResultBoost;
 use std::{
     any::type_name,
     error::Error,
     hash::Hash,
     io::{Error as IoError, ErrorKind as IoErrorKind},
 };
-use util::ResultBoost;
 
 // 实现 //
 
@@ -941,7 +941,7 @@ impl ExtractTerms for Term {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use util::*;
+    use nar_dev_utils::*;
     use TermCategory::*;
 
     /// 辅助宏：快速生成样板词项

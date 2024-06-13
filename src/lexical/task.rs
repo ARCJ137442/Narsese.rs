@@ -158,7 +158,8 @@ impl GetTruth<Truth> for Task {
 #[allow(unused)]
 mod tests {
     use super::*;
-    use crate::{lexical_atom, lexical_truth, util::*};
+    use crate::{lexical_atom, lexical_truth};
+    use nar_dev_utils::*;
 
     #[test]
     fn main() {

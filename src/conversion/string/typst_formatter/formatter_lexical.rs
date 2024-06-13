@@ -16,7 +16,7 @@
 
 // use super::FormatterTypst;
 // use crate::{api::FormatTo, lexical::Term};
-// use util::ToDebug;
+// use nar_dev_utils::ToDebug;
 
 // /// 【占位符】将「需要转换为Typst公式的内容」转换为Typst公式
 // /// * 🚩【2024-04-05 19:45:50】目前仅将其稍作「引用」处理

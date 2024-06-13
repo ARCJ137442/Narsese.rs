@@ -146,7 +146,8 @@ impl GetTruth<Truth> for Sentence {
 #[allow(unused)]
 mod tests {
     use super::*;
-    use crate::{lexical_atom, util::*};
+    use crate::lexical_atom;
+    use nar_dev_utils::*;
 
     #[test]
     fn main() {

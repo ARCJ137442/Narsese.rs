@@ -1,6 +1,6 @@
 //! 枚举Narsese与「字符串转换」有关的模块
 
-util::mod_and_pub_use! {
+nar_dev_utils::mod_and_pub_use! {
     // 格式
     // * 【2024-03-13 14:42:13】最初源自enum_narsese
     format
@@ -38,7 +38,7 @@ pub mod tests {
     use self::parser::NarseseResult;
     use super::{format_instances::*, *};
     use crate::enum_narsese::{Budget, Sentence, Stamp, Task, Term, Truth};
-    use util::{f_tensor, show};
+    use nar_dev_utils::{f_tensor, show};
 
     /// 用于给格式加上「自动解包并格式化内容」功能
     trait FormatResult {

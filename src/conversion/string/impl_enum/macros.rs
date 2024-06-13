@@ -104,7 +104,7 @@ mod tests {
         enum_nse as nse, enum_nse_sentence as nse_sentence, enum_nse_task as nse_task,
         enum_nse_term as nse_term,
     };
-    use util::*;
+    use nar_dev_utils::*;
 
     /// 测试：快捷构造
     #[test]

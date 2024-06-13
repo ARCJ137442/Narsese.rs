@@ -11,7 +11,7 @@ use crate::{
     conversion::string::{template_atom, template_components, template_statement},
     enum_narsese::{Budget, Punctuation, Sentence, Stamp, Task, Term, Truth},
 };
-use util::{manipulate, ToDebug};
+use nar_dev_utils::{manipulate, ToDebug};
 use Term::*;
 use TermCategory::*;
 
@@ -364,7 +364,7 @@ mod tests {
         conversion::string::impl_enum::tests::_sample_task,
         enum_narsese::tests::generate_term_testset, enum_nse as nse,
     };
-    use util::{asserts, f_parallel};
+    use nar_dev_utils::{asserts, f_parallel};
 
     /// 测试一个Narsese值
     /// * 🎯成功格式化

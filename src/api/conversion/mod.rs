@@ -5,7 +5,7 @@
 //!   * 📌数据结构之间的互转
 //!     * 📄词项⇄语句⇄任务
 
-util::pub_mod_and_pub_use! {
+nar_dev_utils::pub_mod_and_pub_use! {
     // API「解析」
     parse
     // API「格式化」

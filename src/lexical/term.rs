@@ -187,7 +187,7 @@ impl ExtractTerms for Term {
 #[allow(unused)]
 pub(crate) mod tests {
     use super::*;
-    use util::{asserts, show};
+    use nar_dev_utils::{asserts, show};
 
     /// 快捷宏
     /// * 🎯减少冗余的`.clone()`

@@ -96,7 +96,7 @@ pub trait EvidentNumber:
 mod impl_num_float {
     use super::*;
     use crate::api::FloatPrecision;
-    use util::floats::ZeroOneFloat;
+    use nar_dev_utils::floats::ZeroOneFloat;
 
     /// 对所有「0-1 浮点数」批量实现「证据数值」
     /// * 🎯对[`f32`]、[`f64`]统一提供默认实现
@@ -248,7 +248,7 @@ impl<V: EvidentNumber + Copy> EvidentValue<V> for (V, V) {
 #[cfg(test)]
 mod test {
     use super::*;
-    use util::{asserts, for_in_ifs, macro_once, manipulate, pipe};
+    use nar_dev_utils::{asserts, for_in_ifs, macro_once, manipulate, pipe};
 
     /// 统一的浮点数类型
     type V = f64;
