@@ -45,7 +45,11 @@ use std::{error::Error, fmt::Display};
 /// * 🚩【2024-06-13 19:42:07】现在直接对外展开，内部模块结构不再直接呈现
 mod structs {
     use super::*;
-    use crate::lexical::{Budget, Punctuation, Stamp, Truth};
+    use crate::{
+        api::NarseseOptions,
+        lexical::{Budget, Punctuation, Stamp, Truth},
+    };
+    use nar_dev_utils::matches_or;
 
     /// 定义「解析环境」：字符数组切片
     pub(super) type ParseEnv<'a> = &'a [char];
@@ -67,27 +71,21 @@ mod structs {
     ///   * 🏷️预算、词项、标点、时间戳、真值
     /// * 📌其内字段均具有所有权
     ///   * ✅均可以被直接拿取，并解析为Narsese值
-    #[derive(Debug, Clone)]
-    pub(super) struct MidParseResult {
-        /// 预算值
-        pub budget: Option<Budget>,
-        /// 词项
-        pub term: Option<Term>,
-        /// 标点
-        pub punctuation: Option<Punctuation>,
-        /// 时间戳
-        pub stamp: Option<Stamp>,
-        /// 真值
-        pub truth: Option<Truth>,
-    }
+    pub(super) type MidParseResult = NarseseOptions<Budget, Term, Punctuation, Stamp, Truth>;
 
+    /// 实现「可选折叠」
+    /// * 📝Rust的`struct`有访问控制，但`impl`没有
+    ///   * 📝同时，Rust对`type`实现方法，影响到的是此「泛型结构特化后的一个具体类型」的功能
+    ///   * ⚠️【2024-06-13 22:13:27】该功能有可能被外界使用，故需要考虑版本兼容性
     impl MidParseResult {
-        /// 从「中间解析结果」到「Narsese值」
+        /// 从「Narsese可选值」到「Narsese值」
         /// * 🎯实现最终的「词项/语句/任务」限制
         /// * ⚠️会直接递交所有权：需要取出其中的值
         /// * 🚩暂且最纯粹地实现为[`Option`]，[`Err`]生成交给调用者
         pub fn fold(self) -> Option<Narsese> {
-            match self {
+            matches_or! {
+                // * 🚩对self进行匹配，只对给定模式返回Some，缺省情况返回None
+                ?self,
                 // 任务：词项+标点+预算值
                 MidParseResult {
                     term: Some(term),
@@ -96,7 +94,7 @@ mod structs {
                     stamp,
                     truth,
                     ..
-                } => Some(Narsese::Task(Task {
+                } => Narsese::Task(Task {
                     budget,
                     sentence: Sentence {
                         term,
@@ -104,7 +102,7 @@ mod structs {
                         stamp: stamp.unwrap_or(Stamp::new()),
                         truth: truth.unwrap_or(Truth::new()),
                     },
-                })),
+                }),
                 // 语句：词项+标点
                 MidParseResult {
                     term: Some(term),
@@ -112,18 +110,16 @@ mod structs {
                     stamp,
                     truth,
                     ..
-                } => Some(Narsese::Sentence(Sentence {
+                } => Narsese::Sentence(Sentence {
                     term,
                     punctuation,
                     stamp: stamp.unwrap_or(Stamp::new()),
                     truth: truth.unwrap_or(Truth::new()),
-                })),
+                }),
                 // 词项
                 MidParseResult {
                     term: Some(term), ..
-                } => Some(Narsese::Term(term)),
-                // 缺省情况
-                _ => None,
+                } => Narsese::Term(term),
             }
         }
     }

@@ -8,6 +8,8 @@
 nar_dev_utils::pub_mod_and_pub_use! {
     // Narsese值
     narsese_value
+    // 部分初始化的Narsese值
+    narsese_options
     // 词项
     term
     // 证据值

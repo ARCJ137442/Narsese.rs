@@ -27,7 +27,7 @@
 
 use super::format::*;
 use crate::{
-    api::{FloatPrecision, FromParse, IntPrecision, UIntPrecision},
+    api::{FloatPrecision, FromParse, IntPrecision, NarseseOptions, UIntPrecision},
     enum_narsese::*,
 };
 use nar_dev_utils::*;
@@ -90,46 +90,7 @@ impl TryFrom<NarseseResult> for Task {
 /// !❌【2024-03-27 21:03:54】[`Truth`]、[`Budget`]不支持[`Eq`]特征
 ///
 /// !❌【2024-03-27 21:03:54】[`Term`]不支持[`PartialOrd`]特征
-#[derive(Debug, Clone, Default, PartialEq)]
-struct MidParseResult {
-    /// 词项
-    term: Option<Term>,
-    /// 真值 @ 语句
-    truth: Option<Truth>,
-    /// 预算值 @ 任务
-    budget: Option<Budget>,
-    /// 时间戳 @ 语句
-    stamp: Option<Stamp>,
-    /// 标点 @ 语句
-    punctuation: Option<Punctuation>,
-}
-
-/// 实现/构造
-///
-/// ! 不直接实现`Into<ParseResult>`：报错信息需要「解析状态」
-impl MidParseResult {
-    /// 构造一个全空的结果
-    pub fn new() -> Self {
-        Self {
-            term: None,
-            truth: None,
-            budget: None,
-            stamp: None,
-            punctuation: None,
-        }
-    }
-    /// 拿走其中所有结果，将自身变回空值
-    /// * 🚩一个个字段[`Option::take`]
-    pub fn take(&mut self) -> Self {
-        Self {
-            term: self.term.take(),
-            truth: self.truth.take(),
-            budget: self.budget.take(),
-            stamp: self.stamp.take(),
-            punctuation: self.punctuation.take(),
-        }
-    }
-}
+type MidParseResult = NarseseOptions<Budget, Term, Punctuation, Stamp, Truth>;
 
 /// 用于表征「解析环境」
 /// * 具有所有权

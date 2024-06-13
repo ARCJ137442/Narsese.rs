@@ -10,13 +10,13 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "nar_dev_utils"
-version = "0.31.0"
+version = "0.32.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de2fad06f5a0f39772634d0f72d7d114bc31f33b089012692330e914e5f02bea"
+checksum = "1bc436754166820e0cdf0dfd147ec5f8faefc6459e65e8b91c4bf5da684e8f85"
 
 [[package]]
 name = "narsese"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "lazy_static",
  "nar_dev_utils",
