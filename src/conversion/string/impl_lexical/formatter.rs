@@ -1,7 +1,5 @@
 //! 实现/格式化器
 
-use util::join_to;
-
 use super::NarseseFormat;
 use crate::{
     api::{FormatTo, GetBudget, GetTerm},
@@ -9,6 +7,7 @@ use crate::{
     lexical::{Budget, Narsese, Sentence, Task, Term, Truth},
     util::{add_space_if_necessary_and_flush_buffer, catch_flow},
 };
+use util::join_to;
 
 /// 实现：转换
 ///

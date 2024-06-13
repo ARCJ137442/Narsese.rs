@@ -209,7 +209,8 @@ impl Error for ParseError {}
 /// 定义一个「解析器状态」类型
 /// * 🎯除了内置「格式」外，还可【缓存】解析状态
 /// * 📄学习参考：[tomllib/parser.rs](https://github.com/joelself/tomllib/blob/master/src/internals/parser.rs)
-pub struct ParseState<'a, Content = &'a str> {
+/// * 📌【2024-06-13 19:51:35】限制可见性：只允许在包内使用（macros中需要用到）
+pub(crate) struct ParseState<'a, Content = &'a str> {
     /// 引用的「解析格式」
     format: &'a NarseseFormat<Content>,
     /// 「解析环境」
@@ -239,6 +240,7 @@ impl<'a, C> ParseState<'a, C> {
     /// * 重置状态到默认情形：解析环境不变，头索引指向`0`
     /// * 📌自动内联
     #[inline(always)]
+    #[allow(unused)]
     pub fn reset(&mut self) {
         self.head = 0;
     }
@@ -425,13 +427,17 @@ impl<'a> ParseState<'a, &'a str> {
     /// 根据格式构造parser
     /// * 🚩方法：默认状态+重定向
     #[inline(always)]
-    pub fn new(format: &'a NarseseFormat<&str>, input: &'a str, head: ParseIndex) -> Self {
+    fn new(format: &'a NarseseFormat<&str>, input: &'a str, head: ParseIndex) -> Self {
         Self::from_env(format, Self::_build_env(input), head)
     }
 
     /// 从指定的「解析环境」构造parser
     /// * 🚩方法：默认状态+重定向
-    pub fn from_env(format: &'a NarseseFormat<&str>, env: ParseEnv, head: ParseIndex) -> Self {
+    pub(crate) fn from_env(
+        format: &'a NarseseFormat<&str>,
+        env: ParseEnv,
+        head: ParseIndex,
+    ) -> Self {
         // 生成环境长度 // ! 直接插入会有「同时引用」的所有权问题
         let len_env = env.len();
         // 构造结构体
@@ -1577,7 +1583,7 @@ impl<'s> FromParse<(), &'s mut ParseState<'_>> for ParseResult<Budget> {
 impl NarseseFormat<&str> {
     /// 构造解析状态
     /// * 索引默认从开头开始
-    pub fn build_parse_state<'a>(&'a self, input: &'a str) -> ParseState<'_, &str> {
+    pub(crate) fn build_parse_state<'a>(&'a self, input: &'a str) -> ParseState<'_, &str> {
         ParseState::new(self, input, 0)
     }
 

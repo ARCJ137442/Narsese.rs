@@ -37,7 +37,7 @@
 /// * 格式预期：`{前缀}+词项字符串名`
 ///   * 📌将「占位符」也包含在内——相当于「只有前缀，没有内容」的词项
 /// * 核心：存储各个原子词项的**前缀**
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NarseseFormatAtom<Content> {
     /// 前缀/词语 | ``
     pub prefix_word: Content,
@@ -61,7 +61,7 @@ pub struct NarseseFormatAtom<Content> {
 ///
 /// 📌此举专用于解析CommonNarsese
 /// * 不考虑其它idea 如「将 外延集/内涵集 也变成`({连接符}, 词项...)`的形式」
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NarseseFormatCompound<Content> {
     // 通用 //
     /// 首尾括弧 | `(` `)`
@@ -103,7 +103,7 @@ pub struct NarseseFormatCompound<Content> {
 /// Narsese格式/陈述
 /// * 格式预期：`<词项 {系词} 词项>`
 /// * 核心：存储各个陈述的**系词**
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NarseseFormatStatement<Content> {
     // 通用 //
     /// 首尾括弧 | `<` `>`
@@ -143,7 +143,7 @@ pub struct NarseseFormatStatement<Content> {
 
 /// Narsese格式/语句
 /// * 格式预期：`词项{标点} {时间戳} {真值}`
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NarseseFormatSentence<Content> {
     /// 标点/判断 | `.`
     pub punctuation_judgement: Content,
@@ -173,7 +173,7 @@ pub struct NarseseFormatSentence<Content> {
 
 /// Narsese格式/任务
 /// * 格式预期：`{预算值}语句`
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NarseseFormatTask<Content> {
     /// 预算值/括弧 | `$` `$`
     pub budget_brackets: (Content, Content),
@@ -182,7 +182,7 @@ pub struct NarseseFormatTask<Content> {
 }
 
 /// Narsese格式/空白符
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NarseseFormatSpace<Content> {
     /// 空白符（解析用）
     pub parse: Content,
@@ -197,12 +197,20 @@ pub struct NarseseFormatSpace<Content> {
 /// Narsese格式
 /// * 📌记录「枚举Narsese」的各类常量
 ///   * ⚠️只用于存储数据，后续需要载入「解析器状态」
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NarseseFormat<Content> {
     /// 判断是否可作为原子词项名称
     /// * 🚩【2024-06-11 21:00:28】使用静态函数指针
     ///   * ✅使整个结构体可作为常量，并且允许动态指定
-    pub is_valid_atom_name: &'static fn(char) -> bool,
+    /// * ✅现在直接使用函数指针本身，而非其静态不可变引用
+    ///   * 📝函数指针本身就是[`Copy`]类型
+    ///
+    /// ## 有关「函数指针均实现[`Copy`]」的验证：
+    /// ```rust
+    /// trait IsCopy: Copy {}
+    /// impl IsCopy for fn(char) -> bool {}
+    /// ```
+    pub is_valid_atom_name: fn(char) -> bool,
 
     /// 空白符
     pub space: NarseseFormatSpace<Content>,
@@ -231,7 +239,7 @@ impl NarseseFormat<&str> {
     /// * 🚩保留完整的系词字串
     /// * ⚠️纯功能性：不判断「是否启用」
     /// * 🚩【2024-03-28 14:33:09】替代「保留关键字」，牺牲部分性能，换得对「作为原子词项内容的`-`」的兼容性
-    pub fn copulas(&self) -> [&str; 13] {
+    pub const fn copulas(&self) -> [&str; 13] {
         // 创建&填充数组
         [
             // * （主要）陈述系词

@@ -42,19 +42,20 @@ use util::{PrefixMatch, StartsWithStr, SuffixMatch};
 
 /// 词法解析 辅助结构对象
 /// * 🚩放在一个独立的模块内，以便折叠
-pub mod structs {
+/// * 🚩【2024-06-13 19:42:07】现在直接对外展开，内部模块结构不再直接呈现
+mod structs {
     use super::*;
     use crate::lexical::{Budget, Punctuation, Stamp, Truth};
 
     /// 定义「解析环境」：字符数组切片
-    pub type ParseEnv<'a> = &'a [char];
+    pub(super) type ParseEnv<'a> = &'a [char];
 
     /// 定义具备所有权的「解析环境」：字符数组
-    pub type ParseEnvOwned = Vec<char>;
+    pub(super) type ParseEnvOwned = Vec<char>;
 
     /// 定义「解析索引」
     /// * 🎯用于区分「长度」与「位置」：与直接使用的`UIntPrecision`区分开
-    pub type ParseIndex = UIntPrecision;
+    pub(super) type ParseIndex = UIntPrecision;
 
     /// 定义「解析结果」
     /// * 🚩实际就是「错误类型已指定的[`Result`]」
@@ -67,7 +68,7 @@ pub mod structs {
     /// * 📌其内字段均具有所有权
     ///   * ✅均可以被直接拿取，并解析为Narsese值
     #[derive(Debug, Clone)]
-    pub struct MidParseResult {
+    pub(super) struct MidParseResult {
         /// 预算值
         pub budget: Option<Budget>,
         /// 词项
@@ -182,7 +183,7 @@ pub mod structs {
     /// * 📌这种结构一定是**轻量级**的
     ///   * 🚩后续预计会大量递归调用（至少会出现在「递归解析词项」中）
     #[derive(Clone)]
-    pub struct ParseState<'a> {
+    pub(super) struct ParseState<'a> {
         /// 词法格式
         /// * 📌用于指定解析所用的关键字
         pub format: &'a NarseseFormat,
@@ -203,22 +204,22 @@ pub mod structs {
         }
 
         /// 快速构造`ParseError`
-        pub fn parse_error(&self, env: ParseEnv<'a>, message: &str) -> ParseError {
+        pub fn parse_error(&self, env: ParseEnv, message: &str) -> ParseError {
             ParseError::new(message, env)
         }
 
         /// 快速构造`Err`
-        pub fn err<T>(&self, env: ParseEnv<'a>, message: &str) -> ParseResult<T> {
+        pub fn err<T>(&self, env: ParseEnv, message: &str) -> ParseResult<T> {
             Err(self.parse_error(env, message))
         }
     }
 }
-use structs::*;
+pub use structs::*;
 
 // 词法解析 正式逻辑开始 //
 
 /// 用于把「自由函数」封装成「实例方法」
-pub trait RightUnwrapOr<T, U> {
+trait RightUnwrapOr<T, U> {
     /// 工具函数
     /// * 🎯用于可选元组「(解析结果，索引)」的部分默认值化
     ///   * 在「真值」「预算值」等「可选条目」中，「没有值」与「值为空字串」是不一样的
@@ -248,11 +249,21 @@ pub fn parse(format: &NarseseFormat, input: &str) -> ParseResult {
     // ! 随后丢弃状态
 }
 
+/// 入口/词项
+/// * 🚩单独解析出一个「词项」
+pub fn parse_term(format: &NarseseFormat, input: &str) -> ParseResult<Term> {
+    // 构造解析状态
+    let state = ParseState::new(format);
+    // 封装「解析状态」的入口
+    state.parse_term(input)
+    // ! 随后丢弃状态
+}
+
 /// 预处理/理想化
 /// * 📌将一个「字符串」进行「理想化」以便后续解析
 /// * 🎯用于「预处理删去空格」这一类情况
 ///   * ❗每个`&str`字符串在被解析之前，都要经过此处解析
-pub fn idealize_env(format: &NarseseFormat, input: &str) -> ParseEnvOwned {
+fn idealize_env(format: &NarseseFormat, input: &str) -> ParseEnvOwned {
     // 获取字符迭代器
     let chars = input.chars();
     // 对「字符迭代器」进行处理 | 不能提取`.collect::<ParseEnvOwned>()`，因为其所应用的类型不一致
@@ -267,12 +278,12 @@ pub fn idealize_env(format: &NarseseFormat, input: &str) -> ParseEnvOwned {
 }
 
 /// 开始在「解析状态」的基础上进行解析
-impl<'a> ParseState<'a> {
+impl ParseState<'_> {
     /// 主解析入口
     /// * 📌【2024-03-17 01:34:10】现在总是从外部传入「解析环境」
     /// * 🚩先解析出各个条目组成「中间结果」，再进行拼接
     ///   * 其中「中间结果」不作为自身字段
-    pub fn parse(&mut self, env: ParseEnv<'a>) -> ParseResult {
+    pub fn parse(&mut self, env: ParseEnv) -> ParseResult {
         // 先解析出「中间结果」
         let mid_result = self.parse_items(env)?;
         // 再折叠「中间结果」得到最终情况
@@ -291,7 +302,7 @@ impl<'a> ParseState<'a> {
     /// * 📄从「中间结果」到「Narsese值」参见
     /// * ⚠️注意：「没解析到」和「解析时出错」是不一样的
     ///   * 比如「没解析到预算值」也可以是如`$A.`的情况
-    pub fn parse_items(&mut self, env: ParseEnv<'a>) -> ParseResult<MidParseResult> {
+    fn parse_items(&mut self, env: ParseEnv) -> ParseResult<MidParseResult> {
         // 前缀切割出预算值 //
         let budget = self.segment_budget(env);
         // 默认值 "" | 词项的起始索引（含）
@@ -351,7 +362,7 @@ impl<'a> ParseState<'a> {
     #[inline(always)]
     fn segment_some_prefix(
         &self,
-        env: ParseEnv<'a>,
+        env: ParseEnv,
         start: ParseIndex,
         right_chars: ParseEnv,
         verify_char: impl Fn(char) -> bool,
@@ -393,7 +404,7 @@ impl<'a> ParseState<'a> {
     #[inline(always)]
     fn collect_some_prefix(
         &self,
-        env: ParseEnv<'a>,
+        env: ParseEnv,
         start: ParseIndex,
         verify: impl Fn(ParseIndex, char) -> bool,
     ) -> ParseIndex {
@@ -428,7 +439,7 @@ impl<'a> ParseState<'a> {
     #[inline(always)]
     fn segment_some_suffix(
         &self,
-        env: ParseEnv<'a>,
+        env: ParseEnv,
         left_chars: ParseEnv,
         verify_char: impl Fn(char) -> bool,
     ) -> Result<ParseIndex, ParseIndex> {
@@ -473,7 +484,7 @@ impl<'a> ParseState<'a> {
     /// ```no-test
     /// fn segment_brackets_prefix<S: Deref<Target = str>>(
     ///    &self,
-    ///    env: ParseEnv<'a>,
+    ///    env: ParseEnv,
     ///    brackets: impl PrefixMatch<(S, S)>,
     ///    verify_char: impl Fn(char) -> bool,
     ///) -> Option<(String, ParseIndex)>
@@ -486,7 +497,7 @@ impl<'a> ParseState<'a> {
     /// * 📝【2024-03-19 00:15:02】似乎`rust,no-test`在此又失效了
     fn segment_brackets_prefix(
         &self,
-        env: ParseEnv<'a>,
+        env: ParseEnv,
         brackets: &impl PrefixMatch<(String, String)>,
         verify_char: impl Fn(char) -> bool,
     ) -> Option<(String, ParseIndex)> {
@@ -518,7 +529,7 @@ impl<'a> ParseState<'a> {
     ///   * 📄例如：`("abc", start = 1)` ⇒ `(&"abc"[..2])`
     fn segment_brackets_suffix(
         &self,
-        env: ParseEnv<'a>,
+        env: ParseEnv,
         brackets: &impl SuffixMatch<(String, String)>,
         verify_char: impl Fn(char) -> bool,
     ) -> Option<(String, ParseIndex)> {
@@ -558,13 +569,13 @@ impl<'a> ParseState<'a> {
     ///     * 🎯返回并直接使用「词项部分」的开头索引，同时也无需做「-1」偏移
     /// * 📄匹配的环境如：`$0.5;0.5;0.5$<A-->B>.%1.0;0.9%`
     /// * 📄匹配的结果如：`Some(("$0.5;0.5;0.5$", 12))` | `12` 对应第二个`$`
-    fn segment_budget(&self, env: ParseEnv<'a>) -> Option<(Budget, ParseIndex)> {
+    fn segment_budget(&self, env: ParseEnv) -> Option<(Budget, ParseIndex)> {
         // * 📌至于「解析出『vec![".9"]』和『vec!["0.9"]』之后，如何能判等」的问题：不应该以这里的「词法Narsese」作为判等依据
         // 尝试前缀匹配
         let (budget_string, right_border) = self.segment_brackets_prefix(
             env,
             &self.format.task.budget_brackets,
-            &self.format.task.is_budget_content,
+            self.format.task.is_budget_content,
         )?;
         // 截去头尾俩括弧
         let budget_string = budget_string
@@ -590,12 +601,12 @@ impl<'a> ParseState<'a> {
     ///   * 📌要么返回「匹配到的完整真值，以及其在『解析环境』中的开头位置（用于切分时间戳）」
     /// * 📄匹配的环境如：`$0.5;0.5;0.5$<A-->B>.%1.0;0.9%`
     /// * 📄匹配的结果如：`Some(("$0.5;0.5;0.5$", 21))` | `21` 对应第一个`%`
-    fn segment_truth(&self, env: ParseEnv<'a>) -> Option<(Truth, ParseIndex)> {
+    fn segment_truth(&self, env: ParseEnv) -> Option<(Truth, ParseIndex)> {
         // 尝试后缀匹配
         let (truth_string, right_border) = self.segment_brackets_suffix(
             env,
             &self.format.sentence.truth_brackets,
-            &self.format.sentence.is_truth_content,
+            self.format.sentence.is_truth_content,
         )?;
         // 截去头尾俩括弧
         let truth_string = truth_string
@@ -627,12 +638,12 @@ impl<'a> ParseState<'a> {
     /// * 📄匹配的环境如：`G!:|:`
     ///   * ⚠️此时应该已经截去了真值
     /// * 📄匹配的结果如：`Some((":|:", 2))` | `2` 对应第一个`:`
-    fn segment_stamp(&self, env: ParseEnv<'a>) -> Option<(String, ParseIndex)> {
+    fn segment_stamp(&self, env: ParseEnv) -> Option<(String, ParseIndex)> {
         // 尝试后缀匹配
         self.segment_brackets_suffix(
             env,
             &self.format.sentence.stamp_brackets,
-            &self.format.sentence.is_stamp_content,
+            self.format.sentence.is_stamp_content,
         )
     }
 
@@ -645,7 +656,7 @@ impl<'a> ParseState<'a> {
     ///   * 📌要么返回「匹配到的完整标点，以及其在『解析环境』中的开头位置（用于切分出词项）」
     /// * 📄匹配的环境如：`<A-->B>!`
     /// * 📄匹配的结果如：`Some(("!", 7))` | `7` 对应`!`
-    fn segment_punctuation(&self, env: ParseEnv<'a>) -> Option<(String, ParseIndex)> {
+    fn segment_punctuation(&self, env: ParseEnv) -> Option<(String, ParseIndex)> {
         // 尝试解析出标点
         let punctuation = self
             .format
@@ -674,7 +685,7 @@ impl<'a> ParseState<'a> {
     ///   * 📌要么返回「解析成功」：词项及其右边界（即长度）
     /// * 🚩因为「递归解析」需要传递信息，故需要额外传递索引
     /// * 📌不传递额外信息、直接传递字符串的才能叫「parse」
-    fn segment_term(&self, env: ParseEnv<'a>) -> ParseResult<(Term, ParseIndex)> {
+    fn segment_term(&self, env: ParseEnv) -> ParseResult<(Term, ParseIndex)> {
         // 先解析「集合词项」
         if let Ok(result) = self.segment_term_set(env) {
             return Ok(result);
@@ -705,7 +716,7 @@ impl<'a> ParseState<'a> {
     ///   * 📌核心原因：「后缀匹配」的需求仅在「原子词项作陈述主词」时出现
     ///   * 📍解决方案：直接作为「陈述解析」的特殊情况对待
     /// * 🚩【2024-03-19 19:02:38】现在添加「额外停止条件」用以应对「吃掉系词」的情况
-    fn segment_atom(&self, env: ParseEnv<'a>) -> ParseResult<(Term, ParseIndex)> {
+    fn segment_atom(&self, env: ParseEnv) -> ParseResult<(Term, ParseIndex)> {
         // 尝试解析出前缀
         let prefix = self
             // 匹配前缀
@@ -746,7 +757,7 @@ impl<'a> ParseState<'a> {
     }
 
     /// 解析集合词项
-    fn segment_term_set(&self, env: ParseEnv<'a>) -> ParseResult<(Term, ParseIndex)> {
+    fn segment_term_set(&self, env: ParseEnv) -> ParseResult<(Term, ParseIndex)> {
         // 前缀匹配并跳过左括弧
         let (left, right) = self
             .format
@@ -792,7 +803,7 @@ impl<'a> ParseState<'a> {
     }
 
     /// 解析复合词项
-    fn segment_compound(&self, env: ParseEnv<'a>) -> ParseResult<(Term, ParseIndex)> {
+    fn segment_compound(&self, env: ParseEnv) -> ParseResult<(Term, ParseIndex)> {
         // 前缀匹配并跳过左括弧
         let (left, right) = self
             .format
@@ -854,7 +865,7 @@ impl<'a> ParseState<'a> {
     /// * ❌【2024-03-19 16:29:22】弃用「后缀匹配谓词，再以此定位系词」的方案：后缀匹配还得分开「无前缀原子词项」的情况
     /// * 🚩方案：使用「原子词项前缀」结合「原子词项内容（首个字符）」作为判断依据
     /// ! ⚠️不能直接使用「原子词项前缀」作为判断依据：必须考虑**空前缀**情况
-    fn segment_statement(&self, env: ParseEnv<'a>) -> ParseResult<(Term, ParseIndex)> {
+    fn segment_statement(&self, env: ParseEnv) -> ParseResult<(Term, ParseIndex)> {
         // 前缀匹配并跳过左括弧
         let (left, right) = self
             .format
@@ -914,6 +925,12 @@ impl NarseseFormat {
     ///   * ❗本身并没多少实际的「应用场景」
     pub fn parse(&self, input: &str) -> ParseResult {
         parse(self, input)
+    }
+
+    /// 解析函数/词项@字符串
+    /// * 🚩【2024-06-13 19:41:02】传出内部有关「解析词项」的入口
+    pub fn parse_term(&self, input: &str) -> ParseResult<Term> {
+        parse_term(self, input)
     }
 }
 

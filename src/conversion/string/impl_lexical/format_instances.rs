@@ -100,6 +100,18 @@ lazy_static! {
     pub static ref FORMAT_HAN: NarseseFormat = create_format_han();
 }
 
+/// 简单判断是否为原子词项（标识符）
+/// * 🚩仅使用一个有限的范围
+/// * ⚠️若使用否定性匹配，一是影响性能，二是过于模糊（像是"wer#-12395%^#$"都会被匹配到）
+/// * 🚩【2024-06-11 20:39:43】对emoji只进行有限度的支持（常见表情符号）
+///   * 🔗参考：https://www.reddit.com/r/rust/comments/kohitu/how_to_check_if_a_char_is_emoji/
+///   * 💭部分表情如"❗"等不受支持；范围不明，可能还会继续扩大
+///   * 🔗另见：https://unicode.org/reports/tr51/index.html#emoji_data
+/// * ⚠️目前[`char::is_alphanumeric`]还不是常量函数
+fn is_identifier(c: char) -> bool {
+    c.is_alphanumeric() || c == '_' || c == '-' || c > '\u{1f2ff}' // 常见emoji兼容
+}
+
 /// 通用 ASCII格式
 /// * 来源：文档 `NARS ASCII Input.pdf`
 /// * 另可参考：<https://github.com/opennars/opennars/wiki/Narsese-Grammar-(Input-Output-Format)>
@@ -110,13 +122,25 @@ lazy_static! {
 ///   * ❌使用`static`的方法行不通：闭包无法保证线程安全
 ///   * ✅使用[`lazy_static`]实现了一定的「静态常量」定义
 ///     * 🚩【2024-03-15 19:58:20】但目前仍然保留该工厂函数
+/// * 🚩【2024-06-13 19:11:50】部分删除堆分配
+///   * ✅成功通过「函数指针类型」去除了其中的Box堆分配，
+///   * ⚠️但涉及「前后缀匹配字典」的堆分配，仍然需要使用[`lazy_static`]
 pub fn create_format_ascii() -> NarseseFormat {
+    const fn is_stamp_content(c: char) -> bool {
+        matches!(c, '0'..='9' | '+' | '-') // regex:`[0-9+\-]`
+    }
+    const fn is_truth_content(c: char) -> bool {
+        matches!(c, '0'..='9' | '.' | ';')
+    }
+    const fn is_budget_content(c: char) -> bool {
+        matches!(c, '0'..='9' | '.' | ';')
+    }
     NarseseFormat {
         space: NarseseFormatSpace {
-            is_for_parse: Box::new(|c: char| c.is_whitespace()), // ! 解析时忽略空格
-            format_terms: s!(" "), // 格式化时，词项间需要空格（英文如此）
-            format_items: s!(" "), // 格式化时，条目间需要空格（英文如此）
-            remove_spaces_before_parse: true, // ASCII版本空格无关
+            is_for_parse: char::is_whitespace, // ! 解析时忽略空格
+            format_terms: s!(" "),             // 格式化时，词项间需要空格（英文如此）
+            format_items: s!(" "),             // 格式化时，条目间需要空格（英文如此）
+            remove_spaces_before_parse: true,  // ASCII版本空格无关
         },
         atom: NarseseFormatAtom {
             // 所有原子词项的前缀
@@ -133,7 +157,7 @@ pub fn create_format_ascii() -> NarseseFormat {
                 "^"
             ),
             // 一般文字、数字、连带`-`均算入在内
-            is_identifier: Box::new(is_atom_identifier),
+            is_identifier,
         },
         compound: NarseseFormatCompound {
             // 外延集/内涵集
@@ -198,31 +222,20 @@ pub fn create_format_ascii() -> NarseseFormat {
                 // * 📌ASCII版本经典使用双边括弧
                 ":!" => r":" // 固定
             ),
-            is_stamp_content: Box::new(|c: char| matches!(c, '0'..='9' | '+' | '-')), // regex:`[0-9+\-]`
+            is_stamp_content,
             // 真值 | 内容已不包含空格
             truth_brackets: s!("%", "%"),
             truth_separator: s!(";"),
             // ! 【2024-03-22 20:23:39】↓虽说此时使用分隔符，但在「截取」阶段仍然需要将分隔符作为「内容」
-            is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | ';')),
+            is_truth_content,
         },
         task: NarseseFormatTask {
             // 预算 | 内容已不包含空格
             budget_brackets: s!("$", "$"),
             budget_separator: s!(";"),
-            is_budget_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | ';')),
+            is_budget_content,
         },
     }
-}
-
-/// 简单判断是否为原子词项
-/// * 🚩仅使用一个有限的范围
-/// * ⚠️若使用否定性匹配，一是影响性能，二是过于模糊（像是"wer#-12395%^#$"都会被匹配到）
-/// * 🚩【2024-06-11 20:39:43】对emoji只进行有限度的支持（常见表情符号）
-///   * 🔗参考：https://www.reddit.com/r/rust/comments/kohitu/how_to_check_if_a_char_is_emoji/
-///   * 💭部分表情如"❗"等不受支持；范围不明，可能还会继续扩大
-///   * 🔗另见：https://unicode.org/reports/tr51/index.html#emoji_data
-fn is_atom_identifier(c: char) -> bool {
-    c.is_alphanumeric() || c == '_' || c == '-' || c > '\u{1f2ff}' // 常见emoji兼容
 }
 
 /// LaTeX扩展
@@ -234,12 +247,21 @@ fn is_atom_identifier(c: char) -> bool {
 ///   * ℹ️LaTeX扩展本身不会有多少「需要由此转换成Narsese」的场景
 /// * 🆕更新@2024-04-05：时序系词与时态由「前缀竖杠」变为「中缀竖杠」
 pub fn create_format_latex() -> NarseseFormat {
+    const fn is_stamp_content(c: char) -> bool {
+        matches!(c, '0'..='9' | '+' | '-') // regex:`[0-9+\-]`
+    }
+    const fn is_truth_content(c: char) -> bool {
+        matches!(c, '0'..='9' | '.' | ',') // ! LaTeX使用逗号而非分号
+    }
+    const fn is_budget_content(c: char) -> bool {
+        matches!(c, '0'..='9' | '.' | ';')
+    }
     NarseseFormat {
         space: NarseseFormatSpace {
-            is_for_parse: Box::new(|c| c.is_whitespace()), // ! 解析时可跳过空格
-            format_terms: s!(" "), // 格式化时，词项间需要分隔（避免代码粘连）
-            format_items: s!(" "), // 格式化时，条目间需要分隔（避免代码粘连）
-            remove_spaces_before_parse: true, // LaTeX版本亦可空格无关——通过「后缀空参数」省去空格
+            is_for_parse: char::is_whitespace, // ! 解析时可跳过空格
+            format_terms: s!(" "),             // 格式化时，词项间需要分隔（避免代码粘连）
+            format_items: s!(" "),             // 格式化时，条目间需要分隔（避免代码粘连）
+            remove_spaces_before_parse: true,  // LaTeX版本亦可空格无关——通过「后缀空参数」省去空格
         },
         atom: NarseseFormatAtom {
             prefixes: x_fix_match_dict!(
@@ -254,7 +276,7 @@ pub fn create_format_latex() -> NarseseFormat {
                 // 操作符
                 r"\Uparrow{}" // ! 此处即「后缀空参数」
             ),
-            is_identifier: Box::new(is_atom_identifier),
+            is_identifier,
         },
         compound: NarseseFormatCompound {
             // 左右括弧
@@ -320,17 +342,17 @@ pub fn create_format_latex() -> NarseseFormat {
                 // !【2024-03-17 10:07:16】没有后缀，只以前缀区分
                 "t=" => "", // ? LaTeX语法未知
             ),
-            is_stamp_content: Box::new(|c: char| matches!(c, '0'..='9' | '+' | '-')), // regex:`[0-9+\-]`
+            is_stamp_content,
             // 真值
             truth_brackets: s!(r"\langle{}", r"\rangle{}"),
             truth_separator: s!(","), // ! LaTeX格式使用`,`作为真值分隔符
-            is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | ',')), // ! LaTeX使用逗号而非分号
+            is_truth_content,
         },
         task: NarseseFormatTask {
             // 预算
             budget_brackets: s!(r"\$", r"\$"),
             budget_separator: s!(";"),
-            is_budget_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | ';')),
+            is_budget_content,
         },
     }
 }
@@ -338,11 +360,20 @@ pub fn create_format_latex() -> NarseseFormat {
 /// 漢文扩展
 /// * 📌原创
 pub fn create_format_han() -> NarseseFormat {
+    const fn is_stamp_content(c: char) -> bool {
+        matches!(c, '0'..='9' | '+' | '-') // regex:`[0-9+\-]`
+    }
+    const fn is_truth_content(c: char) -> bool {
+        matches!(c, '0'..='9' | '.' | '、') // 此处有特别的分隔符「、」
+    }
+    const fn is_budget_content(c: char) -> bool {
+        matches!(c, '0'..='9' | '.' | '、') // 此处有特别的分隔符「、」
+    }
     NarseseFormat {
         space: NarseseFormatSpace {
-            is_for_parse: Box::new(|c| c.is_whitespace()), // ! 解析时忽略空格
-            format_terms: s!(""),  // 格式化时，词项间无需分隔（避免太过松散）
-            format_items: s!(" "), // 格式化时，条目间需要分隔（避免太过密集）
+            is_for_parse: char::is_whitespace, // ! 解析时忽略空格
+            format_terms: s!(""),              // 格式化时，词项间无需分隔（避免太过松散）
+            format_items: s!(" "),             // 格式化时，条目间需要分隔（避免太过密集）
             // ! ❌【2024-03-22 23:25:40】暂时不能支持全角空格：枚举Narsese处只能有一种空格
             remove_spaces_before_parse: true, // 漢文亦空格无关
         },
@@ -359,7 +390,7 @@ pub fn create_format_han() -> NarseseFormat {
                 // 操作符
                 "操作"
             ),
-            is_identifier: Box::new(is_atom_identifier),
+            is_identifier,
         },
         compound: NarseseFormatCompound {
             brackets: s!("（", "）"),
@@ -420,17 +451,17 @@ pub fn create_format_han() -> NarseseFormat {
                 // !【2024-03-17 10:07:16】没有后缀，只以前缀区分
                 "发生在" => "",
             ),
-            is_stamp_content: Box::new(|c: char| matches!(c, '0'..='9' | '+' | '-')), // regex:`[0-9+\-]`
+            is_stamp_content,
             // 真值
             truth_brackets: s!("真", "值"), // 大改：兼容单真值、空真值
             truth_separator: s!("、"),
-            is_truth_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | '、')), // 此处有特别的分隔符「、」
+            is_truth_content,
         },
         task: NarseseFormatTask {
             // 预算
             budget_brackets: s!("预", "算"),
             budget_separator: s!("、"),
-            is_budget_content: Box::new(|c: char| matches!(c, '0'..='9' | '.' | '、')), // 此处有特别的分隔符「、」
+            is_budget_content,
         },
     }
 }
@@ -445,7 +476,7 @@ mod tests_enum_narsese {
     #[test]
     fn test_is_atom_identifier() {
         use util::show;
-        show!(is_atom_identifier('a'));
+        show!(is_identifier('a'));
         show!(&FORMAT_ASCII.sentence.stamp_brackets);
     }
 

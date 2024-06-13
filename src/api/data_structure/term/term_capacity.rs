@@ -61,6 +61,12 @@ pub trait GetCapacity {
         self.get_capacity() == Unary
     }
 
+    /// 在容量上是否为「二元」
+    #[inline]
+    fn is_capacity_binary(&self) -> bool {
+        matches!(self.get_capacity(), BinaryVec | BinarySet)
+    }
+
     /// 在容量上是否为「二元序列」
     #[inline]
     fn is_capacity_binary_vec(&self) -> bool {
@@ -71,6 +77,12 @@ pub trait GetCapacity {
     #[inline]
     fn is_capacity_binary_set(&self) -> bool {
         self.get_capacity() == BinarySet
+    }
+
+    /// 在容量上是否为「多元」
+    #[inline]
+    fn is_capacity_multi(&self) -> bool {
+        matches!(self.get_capacity(), Vec | Set)
     }
 
     /// 在容量上是否为「（多元）序列」

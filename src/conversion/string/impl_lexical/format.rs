@@ -19,10 +19,8 @@ use util::{
 };
 
 /// Narsese格式/空白符
-pub struct NarseseFormatSpace<F = Box<dyn Fn(char) -> bool + Send + Sync>>
-where
-    F: Fn(char) -> bool + Send + Sync,
-{
+#[derive(Debug, Clone)]
+pub struct NarseseFormatSpace {
     /// 用于判断字符是否为空白符（解析用）
     /// * 📝Rust中若需定义静态常量，需要对常量确保线程安全
     ///   * 📄线程安全的类型⇔实现`Send + Sync`特征
@@ -32,7 +30,7 @@ where
     ///     * ✅常量表达式：使用[`lazy_statics`]实现「静态懒加载」绕开「`static`要求常量表达式」限制
     ///     * ✅线程安全：限制下边闭包为`dyn Fn(char) -> bool + Send + Sync`
     ///       * 📌其通常就是个纯函数
-    pub is_for_parse: F,
+    pub is_for_parse: fn(char) -> bool,
 
     /// 解析前是否筛除空白符
     /// 🎯用于决定在「解析环境理想化」时是否要「预筛除空白符」
@@ -51,10 +49,8 @@ where
 
 /// 原子词项格式
 /// * 📌格式：[前缀] + (标识符)
-pub struct NarseseFormatAtom<F = Box<dyn Fn(char) -> bool + Send + Sync>>
-where
-    F: Fn(char) -> bool + Send + Sync,
-{
+#[derive(Debug, Clone)]
+pub struct NarseseFormatAtom {
     /// 合法的「原子词项前缀」
     /// * 词语
     /// * 独立变量
@@ -65,7 +61,7 @@ where
     pub prefixes: PrefixMatchDict,
 
     /// 用于判断字符是否为「合法原子标识符」的函数
-    pub is_identifier: F,
+    pub is_identifier: fn(char) -> bool,
 }
 
 /// 复合词项格式
@@ -111,10 +107,8 @@ pub struct NarseseFormatStatement {
 }
 
 /// 语句格式（含标点、真值、时间戳）
-pub struct NarseseFormatSentence<F = Box<dyn Fn(char) -> bool + Send + Sync>>
-where
-    F: Fn(char) -> bool + Send + Sync,
-{
+#[derive(Debug, Clone)]
+pub struct NarseseFormatSentence {
     /// 合法的「标点」
     pub punctuations: SuffixMatchDict,
 
@@ -133,7 +127,7 @@ where
 
     /// 判断是否为「真值内部允许的字符」
     /// * 🎯用于提供信息以更快分割边界（从预算值而来）
-    pub is_truth_content: F,
+    pub is_truth_content: fn(char) -> bool,
 
     /// 合法的时间戳「括弧」对
     /// * 🎯适配LaTeX/漢文的「无固定括弧」情况
@@ -154,14 +148,12 @@ where
     /// * 🎯适配LaTeX/漢文的「无固定括弧」情况
     /// * 📌通过「合法字符序列」兼容「前后缀不固定的『固定』时间戳类型」
     ///   * 📄ASCIIの「固定」：`:!-123:`
-    pub is_stamp_content: F,
+    pub is_stamp_content: fn(char) -> bool,
 }
 
 /// 任务格式（含预算值）
-pub struct NarseseFormatTask<F = Box<dyn Fn(char) -> bool + Send + Sync>>
-where
-    F: Fn(char) -> bool + Send + Sync,
-{
+#[derive(Debug, Clone)]
+pub struct NarseseFormatTask {
     /// 预算值括弧
     /// * 🚩通过括弧捕获整个「预算值」字符串，然后拆分其内部结构
     pub budget_brackets: (String, String),
@@ -192,7 +184,7 @@ where
     /// * 📄case@漢文: `预预算。`⇒空预算、词项为`预预算`、判断、永恒、空真值
     ///   * ✅解析过程：遇到非法内容`预`提前结束
     ///   * ⚠️无此函数的版本：截取到`预预算`，后边没词项⇒报错
-    pub is_budget_content: F,
+    pub is_budget_content: fn(char) -> bool,
 }
 
 /// 总「词法Narsese格式」
@@ -204,18 +196,15 @@ where
 ///   * 任务格式（含预算值）
 /// * 🚩不特化符号为`LexicalNarseseFormat`
 ///   * 📌这种「符号特化」交给调用方处理
-/// * 🚩现在将其中的「函数类型」提取为类型参数
-///   * 📜默认还是`Box<dyn Fn>`
-///   * ✅可兼容其它实现了`Fn`特征的对象（如函数指针）
-pub struct NarseseFormat<F = Box<dyn Fn(char) -> bool + Send + Sync>>
-where
-    F: Fn(char) -> bool + Send + Sync,
-{
+/// * 🚩【2024-06-13 19:13:59】现在使用函数指针，而非[`Box`]堆分配指针类型
+///   * ✅不再需要引入泛型参数
+#[derive(Debug, Clone)]
+pub struct NarseseFormat {
     /// 空白符格式
-    pub space: NarseseFormatSpace<F>,
+    pub space: NarseseFormatSpace,
 
     /// 原子词项格式
-    pub atom: NarseseFormatAtom<F>,
+    pub atom: NarseseFormatAtom,
 
     /// 复合词项格式
     pub compound: NarseseFormatCompound,
@@ -224,7 +213,7 @@ where
     pub statement: NarseseFormatStatement,
 
     /// 语句格式（含标点、真值、时间戳）
-    pub sentence: NarseseFormatSentence<F>,
+    pub sentence: NarseseFormatSentence,
 
     /// 任务格式（含预算值）
     pub task: NarseseFormatTask,

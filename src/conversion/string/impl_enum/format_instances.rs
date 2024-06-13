@@ -7,7 +7,8 @@ use super::format::*;
 
 /// 工具函数/判断字符是否能作为「词项名」
 /// * 🎯用于判断「合法词项名」
-fn is_atom_identifier(c: char) -> bool {
+/// * ⚠️【2024-06-13 19:25:15】[`char::is_alphanumeric`]目前还不是常量函数
+fn is_valid_atom_name(c: char) -> bool {
     //  先判断是否为「字母/数字」
     c.is_alphanumeric()
     // 特殊：横杠/下划线
@@ -23,7 +24,7 @@ fn is_atom_identifier(c: char) -> bool {
 /// * 另可参考：<https://github.com/opennars/opennars/wiki/Narsese-Grammar-(Input-Output-Format)>
 /// * 可用于打印Narsese的默认形式
 pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
-    is_valid_atom_name: &(is_atom_identifier as fn(char) -> bool),
+    is_valid_atom_name,
     space: NarseseFormatSpace {
         parse: " ",        // ! 解析时忽略空格
         format_terms: " ", // 格式化时，词项间需要空格（英文如此）
@@ -98,7 +99,7 @@ pub const FORMAT_ASCII: NarseseFormat<&str> = NarseseFormat {
 /// * 【20230811 0:26:55】不能很好地兼容「二元运算」表达（需要更专业者优化）
 /// * 🆕更新@2024-04-05：时序系词与时态由「前缀竖杠」变为「中缀竖杠」
 pub const FORMAT_LATEX: NarseseFormat<&str> = NarseseFormat {
-    is_valid_atom_name: &(is_atom_identifier as fn(char) -> bool),
+    is_valid_atom_name,
     space: NarseseFormatSpace {
         parse: " ",        // ! 解析时可跳过空格
         format_terms: " ", // 格式化时，词项间需要分隔（避免代码粘连）
@@ -172,7 +173,7 @@ pub const FORMAT_LATEX: NarseseFormat<&str> = NarseseFormat {
 /// 漢文扩展
 /// * 📌原创
 pub const FORMAT_HAN: NarseseFormat<&str> = NarseseFormat {
-    is_valid_atom_name: &(is_atom_identifier as fn(char) -> bool),
+    is_valid_atom_name,
     space: NarseseFormatSpace {
         parse: " ",        // ! 解析时忽略空格
         format_terms: "",  // 格式化时，词项间无需分隔（避免太过松散）
