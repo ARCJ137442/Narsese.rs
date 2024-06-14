@@ -12,6 +12,41 @@
 /// # Panics
 ///
 /// ⚠️当所传入的Narsese非法（解析失败）时，将在运行中panic
+///
+/// ## 用例
+///
+/// ```rust
+/// use narsese::{
+///     conversion::string::impl_lexical::format_instances::*,
+///     lexical::{Narsese, Sentence, Task, Term},
+///     lexical_nse as nse, lexical_nse_sentence as nse_sentence, lexical_nse_task as nse_task,
+///     lexical_nse_term as nse_term,
+/// };
+/// use nar_dev_utils::*;
+///
+/// // 简单case
+/// let nse_str = "<A --> B>.";
+/// let nse = nse!(<A --> B>.);
+/// asserts! {
+///     // 测试是否等效
+///     dbg!(&nse) => &FORMAT_ASCII.parse(nse_str).unwrap(),
+///     nse.clone().try_into_sentence().unwrap() => nse_sentence!(<A --> B>.),
+///     // 匹配内部结构
+///     nse => @ Narsese::Sentence(..),
+///     nse => @ Narsese::Sentence(Sentence{..}),
+///     nse => @ Narsese::Sentence(Sentence{term: Term::Statement { .. }, ..}),
+/// };
+///
+/// // 复杂case
+/// let nse_str = "$0.5;0.75;0.4$ <(&/, <{ball} --> [left]>, <(*, {SELF}, $any, #some) --> ^do>) ==> <{SELF} --> [good]>>. :!-1: %1.0;0.9%";
+/// let nse_s = nse_task!("$0.5;0.75;0.4$ <(&/, <{ball} --> [left]>, <(*, {SELF}, $any, #some) --> ^do>) ==> <{SELF} --> [good]>>. :!-1: %1.0;0.9%");
+/// let nse = nse_task!($0.5;0.75;0.4$ <(&/, <{ball} --> [left]>, <(*, {SELF}, $any, #some) --> ^do>) ==> <{SELF} --> [good]>>. :!-1: %1.0;0.9%);
+/// asserts! {
+///     // 测试是否等效
+///     dbg!(&nse) => &FORMAT_ASCII.parse(nse_str).unwrap().try_into_task().unwrap(),
+///     dbg!(&nse_s) => &nse,
+/// }
+/// ```
 #[macro_export]
 macro_rules! lexical_nse {
     // 对字符串字面量的支持
@@ -28,15 +63,15 @@ macro_rules! lexical_nse {
             // 「解析」子函数
             @PARSE
             // 解析所用的格式
-            [$crate::conversion::string::impl_lexical::format_instances::FORMAT_ASCII]
+            [$crate::conversion::string::impl_lexical::format_instances::FORMAT_ASCII],
             // 解析的目标类型
-            [$crate::lexical::Narsese]
+            [$crate::lexical::Narsese],
             // 被解析的表达式（实际上是字面量）
             $narsese
         )
     };
     // 主解析规则
-    (@PARSE [$format:expr] [$target:ty] $narsese:expr) => {
+    (@PARSE [$format:expr], [$target:ty], $narsese:expr) => {
         {
             // 直接调用模块内部的解析方法
             // 🚩【2024-03-23 17:25:58】没有性能trick

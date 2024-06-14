@@ -1551,9 +1551,21 @@ impl NarseseFormat<&str> {
     /// 主解析函数
     /// * ✨【2024-03-20 15:30:43】现在支持任意扩展可解析的目标类型，而无需为之分别添加函数
     ///   * 📌通过模仿标准库[`String::parse`]与[`From`]实现
+    /// * ❌无法通过特别的「输入」泛型进行非破坏性修改
+    ///   * 新增泛型参数：即便【能自动推断】仍然需要手动填入⇒影响已有代码
     pub fn parse<'a, To>(&'a self, input: &'a str) -> ParseResult<To>
     where
         ParseResult<To>: FromParse<&'a str, &'a Self>,
+    {
+        // 调用关联函数进行解析
+        ParseResult::from_parse(input, self)
+    }
+
+    /// 主解析函数 for `Vec<char>`
+    /// * 🎯最初用于自动解析宏（不涉及内部`ParseState`类型）
+    pub fn parse_chars<'a, To>(&'a self, input: Vec<char>) -> ParseResult<To>
+    where
+        ParseResult<To>: FromParse<Vec<char>, &'a Self>,
     {
         // 调用关联函数进行解析
         ParseResult::from_parse(input, self)
@@ -1611,6 +1623,23 @@ where
         // ! 随后丢弃状态，但解析出来的结果仍然存活（隐含`'s: 'a`）
     }
 }
+
+/// 上述实现的`Vec<char>`版本
+/// * 📄`impl<'a, To> FromParse<&'a str, &'a NarseseFormat<&'_ str>> for ParseResult<To>`
+impl<'a, To> FromParse<Vec<char>, &'a NarseseFormat<&'_ str>> for ParseResult<To>
+where
+    // * 📝↓此处`for<'s>`保证「解析状态」是一个比`'a`小的生命周期
+    //   * 📌隐含限定：「引用的生命周期」's必须在「结构本身的生命周期」'a之内
+    ParseResult<To>: for<'s> FromParse<(), &'s mut ParseState<'a>>,
+{
+    /// 主解析函数
+    fn from_parse(input: Vec<char>, parser: &'a NarseseFormat<&str>) -> Self {
+        let mut state = ParseState::from_env(parser, input, 0);
+        // 向指定目标进行解析
+        state.parse::<To>()
+    }
+}
+
 /// 单元测试
 #[cfg(test)]
 mod tests_parse {

@@ -3,9 +3,46 @@
 /// * ⚠️一般用于Narsese字面量
 ///   * **强制`unwrap`解析结果**
 ///
-/// ! 已知问题
+/// ## ! 已知问题
 /// * ❌输入必须遵循Rust词法：不能出现未配对的括弧
 ///   * 📄无法输入的语法元素：`{--` `--]` `{-]`
+///
+/// # Panics
+///
+/// ⚠️当所传入的Narsese非法（解析失败）时，将在运行中panic
+///
+/// ## 用例
+///
+/// ```rust
+/// use nar_dev_utils::asserts;
+/// use narsese::{
+///     conversion::string::impl_enum::format_instances::*,
+///     enum_narsese::{Narsese, Sentence, Task, Term},
+///     enum_nse as nse, enum_nse_sentence as nse_sentence, enum_nse_task as nse_task,
+///     enum_nse_term as nse_term,
+/// };
+///
+/// // 简单case
+/// let nse_str = "<A --> B>.";
+/// let nse = nse!(<A --> B>.);
+/// asserts! {
+///     // 测试是否等效
+///     dbg!(&nse) => &FORMAT_ASCII.parse(nse_str).unwrap(),
+///     // 匹配内部结构
+///     nse => @ Narsese::Sentence(..),
+///     nse => @ Narsese::Sentence(Sentence::Judgement(..)),
+///     nse => @ Narsese::Sentence(Sentence::Judgement(Term::Inheritance(..), ..)),
+/// };
+/// // 复杂case
+/// let nse_str = "$0.5;0.75;0.4$ <(&/, <{ball} --> [left]>, <(*, {SELF}, $any, #some) --> ^do>) ==> <{SELF} --> [good]>>. :!-1: %1.0;0.9%";
+/// let nse_s = nse!("$0.5;0.75;0.4$ <(&/, <{ball} --> [left]>, <(*, {SELF}, $any, #some) --> ^do>) ==> <{SELF} --> [good]>>. :!-1: %1.0;0.9%");
+/// let nse = nse!($0.5;0.75;0.4$ <(&/, <{ball} --> [left]>, <(*, {SELF}, $any, #some) --> ^do>) ==> <{SELF} --> [good]>>. :!-1: %1.0;0.9%);
+/// asserts! {
+///     // 测试是否等效
+///     dbg!(&nse) => &FORMAT_ASCII.parse(nse_str).unwrap(),
+///     dbg!(&nse_s) => &nse,
+/// }
+/// ```
 #[macro_export]
 macro_rules! enum_nse {
     // 对字符串字面量的支持
@@ -22,33 +59,26 @@ macro_rules! enum_nse {
             // 「解析」子函数
             @PARSE
             // 解析所用的格式
-            [$crate::conversion::string::impl_enum::format_instances::FORMAT_ASCII]
+            [$crate::conversion::string::impl_enum::format_instances::FORMAT_ASCII],
             // 解析的目标类型
-            [$crate::enum_narsese::Narsese]
+            [$crate::enum_narsese::Narsese],
             // 被解析的表达式（实际上是字面量）
             $narsese
         )
     };
     // 主解析规则
-    (@PARSE [$format:expr] [$target:ty] $narsese:expr) => {
+    (@PARSE [$format:expr], [$target:ty], $narsese:expr) => {
         {
             // 去掉空格的字符数组
             let narsese_chars = $narsese
                 .chars()
                 .filter(|c| !c.is_whitespace())
                 .collect::<Vec<_>>();
-            // 直接作为「解析环境」构建「解析状态」
+            // 直接使用字符数组解析
             // * ⚡无需再构造`String`对象，享受性能提升
-            let mut state =
-                $crate
-                ::conversion::string::impl_enum::ParseState
-                ::from_env(
-                    &$format,
-                    narsese_chars,
-                    0
-                );
+            // * ✅不涉及内部的「解析状态」结构，分离内部实现
             // 向指定目标进行解析
-            state.parse::<$target>().unwrap()
+            $format.parse_chars::<$target>(narsese_chars).unwrap()
         }
     };
     // * 兜底总入口
