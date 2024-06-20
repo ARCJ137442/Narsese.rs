@@ -72,17 +72,19 @@ macro_rules! lexical_nse {
     };
     // 主解析规则
     (@PARSE [$format:expr], [$target:ty], $narsese:expr) => {
-        {
-            // 直接调用模块内部的解析方法
-            // 🚩【2024-03-23 17:25:58】没有性能trick
-            // ✅无需指定目标类型：根目录已经指定了`ParseResult`
-            $crate::conversion::string::impl_lexical::parse(
-                // 格式的引用
-                &$format,
-                // 要解析的Narsese
-                $narsese
-            ).unwrap()
-        }
+        // 直接调用模块内部的解析方法
+        // 🚩【2024-03-23 17:25:58】没有性能trick
+        // ✅无需指定目标类型：根目录已经指定了`ParseResult`
+        $crate::conversion::string::impl_lexical::parse(
+            // 格式的引用
+            &$format,
+            // 要解析的Narsese
+            $narsese
+        ).unwrap()
+    };
+    // * 兜底报错：拦截已加上"@PARSE"的解析转发，避免无限递归
+    (@PARSE $($_:tt)*) => {
+        core::compile_error!("Narsese格式解析错误：内部语法不正确")
     };
     // * 兜底总入口
     // * ❌【2024-03-23 16:35:59】不再尝试兼容其它语法，专精兼容ASCII版本
