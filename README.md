@@ -1,14 +1,18 @@
 # Narsese.rs
 
+**简体中文** | [English](README.en.md)
+
+🕒最后更新时间：【2024-08-19 15:36:29】
+
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-2.0.0-%23FE5196?logo=conventionalcommits&logoColor=white)](https://conventionalcommits.org)
 
-该项目使用[语义化版本 2.0.0](https://semver.org/)进行版本号管理。
+该项目使用[语义化版本 2.0.0](https://semver.org/lang/zh-CN/)进行版本号管理。
 
 **Narsese**的[**Rust**](https://www.rust-lang.org)实现
 
 - ✨基于枚举`enum`类型实现的[**枚举Narsese**](#枚举narsese)
 - ✨基于「嵌套字串词法树」实现的[**词法Narsese**](#词法narsese)
-- 🚧一个可用于在Rust中开发NARS的**Narsese API**（WIP）
+- 🏗️一个可用于在Rust中开发NARS的**Narsese API**（开发中）
 
 ## 安装
 
@@ -38,16 +42,16 @@ features = ["bundled"] # 启用所有特性，包括「枚举Narsese」和「词
 use narsese::enum_nse;
 
 fn main() {
-    // 使用快捷宏解析创建Narsese（保证语法正确） //
+    // 使用快捷宏解析创建Narsese（需要保证语法正确，否则panic） //
     let term = enum_term!(<A --> B>);
     let sentence = enum_sentence!("<SELF {-] good>!");
     let task = enum_task!($0.8;0.8;0.8$ <robin --> bird>?);
 
     // 输出 / 检验 //
-    println!("{:?}", term);
+    println!("{term:?}");
     assert_eq!(term, enum_nse!("<A --> B>").try_into_term().unwrap()); // 字符串形式的解析结果与之相等，并使用`try_into_term`进行向下转换
-    println!("{:?}", sentence);
-    println!("{:?}", task);
+    println!("{sentence:?}");
+    println!("{task:?}");
 }
 ```
 
@@ -57,15 +61,15 @@ fn main() {
 use narsese::lexical_nse;
 
 fn main() {
-    // 使用快捷宏解析创建Narsese（保证语法正确） //
+    // 使用快捷宏解析创建Narsese（需要保证语法正确，否则panic） //
     let term = lexical_term!(<A --> B>);
     let sentence = lexical_sentence!("<SELF {-] good>!");
     let task = lexical_task!($0.8;0.8;0.8$ <robin --> bird>?);
 
     // 输出 / 检验 //
-    println!("{:?}", term);
-    println!("{:?}", sentence);
-    println!("{:?}", task);
+    println!("{term:?}");
+    println!("{sentence:?}");
+    println!("{task:?}");
 }
 ```
 
@@ -81,7 +85,7 @@ fn main() {
 
 ### 枚举Narsese
 
-✨基于Rust原生枚举`enum`特性实现[**枚举Narsese**](#枚举narsese)
+✨基于Rust原生枚举`enum`特性实现
 
 - ✅语义精确性
   - 集合语义：元素无序的复合词项中，语义顺序无关
@@ -98,7 +102,7 @@ fn main() {
 - ✅数据灵活性
   - 非类别特定：不特别限定「原子词项前缀」「复合词项连接词」「陈述系词」的范围
   - 可扩展：通过「词法折叠」机制，允许向特定、专用数据结构的进一步转换
-    - ✅已对[枚举Narsese](#枚举narsese)提供词法折叠了机制
+    - ✅已对[枚举Narsese](#枚举narsese)提供了「词法折叠」机制
 
 ### NarseseAPI
 
@@ -154,7 +158,7 @@ budget_content = {
 truth_budget_term = @{(ASCII_DIGIT|".")+}
 
 /// 语句 = 词项 标点 时间戳? 真值?
-sentence       = {
+sentence = {
     term ~ punctuation ~ stamp? ~ truth?
 }
 
