@@ -1,6 +1,9 @@
 # 构建目标
 target
 
+# 编辑器配置
+.vscode
+
 # 临时文件
 *tempCodeRunnerFile*
 
