@@ -5,8 +5,6 @@
 
 🕒 Last updated time: [2024-09-14 10:19:55]
 
-<!-- 徽章安排参考：https://daily.dev/blog/readme-badges-github-best-practices#organizing-badges-in-your-readme -->
-
 ![License](https://img.shields.io/crates/l/narsese?style=for-the-badge&color=ff7043)
 ![Code Size](https://img.shields.io/github/languages/code-size/ARCJ137442/Narsese.rs?style=for-the-badge&color=ff7043)
 ![Lines of Code](https://www.aschey.tech/tokei/github.com/ARCJ137442/Narsese.rs?style=for-the-badge&color=ff7043)
