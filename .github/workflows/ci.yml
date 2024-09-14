@@ -6,7 +6,7 @@ on:
   push: # 推送到特定分支
     branches:
       - main
-      - dev
+      # - dev # ! ❌【2024-09-14 12:23:09】目前禁用：`dev`分支用于快速开发，没必要在推送时触发CI
       - 'test**'
   label: # 创建标签
     types:
