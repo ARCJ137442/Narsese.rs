@@ -1,10 +1,39 @@
 # Narsese.rs
 
-[简体中文](README.md) | **English**
+|[简体中文](README.md) | **English**|
+|:-:|:-:|
 
-🕒 Last updated time: 【2024-08-19 15:44:49】
+🕒 Last updated time: [2024-09-14 10:19:55]
 
-[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-2.0.0-%23FE5196?logo=conventionalcommits&logoColor=white)](https://conventionalcommits.org)
+<!-- 徽章安排参考：https://daily.dev/blog/readme-badges-github-best-practices#organizing-badges-in-your-readme -->
+
+![License](https://img.shields.io/crates/l/narsese?style=for-the-badge&color=ff7043)
+![Code Size](https://img.shields.io/github/languages/code-size/ARCJ137442/Narsese.rs?style=for-the-badge&color=ff7043)
+![Lines of Code](https://www.aschey.tech/tokei/github.com/ARCJ137442/Narsese.rs?style=for-the-badge&color=ff7043)
+[![Language](https://img.shields.io/badge/language-Rust-orange?style=for-the-badge&color=ff7043)](https://www.rust-lang.org)
+
+<!-- Towards Users -->
+
+Cargo Status:
+
+[![crates.io](https://img.shields.io/crates/v/narsese?style=for-the-badge)](https://crates.io/crates/narsese)
+[![docs.rs](https://img.shields.io/docsrs/narust-158?style=for-the-badge)](https://docs.rs/narsese)
+![Recent Downloads](https://img.shields.io/crates/dr/narsese?style=for-the-badge)
+![Downloads](https://img.shields.io/crates/d/narsese?style=for-the-badge)
+![Crate Size](https://img.shields.io/crates/size/narsese?style=for-the-badge)
+
+<!-- Towards Developers -->
+
+Development Status:
+
+[![CI status](https://img.shields.io/github/actions/workflow/status/ARCJ137442/Narsese.rs/ci.yml?style=for-the-badge)](https://github.com/ARCJ137442/Narsese.rs/actions/workflows/ci.yml)
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-2.0.0-%23FE5196?style=for-the-badge)](https://conventionalcommits.org)
+![GitHub commits since latest release](https://img.shields.io/github/commits-since/ARCJ137442/Narsese.rs/latest?style=for-the-badge)
+
+![Created At](https://img.shields.io/github/created-at/ARCJ137442/Narsese.rs?style=for-the-badge)
+![Last Commit](https://img.shields.io/github/last-commit/ARCJ137442/Narsese.rs?style=for-the-badge)
+
+## Introduction
 
 This project uses [Semantic Versioning 2.0.0](https://semver.org/) for version number management.
 
