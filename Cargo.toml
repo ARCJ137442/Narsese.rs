@@ -19,6 +19,7 @@ categories = [
 ] # 🔗<https://crates.io/category_slugs>
 repository = "https://github.com/ARCJ137442/Narsese.rs"
 
+
 [dependencies]
 
 # 用于实现「静态闭包常量」
@@ -35,6 +36,7 @@ version = "0.42" # * ✅现已发布至`crates.io`
 # git = "https://github.com/ARCJ137442/NAR-dev-util"
 # ! 【2024-03-23 19:19:01】似乎Rust-Analyzer无法获取私有仓库数据
 features = ["bundled"]
+
 
 [features]
 # 默认启用所有特性（可选禁用）
@@ -54,3 +56,16 @@ lexical_narsese = [
     # 需要以此引入「静态闭包常量」
     "lazy_static"
 ]
+
+
+# 有关Clippy的参考：
+# * 🔗<https://doc.rust-lang.org/clippy/configuration.html>
+[lints.clippy]
+
+# 📌【2024-08-25 00:31:01】允许文档注释中出现以下情况
+# ```markdown
+# * 📝这是一个笔记
+# ? 💭这是一个问题
+#   * 📍这是问题下的一个小点
+# ```
+doc_lazy_continuation = "allow"

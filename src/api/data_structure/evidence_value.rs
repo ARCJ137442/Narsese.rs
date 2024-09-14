@@ -246,6 +246,7 @@ impl<V: EvidentNumber + Copy> EvidentValue<V> for (V, V) {
 
 /// 单元测试
 #[cfg(test)]
+#[allow(dead_code)] // 允许未使用的代码，首次见于`TruthWithFunctions::fc`
 mod test {
     use super::*;
     use nar_dev_utils::{asserts, for_in_ifs, macro_once, manipulate, pipe};
