@@ -15,10 +15,12 @@
 Cargo Status:
 
 [![crates.io](https://img.shields.io/crates/v/narsese?style=for-the-badge)](https://crates.io/crates/narsese)
-[![docs.rs](https://img.shields.io/docsrs/narust-158?style=for-the-badge)](https://docs.rs/narsese)
+[![docs.rs](https://img.shields.io/docsrs/narsese?style=for-the-badge)](https://docs.rs/narsese)
+![Crate Size](https://img.shields.io/crates/size/narsese?style=for-the-badge)
+
 ![Recent Downloads](https://img.shields.io/crates/dr/narsese?style=for-the-badge)
 ![Downloads](https://img.shields.io/crates/d/narsese?style=for-the-badge)
-![Crate Size](https://img.shields.io/crates/size/narsese?style=for-the-badge)
+![Crates.io Dependents](https://img.shields.io/crates/dependents/narsese?style=for-the-badge)
 
 <!-- Towards Developers -->
 
