@@ -3,7 +3,7 @@
 
 [package]
 name = "narsese"
-version = "0.21.2"
+version = "0.21.3"
 edition = "2021"
 description = """
 Rust support for Narsese
@@ -30,7 +30,7 @@ optional = true
 
 [dependencies.nar_dev_utils]
 # 【2024-03-13 21:17:55】实用库现在独立为`nar_dev_utils`
-version = "0" # * ✅现已发布至`crates.io`
+version = "0.42" # * ✅现已发布至`crates.io`
 # path = "../NAR-dev-util"
 # git = "https://github.com/ARCJ137442/NAR-dev-util"
 # ! 【2024-03-23 19:19:01】似乎Rust-Analyzer无法获取私有仓库数据

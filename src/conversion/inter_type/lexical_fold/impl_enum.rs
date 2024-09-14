@@ -259,14 +259,14 @@ fn fold_atom(
 
 /// 工具函数/尝试折叠一个「数值数组」到「浮点数组」
 /// * 📌验证「0-1范围」在构建时进行
-fn try_fold_float_vec(values: &[impl AsStrRef]) -> FoldResult<Vec<FloatPrecision>> {
+fn try_fold_float_vec(values: &[impl AsRef<str>]) -> FoldResult<Vec<FloatPrecision>> {
     // 逐个解析
     let mut result = vec![];
     for v_str in values {
         // 尝试解析
         result.push(
             v_str
-                .as_str_ref()
+                .as_ref()
                 .parse::<FloatPrecision>()
                 .transform_err(FoldError::from)?,
         );
